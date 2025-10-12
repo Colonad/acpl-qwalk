@@ -1,0 +1,36 @@
+name: acpl-qwalk
+channels:
+  - pytorch
+  - nvidia      # comment out for CPU-only
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip>=23
+  - numpy
+  - scipy
+  - networkx
+  - pyyaml
+  - hydra-core
+  - omegaconf
+  - tqdm
+  - tensorboard
+  - pip:
+      # ---- Choose exactly one of the two torch installs below ----
+      # GPU (CUDA 12.x):
+      # - torch==2.4.*+cu121 -f https://download.pytorch.org/whl/torch_stable.html
+      # CPU-only:
+      - torch==2.4.*
+
+      # torch-geometric meta-package; will pull matching ops wheels
+      - torch-geometric==2.5.*
+
+      # Dev/test
+      - pytest
+      - pytest-cov
+      - mypy
+      - pyright
+      - black
+      - ruff
+      - isort
+      - pre-commit
+      - wandb

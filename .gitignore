@@ -1,0 +1,44 @@
+# python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.build/
+dist/
+build/
+
+# venvs
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# data / cache / logs
+*.log
+logs/
+checkpoints/
+wandb/
+tensorboard/
+.cache/
+.cache_dir/
+
+# pytest / coverage
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# misc
+.env

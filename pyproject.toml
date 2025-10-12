@@ -1,0 +1,95 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acpl-qwalk"
+version = "0.1.0"
+description = "GNN-based Adaptive Coin Policy for Discrete-Time Quantum Walks"
+readme = "docs/README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Angel Colon" }]
+dependencies = [
+  # Core numerics
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "networkx>=3.2",
+
+  # Torch stack (choose CUDA/CPU wheel outside if you prefer)
+  "torch>=2.3",
+  # torch-geometric (ops wheels auto-resolve on pip; if not, install ops separately)
+  "torch-geometric>=2.5",
+
+  # Config & I/O
+  "pyyaml>=6.0.1",
+  "hydra-core>=1.3",
+  "omegaconf>=2.3",
+
+  # Logging & CLI
+  "tqdm>=4.66",
+  "tensorboard>=2.14",
+  "wandb>=0.17",
+
+  # Dev / tests
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
+  "mypy>=1.7",
+  "types-PyYAML>=6.0.12.12",
+  "typing-extensions>=4.8",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black>=24.3",
+  "ruff>=0.5.0",
+  "isort>=5.13",
+  "pre-commit>=3.7",
+  "pyright>=1.1.380",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["acpl*"]
+
+###############################################
+# Code style / lint / type-check configuration
+###############################################
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+skip-string-normalization = true
+
+[tool.isort]
+profile = "black"
+line_length = 100
+force_sort_within_sections = true
+combine_as_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["docs/"]
+
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "ANN"]
+ignore = ["ANN101", "ANN102"]
+
+
+[tool.ruff.format]
+quote-style = "preserve"
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+reportMissingTypeStubs = false
+reportPrivateImportUsage = false
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-q"
+testpaths = ["tests"]
