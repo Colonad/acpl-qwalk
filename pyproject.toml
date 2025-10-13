@@ -72,14 +72,17 @@ line-length = 100
 target-version = "py311"
 exclude = ["docs/"]
 
+[tool.ruff.format]
+quote-style = "preserve"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N", "ANN"]
-ignore = ["ANN101", "ANN102"]
+ignore = []
 
-
-[tool.ruff.format]
-quote-style = "preserve"
+# 👇 This is the bit that was missing: it must be a table
+[tool.ruff.lint.per-file-ignores]
+# In tests, allow long lines, non-lowercase vars, and skip annotation rules
+"tests/*" = ["E501", "N806", "ANN"]
 
 [tool.pyright]
 pythonVersion = "3.11"
