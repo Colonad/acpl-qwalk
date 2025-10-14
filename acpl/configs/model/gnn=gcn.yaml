@@ -1,0 +1,7 @@
+# acpl/configs/model/gnn=gcn.yaml
+# Two-layer GCN with hidden width H=64 (L=2 is implicit in the architecture)
+
+kind: gcn
+hidden: 64         # H
+layers: 2          # L (TwoLayerGCN is fixed to 2 internally; keep for clarity)
+dropout: 0.0
