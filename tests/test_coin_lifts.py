@@ -1,4 +1,6 @@
 # tests/test_coin_lifts.py
+from __future__ import annotations
+
 import math
 
 import pytest
@@ -89,3 +91,24 @@ def test_invalid_theta_raises():
     bad = torch.zeros(4, 2)  # wrong last dim
     with pytest.raises(ValueError):
         _ = coins_su2_from_theta(bad)
+
+
+def test_su2_determinant_one_random_angles():
+    torch.manual_seed(7)
+    alpha = torch.randn(10)
+    beta = torch.randn(10)
+    gamma = torch.randn(10)
+    c = su2_from_euler(alpha, beta, gamma)  # (10, 2, 2)
+    # det should be ~ 1 for each block
+    dets = c[:, 0, 0] * c[:, 1, 1] - c[:, 0, 1] * c[:, 1, 0]
+    ones = torch.ones_like(dets)
+    assert torch.allclose(dets, ones, atol=1e-6, rtol=0)
+
+
+def test_unitarity_random_batch_large():
+    torch.manual_seed(11)
+    alpha = torch.randn(32)
+    beta = torch.randn(32)
+    gamma = torch.randn(32)
+    c = su2_from_euler(alpha, beta, gamma)  # (32, 2, 2)
+    assert is_unitary(c)
