@@ -1,0 +1,116 @@
+# acpl/configs/train.yaml
+# Single-run config for Phase A
+# - Graph: line, N=64
+# - Steps: T=64
+# - Task: transfer (target a single vertex)
+# - Model: GCN (2-layer) + GRU controller + linear head -> SU(2) coin
+# - Optim: Adam
+
+# -------------------------
+# Repro & runtime
+# -------------------------
+seed: 42
+device: auto           # "auto" | "cpu" | "cuda"
+dtype: float32         # torch dtype for real tensors
+
+# -------------------------
+# Graph / data
+# -------------------------
+data:
+  graph: line          # graph family
+  num_nodes: 64        # N
+  # Node features: degree + normalized coordinate (from data.features.node_features_line)
+  features: degree_coord
+  # Optional positional encodings (kept simple for Phase A)
+  pos_enc: none        # none | coords | time_scalar
+
+# -------------------------
+# Simulation
+# -------------------------
+sim:
+  steps: 64            # T
+  # initial state options (Phase A typically one-hot on an arc or uniform by node)
+  init_state: node0_uniform_ports   # node0_uniform_ports | custom
+  # If custom, your script can override at runtime.
+
+# -------------------------
+# Task / objective
+# -------------------------
+task:
+  name: transfer
+  # Target vertex index j*: default last node (N-1)
+  target_index: 63
+  reduction: mean      # mean | sum | none
+  # Safety: renormalize P before computing the loss
+  renorm: true
+  # Optionally assert prob validity (off for speed; renorm already on)
+  check_prob: false
+
+# -------------------------
+# Model (policy)
+# -------------------------
+model:
+  # Input dim is inferred from data.features (here: 2 dims).
+  gnn:
+    kind: gcn
+    hidden: 64
+    dropout: 0.0
+  controller:
+    kind: gru
+    hidden: 64          # if null, defaults to gnn.hidden
+    layers: 1
+    dropout: 0.0
+    bidirectional: false
+  head:
+    angle_range: tanh_pi   # "unbounded" | "tanh_pi"
+    dropout: 0.0
+  # Optional tiny time embedding added to GCN output
+  use_time_embed: true
+
+# -------------------------
+# Coin / lift
+# -------------------------
+coin:
+  family: su2           # su2 | exp | cayley (Phase A uses su2)
+
+# -------------------------
+# Optimization
+# -------------------------
+optim:
+  name: adam
+  lr: 3.0e-3
+  weight_decay: 0.0
+  betas: [0.9, 0.999]
+  grad_clip: 1.0        # L2 max-norm; set 0 or null to disable
+  # Scheduler (optional)
+  scheduler:
+    name: none          # none | cosine | step
+    # If you enable:
+    cosine:
+      t_max: 1000
+      eta_min: 1.0e-5
+    step:
+      step_size: 200
+      gamma: 0.5
+
+# -------------------------
+# Training loop
+# -------------------------
+train:
+  epochs: 1
+  batch_size: 1         # Phase A: single-episode batches
+  record_traj: false    # enable for diagnostics/plots
+
+# -------------------------
+# Logging (stubs)
+# -------------------------
+log:
+  backend: console      # console | tensorboard | wandb
+  interval: 1           # batches
+  tensorboard:
+    log_dir: runs/acpl-qwalk
+  wandb:
+    enabled: false
+    project: acpl-qwalk
+    entity: null
+    run_name: A6_line64_T64_gcn_gru_su2
