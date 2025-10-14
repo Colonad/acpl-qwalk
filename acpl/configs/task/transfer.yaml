@@ -1,0 +1,12 @@
+# acpl/configs/task/transfer.yaml
+name: transfer
+
+# Episode endpoints
+source_index: 0
+# Uses OmegaConf eval to set target = data.num_nodes - 1
+target_index: ${oc.eval:"${data.num_nodes} - 1"}
+
+# Loss settings
+reduction: mean      # mean | sum | none
+renorm: true         # clamp & renormalize P before loss (numerical stability)
+check_prob: false    # keep off if renorm is true for speed
