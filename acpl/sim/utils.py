@@ -105,70 +105,47 @@ def normalize_state(psi: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
 # -----------------------------------------------------------------------------
 
 
-def partial_trace_position(
-    psi: torch.Tensor,
-    pm: PortMap,
-    *,
-    device: torch.device | None = None,
-) -> torch.Tensor:
+def partial_trace_position(psi: torch.Tensor, pm: PortMap) -> torch.Tensor:
     """
-    Compute position distribution P(v) by tracing out the coin/port.
-
-    In arc basis where each vertex v has a contiguous block of outgoing arcs
-    (as given by pm.node_arcs[ pm.node_ptr[v]:pm.node_ptr[v+1] ]), the position
-    probability is the squared magnitude summed over that block.
-
-    Parameters
-    ----------
-    psi : torch.Tensor
-        Arc-indexed state of shape (A,) or (A, B). Complex dtype recommended.
-        If (A, B), columns are treated as independent states (minibatch).
-    pm : PortMap
-        Port map with CSR fields `node_ptr` and `node_arcs`.
-    device : optional
-        Device to place intermediate tensors. Defaults to psi.device.
-
-    Returns
-    -------
-    torch.Tensor
-        If psi is (A,), returns (V,).
-        If psi is (A, B), returns (V, B).
-        Each column sums to ~1 if psi is normalized.
+    Sum magnitudes over ports (arcs) per vertex to obtain position probabilities P.
+    psi: (A,) or (A,B) complex (or real) wavefunction.
+    Returns:
+        (V,) for 1-D input, or (V,B) for 2-D input.
     """
-    dev = device or psi.device
+    dev = psi.device
     pt = portmap_tensors(pm, device=dev)
     num_arcs = pm.num_arcs
+    num_nodes = pm.num_nodes
 
     if psi.ndim == 1:
         if psi.numel() != num_arcs:
             raise ValueError(f"psi shape mismatch: expected (A,), got {tuple(psi.shape)}")
-        # Gather psi in node-lumped order
+        # Group arcs by tail vertex
         psi_lumped = psi.index_select(0, pt.node_arcs)  # (A,)
-        magsq = (psi_lumped.conj() * psi_lumped).real
-        # Sum segments per vertex using prefix sums
-        starts = pt.node_ptr[:-1]
-        ends = pt.node_ptr[1:]
-        # Vectorized segment sums via cumulative sum
-        csum = torch.cat(
-            [torch.zeros(1, device=dev, dtype=magsq.dtype), magsq.cumsum(0)],
-            dim=0,
-        )
-        p = csum[ends] - csum[starts]
+        magsq = (psi_lumped.conj() * psi_lumped).real  # (A,)
+
+        # Build per-arc vertex ids: repeat each vertex id by its degree
+        deg = pt.node_ptr[1:] - pt.node_ptr[:-1]  # (V,)
+        arc_vid = torch.arange(num_nodes, device=dev).repeat_interleave(deg)  # (A,)
+
+        p = torch.zeros(num_nodes, device=dev, dtype=magsq.dtype)  # (V,)
+        p.index_add_(0, arc_vid, magsq)
         return p
 
     if psi.ndim == 2:
-        if psi.size(0) != num_arcs:
-            raise ValueError(f"psi shape mismatch: expected (A, B), got {tuple(psi.shape)}")
-        batch = psi.size(1)
-        psi_lumped = psi.index_select(0, pt.node_arcs)  # (A, B)
-        magsq = (psi_lumped.conj() * psi_lumped).real
-        csum = torch.cat(
-            [torch.zeros(1, batch, device=dev, dtype=magsq.dtype), magsq.cumsum(0)],
-            dim=0,
-        )  # (A+1, B)
-        starts = pt.node_ptr[:-1].unsqueeze(1)  # (V,1)
-        ends = pt.node_ptr[1:].unsqueeze(1)  # (V,1)
-        p = csum.gather(0, ends) - csum.gather(0, starts)  # (V, B)
-        return p.squeeze(1) if p.shape[1] == 1 else p
+        a0, b = psi.shape
+        if a0 != num_arcs:
+            raise ValueError(f"psi shape mismatch: expected (A,B), got {tuple(psi.shape)}")
+        psi_lumped = psi.index_select(0, pt.node_arcs)  # (A,B)
+        magsq = (psi_lumped.conj() * psi_lumped).real  # (A,B)
 
-    raise ValueError(f"psi must be 1-D or 2-D (got ndim={psi.ndim})")
+        # Per-arc vertex ids (A,)
+        deg = pt.node_ptr[1:] - pt.node_ptr[:-1]  # (V,)
+        arc_vid = torch.arange(num_nodes, device=dev).repeat_interleave(deg)  # (A,)
+
+        # Accumulate along dim 0 into (V,B)
+        p = torch.zeros(num_nodes, b, device=dev, dtype=magsq.dtype)
+        p.index_add_(0, arc_vid, magsq)
+        return p
+
+    raise ValueError(f"psi must be 1-D or 2-D (got ndim={psi.ndim}).")
