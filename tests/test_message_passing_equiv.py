@@ -20,7 +20,7 @@ def _permute_edge_index(edge_index: np.ndarray, perm: np.ndarray) -> np.ndarray:
     Since perm maps new_idx -> old_idx, we need inv to map old_idx -> new_idx
     when rewriting edge endpoints.
     """
-    inv = _inverse_perm(perm)  # old -> new
+    inv = _inverse_perm(perm)
     ei = edge_index.copy()
     ei[0, :] = inv[ei[0, :]]
     ei[1, :] = inv[ei[1, :]]
