@@ -1,0 +1,6 @@
+# acpl/configs/model/controller=gru.yaml
+kind: gru
+hidden: 64       # hidden size (H)
+layers: 1        # number of stacked GRU layers
+dropout: 0.0     # only active if layers > 1
+bidirectional: false
