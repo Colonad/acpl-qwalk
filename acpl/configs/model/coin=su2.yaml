@@ -1,0 +1,8 @@
+# acpl/configs/model/coin=su2.yaml
+family: su2
+parameterization: euler   # Euler angles (alpha, beta, gamma)
+init:
+  strategy: zeros         # start near identity; options: zeros | small_random
+  std: 0.0                # if small_random, set e.g. 0.05
+constraints:
+  angle_range: tanh_pi    # match head output: "unbounded" | "tanh_pi"
