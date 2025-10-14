@@ -1,0 +1,4 @@
+# acpl/configs/data/graphs.yaml
+family: line       # graph family
+num_nodes: 64      # N (override from train.yaml if needed)
+seed: 42           # dataset/graph RNG seed
