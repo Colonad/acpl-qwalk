@@ -1,0 +1,8 @@
+# acpl/configs/optim.yaml
+name: adam
+lr: 3.0e-3
+weight_decay: 0.0
+betas: [0.9, 0.999]
+eps: 1.0e-8
+# Optional gradient clipping (set null or 0.0 to disable)
+grad_clip: 1.0
