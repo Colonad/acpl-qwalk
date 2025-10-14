@@ -133,3 +133,76 @@ def test_is_permutation_matrix_numpy_dense_true_and_false():
     Q = P.copy()
     Q[0, 0] = 1
     assert not is_permutation_matrix_numpy(Q)
+
+
+def _line_edge_index(n: int) -> np.ndarray:
+    """Undirected line graph: 0-1-2-...-(n-1), returned as (2, E) numpy array."""
+    edges = [(i, i + 1) for i in range(n - 1)]
+    uu = np.array([u for (u, v) in edges], dtype=np.int64)
+    vv = np.array([v for (u, v) in edges], dtype=np.int64)
+    return np.stack([uu, vv], axis=0)  # (2, E)
+
+
+def test_shift_torch_is_permutation_and_unitary():
+    ei = _line_edge_index(6)  # small, heterogeneous degrees at interior vs ends
+    pm = make_flipflop_portmap(ei)
+    s = build_shift_torch(pm)  # sparse COO (A x A), values in {0,1}
+
+    # Basic shape check
+    a = pm.num_arcs
+    assert s.shape == (a, a)
+    assert s.is_coalesced()
+
+    # Convert to dense (tiny sizes in tests) and check permutation properties
+    dense = s.to_dense()
+    assert dense.dtype.is_floating_point
+    # Binary 0/1 entries
+    assert torch.all((dense == 0) | (dense == 1))
+    # One-hot rows and columns
+    row_sums = dense.sum(dim=1)
+    col_sums = dense.sum(dim=0)
+    assert torch.allclose(row_sums, torch.ones_like(row_sums))
+    assert torch.allclose(col_sums, torch.ones_like(col_sums))
+    # Unitarity for permutation: S^T S = I
+    prod = dense.T @ dense
+    eye_mat = torch.eye(a, dtype=dense.dtype, device=dense.device)
+    assert torch.allclose(prod, eye_mat)
+
+
+@pytest.mark.skipif(sp is None, reason="SciPy not available")
+def test_shift_scipy_is_permutation_and_unitary():
+    ei = _line_edge_index(7)  # different size than previous test
+    pm = make_flipflop_portmap(ei)
+    s = build_shift_scipy(pm)  # scipy.sparse.coo_matrix
+
+    # Basic shape
+    a = pm.num_arcs
+    assert s.shape == (a, a)
+
+    # Binary values
+    assert np.all((s.data == 0) | (s.data == 1))
+
+    # Row/col sums should be 1
+    row_sums = np.asarray(s.sum(axis=1)).ravel()
+    col_sums = np.asarray(s.sum(axis=0)).ravel()
+    assert np.allclose(row_sums, np.ones_like(row_sums))
+    assert np.allclose(col_sums, np.ones_like(col_sums))
+
+    # Unitarity (for permutation): S^T S = I (in sparse)
+    prod = (s.T @ s).tocoo()
+    # Compare structurally to identity: each diagonal 1, no off-diagonals
+    assert prod.shape == (a, a)
+    # Build an identity to compare
+    from scipy.sparse import eye as sp_eye  # local import to keep test fast if scipy present
+
+    eye_sparse = sp_eye(a, format="coo", dtype=s.dtype)
+    # Same coordinates and data (allow reordering by sorting indices)
+    prod_tuples = sorted(
+        zip(prod.row.tolist(), prod.col.tolist(), prod.data.tolist(), strict=False)
+    )
+    eye_tuples = sorted(
+        zip(
+            eye_sparse.row.tolist(), eye_sparse.col.tolist(), eye_sparse.data.tolist(), strict=False
+        )
+    )
+    assert prod_tuples == eye_tuples
