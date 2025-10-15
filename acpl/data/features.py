@@ -6,7 +6,9 @@ import numpy as np
 __all__ = [
     "node_features_line",
     "laplacian_pe",
+    "laplacian_positional_encodings",  # already defined later; export it too
     "degree_role_onehot",
+    "role_encodings_onehot",  # <— add this
     "hypercube_bitstrings",
     "safe_concat",
 ]
@@ -216,6 +218,10 @@ def degree_role_onehot(
     return out
 
 
+# Backwards-compat alias expected by EpisodeGenerator
+role_encodings_onehot = degree_role_onehot
+
+
 # ---------------------------------------------------------------------
 # Bitstrings for hypercubes (2^dim nodes, lexicographic order)
 # ---------------------------------------------------------------------
@@ -292,3 +298,81 @@ def safe_concat(
         return np.zeros((n, 0), dtype=dtype)
 
     return np.concatenate(blocks, axis=axis)
+
+
+def laplacian_positional_encodings(
+    edge_index: np.ndarray,
+    num_nodes: int,
+    k: int,
+    *,
+    normalized: bool = True,
+    dtype: np.dtype = np.float32,
+) -> np.ndarray:
+    """
+    Compute Laplacian positional encodings (topologically-aware features).
+
+    Returns a matrix of shape (num_nodes, k) with the k smallest *nontrivial*
+    eigenvectors of the (normalized or unnormalized) Laplacian. Each eigenvector
+    has a deterministic sign: we flip it so that its entry with largest magnitude
+    is nonnegative.
+
+    Parameters
+    ----------
+    edge_index : (2, E) int64
+        Undirected edge list with u < v (duplicates ignored).
+    num_nodes : int
+        Number of nodes.
+    k : int
+        Number of nontrivial eigenvectors to return (clamped to available).
+    normalized : bool
+        If True, use L_sym = I - D^{-1/2} A D^{-1/2}, else L = D - A.
+    dtype : np.dtype
+        Output dtype (default float32).
+    """
+    if num_nodes <= 0:
+        raise ValueError("num_nodes must be >= 1")
+    if k <= 0:
+        return np.zeros((num_nodes, 0), dtype=dtype)
+
+    # ----- Build symmetric adjacency A (n x n) -----
+    n = int(num_nodes)
+    a = np.zeros((n, n), dtype=np.float64)
+    if edge_index.size > 0:
+        if edge_index.shape != (2, edge_index.shape[1]):
+            raise ValueError("edge_index must have shape (2, E)")
+        u = edge_index[0].astype(np.int64, copy=False)
+        v = edge_index[1].astype(np.int64, copy=False)
+        a[u, v] = 1.0
+        a[v, u] = 1.0
+
+    d = a.sum(axis=1)
+    if normalized:
+        inv_sqrt = np.where(d > 0.0, 1.0 / np.sqrt(d), 0.0)
+        d_inv = np.diag(inv_sqrt)
+        lap = np.eye(n, dtype=np.float64) - d_inv @ a @ d_inv
+    else:
+        lap = np.diag(d) - a
+
+    # ----- Eigen-decomposition (symmetric) -----
+    # eigh returns eigenvalues in ascending order for symmetric matrices
+    w, v = np.linalg.eigh(lap)  # v columns = eigenvectors
+
+    # Skip the trivial eigenvector(s) with eigenvalue ~0; use a small threshold
+    tol = 1e-12
+    nontrivial_idx = np.where(w > tol)[0]
+    if nontrivial_idx.size == 0:
+        # Graph is totally disconnected (or n=1); return zeros
+        return np.zeros((n, min(k, max(0, n - 1))), dtype=dtype)
+
+    # Take the first k nontrivial eigenvectors
+    take = min(k, nontrivial_idx.size)
+    vecs = v[:, nontrivial_idx[:take]]  # (n, take)
+
+    # Deterministic sign: flip each vector so its largest-magnitude entry is >= 0
+    for j in range(vecs.shape[1]):
+        col = vecs[:, j]
+        idx = int(np.argmax(np.abs(col)))
+        if col[idx] < 0:
+            vecs[:, j] = -col
+
+    return vecs.astype(dtype, copy=False)
