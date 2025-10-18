@@ -1,112 +1,181 @@
 # acpl/policy/head.py
 from __future__ import annotations
 
+from dataclasses import dataclass
 import math
 
 import torch
-from torch import nn
+import torch.nn as nn
+import torch.nn.utils as nn_utils
+
+__all__ = ["CoinHeadSU2", "CoinHeadConfig", "wrap_to_pi"]
 
 
-class CoinEulerHead(nn.Module):
+def wrap_to_pi(x: torch.Tensor) -> torch.Tensor:
     """
-    Linear head mapping hidden states -> Euler angles (alpha, beta, gamma).
+    Wrap angles to (-pi, pi]. Uses modulo; not gradient-friendly by itself.
+    We apply a straight-through estimator (STE) around this in the head.
+    """
+    return ((x + math.pi) % (2 * math.pi)) - math.pi
 
-    Accepts either a single snapshot (N, H) or a time sequence in either layout:
-        - time-first:  (T, N, H)  with time_first=True  (default)
-        - batch-first: (N, T, H)  with time_first=False
 
-    Output shape mirrors the input leading dims and appends 3 for angles:
-        (N, 3) or (T, N, 3) / (N, T, 3)
+def _activation(name: str) -> nn.Module:
+    n = name.lower()
+    if n == "relu":
+        return nn.ReLU()
+    if n == "gelu":
+        return nn.GELU()
+    if n == "tanh":
+        return nn.Tanh()
+    if n == "silu" or n == "swish":
+        return nn.SiLU()
+    raise ValueError(f"Unknown activation: {name}")
 
-    Parameters
-    ----------
-    hidden_dim : int
-        Size H of the hidden state per node.
-    angle_range : {"unbounded", "tanh_pi"}
-        If "tanh_pi", the head outputs π * tanh(raw) to bound angles to [-π, π].
-        If "unbounded", angles are left unconstrained (ℝ).
-    dropout : float
-        Optional dropout applied on the hidden states before the linear layer.
-    bias : bool
-        Whether to include bias in the linear projection.
+
+@dataclass
+class CoinHeadConfig:
+    # Input dim (per node/time)
+    in_dim: int
+
+    # MLP head
+    hidden_dim: int | None = None  # if None or 0 -> linear head
+    num_layers: int = 1  # used only if hidden_dim is set
+    activation: str = "gelu"
+    dropout: float = 0.0
+    layernorm: bool = True  # LayerNorm on the 3-angle output
+
+    # Output scaling & stabilization
+    out_scale: float = 1.0  # multiply logits before wrap
+    weightnorm: bool = False  # apply weight norm on final projection
+    init_small: bool = False  # smaller output init for stable early steps
+
+    # Angle coupling (mix [α,β,γ] via learnable lower-triangular)
+    angle_coupling: bool = False
+
+    # Temperature (per-angle or scalar). If learnable, initialized to 1.0.
+    learnable_temp: bool = False
+    fixed_temp: float = 1.0
+
+    # Exploration noise (applied to pre-wrap outputs during training)
+    noise_std: float = 0.0  # e.g., 0.01 for mild exploration
+
+
+class _LowerTriangularMixer(nn.Module):
+    """
+    Learnable lower-triangular 3x3 mixer with ones on diagonal at init.
+    y = L @ x, L lower-triangular.
     """
 
-    def __init__(
-        self,
-        hidden_dim: int,
-        *,
-        angle_range: str = "unbounded",
-        dropout: float = 0.0,
-        bias: bool = True,
-    ) -> None:
+    def __init__(self):
         super().__init__()
-        if angle_range not in {"unbounded", "tanh_pi"}:
-            raise ValueError('angle_range must be "unbounded" or "tanh_pi"')
-        self.hidden_dim = hidden_dim
-        self.angle_range = angle_range
-        self.drop = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
-        self.proj = nn.Linear(hidden_dim, 3, bias=bias)
-        self._reset_parameters()
+        # Parametrize full matrix, mask as lower-triangular in forward.
+        L = torch.eye(3, dtype=torch.float32)
+        self.param = nn.Parameter(L)  # we'll mask on-the-fly
 
-    def _reset_parameters(self) -> None:
-        # Small init to keep early angles near zero; stable for SU(2) mapping.
-        nn.init.xavier_uniform_(self.proj.weight, gain=0.5)
-        if self.proj.bias is not None:
-            nn.init.zeros_(self.proj.bias)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (..., 3)
+        L = torch.tril(self.param)
+        return x @ L.T
 
-    def _activate(self, raw: torch.Tensor) -> torch.Tensor:
-        if self.angle_range == "tanh_pi":
-            return math.pi * torch.tanh(raw)
-        return raw
 
-    def forward(
-        self,
-        h: torch.Tensor,
-        *,
-        time_first: bool = True,
-    ) -> torch.Tensor:
+class CoinHeadSU2(nn.Module):
+    """
+    Map per-(node,time) features to **Euler angles** (α, β, γ) for SU(2).
+
+    Default behavior (backward-compatible with your tests):
+      - single linear layer to 3 angles
+      - optional LayerNorm over angle triplet
+      - scale by `out_scale`
+      - **STE-wrapped** to (-π, π]
+
+    Optional upgrades (disabled by default):
+      - deeper MLP with `hidden_dim` and `num_layers`
+      - weight norm on the final linear layer
+      - learnable temperature (per-angle) or fixed scalar temperature
+      - angle coupling via learnable lower-triangular mixer
+      - training-time Gaussian noise on pre-wrap logits
+    """
+
+    def __init__(self, cfg: CoinHeadConfig):
+        super().__init__()
+        self.cfg = cfg
+
+        layers: list[nn.Module] = []
+        in_dim = cfg.in_dim
+
+        if cfg.hidden_dim and cfg.hidden_dim > 0 and cfg.num_layers > 0:
+            for li in range(cfg.num_layers):
+                layers.append(nn.Linear(in_dim, cfg.hidden_dim, bias=True))
+                layers.append(_activation(cfg.activation))
+                if cfg.dropout and cfg.dropout > 0:
+                    layers.append(nn.Dropout(cfg.dropout))
+                in_dim = cfg.hidden_dim
+            self.mlp = nn.Sequential(*layers)
+            out_in = cfg.hidden_dim
+        else:
+            self.mlp = nn.Identity()
+            out_in = cfg.in_dim
+
+        # Final linear to 3 angles
+        out = nn.Linear(out_in, 3, bias=True)
+        if cfg.weightnorm:
+            out = nn_utils.weight_norm(out)
+        self.out = out
+
+        # Output normalization over the 3 angles (pre-wrap)
+        self.out_norm = nn.LayerNorm(3) if cfg.layernorm else nn.Identity()
+
+        # Optional angle coupling
+        self.mixer = _LowerTriangularMixer() if cfg.angle_coupling else nn.Identity()
+
+        # Temperature
+        if cfg.learnable_temp:
+            self.temp = nn.Parameter(torch.ones(3, dtype=torch.float32))
+        else:
+            self.register_buffer(
+                "temp", torch.tensor(float(cfg.fixed_temp), dtype=torch.float32), persistent=False
+            )
+
+        # Inits
+        if isinstance(self.out, nn.Linear):
+            if cfg.init_small:
+                nn.init.xavier_uniform_(self.out.weight, gain=0.5)
+            else:
+                nn.init.xavier_uniform_(self.out.weight)
+            nn.init.zeros_(self.out.bias)
+        else:
+            # If weight_norm wraps it, .weight is a Parameter on the wrapper.
+            # Use default init; it's fine in practice.
+            pass
+
+    def forward(self, h: torch.Tensor) -> torch.Tensor:
         """
-        Map hidden states to Euler angles.
-
-        Parameters
-        ----------
-        h : torch.Tensor
-            Hidden states with shape:
-              - (N, H)               single snapshot
-              - (T, N, H)            time-first when time_first=True  (default)
-              - (N, T, H)            batch-first when time_first=False
-        time_first : bool
-            When h is 3-D, indicates whether layout is (T, N, H) (True) or (N, T, H) (False).
-
-        Returns
-        -------
-        torch.Tensor
-            Angles with shape:
-              - (N, 3) or (T, N, 3) / (N, T, 3) corresponding to input layout.
+        h: (..., N, F)
+        returns theta: (..., N, 3) in (-π, π] (wrapped with STE)
         """
-        if h.ndim == 2:
-            n, f = h.shape
-            if f != self.hidden_dim:
-                raise ValueError(f"hidden dim mismatch: got {f}, expected {self.hidden_dim}")
-            out = self.drop(h)
-            raw = self.proj(out)  # (N, 3)
-            return self._activate(raw)
+        x = self.mlp(h)  # (..., N, H)
+        theta = self.out(x)  # (..., N, 3)
 
-        if h.ndim != 3:
-            raise ValueError("h must be 2-D (N,H) or 3-D ((T,N,H)/(N,T,H))")
+        # Temperature (supports scalar or per-angle)
+        if isinstance(self.temp, torch.Tensor) and self.temp.ndim == 0:
+            theta = theta * (float(self.cfg.out_scale) * float(self.temp.item()))
+        else:
+            # Per-angle temperature broadcast
+            theta = theta * float(self.cfg.out_scale)
+            theta = theta * self.temp.view(*([1] * (theta.ndim - 1)), 3)
 
-        if time_first:
-            t, n, f = h.shape
-            if f != self.hidden_dim:
-                raise ValueError(f"hidden dim mismatch: got {f}, expected {self.hidden_dim}")
-            flat = self.drop(h).reshape(t * n, f)
-            raw = self.proj(flat).reshape(t, n, 3)
-            return self._activate(raw)
+        theta = self.out_norm(theta)  # stabilize channels
 
-        # batch-first (N, T, H)
-        n, t, f = h.shape
-        if f != self.hidden_dim:
-            raise ValueError(f"hidden dim mismatch: got {f}, expected {self.hidden_dim}")
-        flat = self.drop(h).reshape(n * t, f)
-        raw = self.proj(flat).reshape(n, t, 3)
-        return self._activate(raw)
+        # Optional angle coupling (learnable lower-triangular mixing)
+        theta = self.mixer(theta)  # (..., N, 3)
+
+        # Exploration noise (train only), applied pre-wrap
+        if self.training and self.cfg.noise_std and self.cfg.noise_std > 0.0:
+            noise = torch.randn_like(theta) * float(self.cfg.noise_std)
+            theta = theta + noise
+
+        # --- Differentiable wrapping via straight-through estimator (STE) ---
+        wrapped = wrap_to_pi(theta)
+        theta = theta + (wrapped - theta).detach()
+
+        return theta

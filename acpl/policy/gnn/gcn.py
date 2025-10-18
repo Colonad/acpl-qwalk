@@ -1,123 +1,208 @@
 # acpl/policy/gnn/gcn.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import torch
-from torch import nn
+import torch.nn as nn
+
+# ----------------------------- helpers (runtime-only) ----------------------------- #
 
 
-def _make_undirected_with_self_loops(
+def _activation(name: str) -> nn.Module:
+    n = name.lower()
+    if n == "relu":
+        return nn.ReLU()
+    if n == "prelu":
+        return nn.PReLU()
+    if n == "gelu":
+        return nn.GELU()
+    if n == "tanh":
+        return nn.Tanh()
+    raise ValueError(f"Unknown activation '{name}'")
+
+
+def _add_self_loops(
     edge_index: torch.Tensor,
+    edge_weight: torch.Tensor | None,
     num_nodes: int,
-    device: torch.device,
-) -> torch.Tensor:
+    self_loop_weight: float = 1.0,
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Return an undirected, self-loop-augmented, coalesced edge_index (2, E').
-    Assumes input edge_index has shape (2, E).
+    Return (edge_index_with_loops, edge_weight_with_loops).
     """
-    ei = edge_index.to(device=device, dtype=torch.long)
-    src, dst = ei[0], ei[1]
+    device = edge_index.device
+    dtype_ei = edge_index.dtype
+    diag = torch.arange(num_nodes, device=device, dtype=dtype_ei)
+    self_edges = torch.stack([diag, diag], dim=0)  # (2, N)
 
-    # Add reverse edges to ensure undirected
-    rev = torch.stack([dst, src], dim=0)
+    if edge_weight is None:
+        ew = torch.ones(edge_index.shape[1], device=device, dtype=torch.float32)
+    else:
+        ew = edge_weight.to(torch.float32)
 
-    # Add self loops
-    loops = torch.arange(num_nodes, device=device, dtype=torch.long)
-    loops = torch.stack([loops, loops], dim=0)
-
-    full = torch.cat([ei, rev, loops], dim=1)
-
-    # Coalesce (unique by pairs), keeping lexicographic order (dst-major is fine)
-    keys = full[0] * num_nodes + full[1]  # (2,E) -> linearized keys
-    uniq = torch.unique(keys, sorted=True)
-    # Rebuild from uniq keys
-    undirected = torch.stack([uniq // num_nodes, uniq % num_nodes], dim=0)
-    return undirected
+    self_w = torch.full((num_nodes,), float(self_loop_weight), device=device, dtype=ew.dtype)
+    ei = torch.cat([edge_index, self_edges], dim=1)
+    ew = torch.cat([ew, self_w], dim=0)
+    return ei, ew
 
 
-def _normalized_weights(edge_index: torch.Tensor, num_nodes: int) -> torch.Tensor:
+def _normalize_renorm(
+    edge_index: torch.Tensor,
+    edge_weight: torch.Tensor | None,
+    num_nodes: int,
+    eps: float = 1e-12,
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Compute symmetric GCN normalization weights:
-        w_e = 1 / sqrt(deg[src] * deg[dst])
-    where degrees are computed on the given edge_index (which should include self loops).
+    Normalized weights for Â = D^{-1/2}(A+I)D^{-1/2}.
     """
-    src, dst = edge_index[0], edge_index[1]
-    deg = torch.bincount(dst, minlength=num_nodes).clamp(min=1)
-    inv_sqrt = deg.to(torch.float32).pow(-0.5)
-    return inv_sqrt[src] * inv_sqrt[dst]
+    ei, ew = _add_self_loops(edge_index, edge_weight, num_nodes, self_loop_weight=1.0)
+    row = ei[0]
+    col = ei[1]
+
+    deg = torch.bincount(row, weights=ew, minlength=num_nodes).to(torch.float32)
+    deg_inv_sqrt = (deg + eps).pow(-0.5)
+
+    norm_w = ew * deg_inv_sqrt[row] * deg_inv_sqrt[col]
+    return ei, norm_w
 
 
-class GCNLayer(nn.Module):
+def _spmm(ei: torch.Tensor, ew: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     """
-    One GCN layer with sum aggregation and symmetric normalization:
-        H = Ď^{-1/2} Â Ď^{-1/2} X W + b
+    Sparse COO matmul: (N×N)_sparse @ (N×F)_dense.
+    """
+    n = x.size(0)
+    A = torch.sparse_coo_tensor(ei, ew, size=(n, n), device=x.device)
+    return torch.sparse.mm(A, x)
+
+
+# --------------------------------- layer & model --------------------------------- #
+
+
+class _GCNLayer(nn.Module):
+    """
+    One renormalized GCN layer:
+        H^{l+1} = Norm( act( (Â H^l) W ) ) + residual
     """
 
-    def __init__(self, in_dim: int, out_dim: int, bias: bool = True) -> None:
+    def __init__(
+        self,
+        in_dim: int,
+        out_dim: int,
+        activation: str = "gelu",
+        dropout: float = 0.1,
+        layernorm: bool = True,
+        residual: bool = True,
+        dropedge: float = 0.0,
+    ):
         super().__init__()
-        self.lin = nn.Linear(in_dim, out_dim, bias=bias)
+        self.lin = nn.Linear(in_dim, out_dim, bias=True)
+        self.act = _activation(activation)
+        self.do = nn.Dropout(dropout) if dropout and dropout > 0 else nn.Identity()
+        self.norm = nn.LayerNorm(out_dim) if layernorm else nn.Identity()
+        self.residual = bool(residual and in_dim == out_dim)
+        self.dropedge = float(dropedge)
 
-    @torch.no_grad()
-    def _check(self, x: torch.Tensor, edge_index: torch.Tensor) -> None:
-        if x.ndim != 2:
-            raise ValueError(f"x must be 2-D (N, F), got shape {tuple(x.shape)}")
-        if edge_index.ndim != 2 or edge_index.size(0) != 2:
-            raise ValueError("edge_index must have shape (2, E)")
+        nn.init.xavier_uniform_(self.lin.weight)
+        if self.lin.bias is not None:
+            nn.init.zeros_(self.lin.bias)
 
-    def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
-        self._check(x, edge_index)
-        device = x.device
-        n = x.size(0)
+    def forward(
+        self,
+        x: torch.Tensor,  # (N, Din)
+        edge_index: torch.Tensor,  # (2, E)
+        edge_weight: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        N = x.size(0)
+        ei, ew = _normalize_renorm(edge_index, edge_weight, N)
 
-        # Undirected + self loops + coalesce
-        undirected = _make_undirected_with_self_loops(edge_index, n, device)
+        # DropEdge (only non-self edges)
+        if self.training and self.dropedge > 0.0:
+            r, c = ei[0], ei[1]
+            is_self = r == c
+            keep = torch.ones_like(ew, dtype=torch.bool)
+            nz = (~is_self).nonzero(as_tuple=False).flatten()
+            if nz.numel() > 0:
+                rnd = torch.rand(nz.numel(), device=ew.device)
+                keep[nz] = rnd > self.dropedge
+            ei = ei[:, keep]
+            ew = ew[keep]
 
-        # Transform then aggregate with normalized weights
-        h = self.lin(x)  # (N, out_dim)
-        src, dst = undirected[0], undirected[1]
-        w = _normalized_weights(undirected, n).to(h.dtype)  # (E',)
+        h = _spmm(ei, ew, x)  # (N, Din)
+        y = self.lin(h)  # (N, Dout)
+        y = self.act(y)
+        y = self.do(y)
+        y = self.norm(y)
+        if self.residual:
+            y = y + x
+        return y
 
-        out = torch.zeros_like(h)
-        out.index_add_(0, dst, h.index_select(0, src) * w.unsqueeze(1))
-        return out
+
+@dataclass
+class GCNConfig:
+    in_dim: int
+    hidden_dim: int
+    out_dim: int
+    activation: str = "gelu"
+    dropout: float = 0.1
+    layernorm: bool = True
+    residual: bool = True
+    dropedge: float = 0.0
 
 
-class TwoLayerGCN(nn.Module):
+class GCN(nn.Module):
     """
-    Minimal 2-layer GCN for node embeddings.
-
-    Args
-    ----
-    in_dim : int
-        Input feature size.
-    hidden_dim : int
-        Hidden/output feature size H.
-    dropout : float
-        Dropout after the first layer.
+    Two-layer GCN encoder (renormalized adjacency, sum aggregation).
     """
 
-    def __init__(self, in_dim: int, hidden_dim: int, dropout: float = 0.0) -> None:
+    def __init__(
+        self,
+        in_dim: int,
+        hidden_dim: int,
+        out_dim: int,
+        activation: str = "gelu",
+        dropout: float = 0.1,
+        layernorm: bool = True,
+        residual: bool = True,
+        dropedge: float = 0.0,
+    ):
         super().__init__()
-        self.gcn1 = GCNLayer(in_dim, hidden_dim)
-        self.gcn2 = GCNLayer(hidden_dim, hidden_dim)
-        self.act = nn.ReLU()
-        self.drop = nn.Dropout(p=dropout) if dropout > 0.0 else nn.Identity()
+        self.cfg = GCNConfig(
+            in_dim=in_dim,
+            hidden_dim=hidden_dim,
+            out_dim=out_dim,
+            activation=activation,
+            dropout=dropout,
+            layernorm=layernorm,
+            residual=residual,
+            dropedge=dropedge,
+        )
+        self.gcn1 = _GCNLayer(
+            in_dim,
+            hidden_dim,
+            activation=activation,
+            dropout=dropout,
+            layernorm=layernorm,
+            residual=False,
+            dropedge=dropedge,
+        )
+        self.gcn2 = _GCNLayer(
+            hidden_dim,
+            out_dim,
+            activation=activation,
+            dropout=dropout,
+            layernorm=layernorm,
+            residual=False,
+            dropedge=dropedge,
+        )
+        self.out_norm = nn.LayerNorm(out_dim) if layernorm else nn.Identity()
 
-    def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
-        """
-        Parameters
-        ----------
-        x : torch.Tensor, shape (N, F)
-            Node features.
-        edge_index : torch.Tensor, shape (2, E)
-            Graph edges (undirected or directed). Undirected & self loops are ensured internally.
-
-        Returns
-        -------
-        z : torch.Tensor, shape (N, H)
-            Node embeddings.
-        """
-        z = self.gcn1(x, edge_index)
-        z = self.act(z)
-        z = self.drop(z)
-        z = self.gcn2(z, edge_index)
-        return z
+    def forward(
+        self,
+        x: torch.Tensor,  # (N, Fin)
+        edge_index: torch.Tensor,  # (2, E)
+        edge_weight: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        h = self.gcn1(x, edge_index, edge_weight)
+        h = self.gcn2(h, edge_index, edge_weight)
+        return self.out_norm(h)

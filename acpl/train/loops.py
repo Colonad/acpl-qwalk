@@ -5,178 +5,358 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 import torch
-from torch import nn
+import torch.nn as nn
 
-from acpl.policy.policy import GNNTemporalPolicy
-from acpl.sim.portmap import PortMap
+from acpl.objectives.metrics import (
+    cvar,
+    mixing_summary,
+    success_on_targets,
+    targeting_summary,
+)
+from acpl.utils.logging import MetricLogger
 
-from .backprop import rollout_and_loss
+try:
+    from tqdm.auto import tqdm
+except Exception:
+    # no-op fallback if tqdm isn't installed
+    def tqdm(x, **kwargs):
+        return x
 
-# -----------------------------------------------------------------------------
-# Hook types
-# -----------------------------------------------------------------------------
+
+__all__ = [
+    "LoopConfig",
+    "build_metric_pack",
+    "log_metric_pack",
+    "train_epoch",
+    "eval_epoch",
+]
+
+
+try:
+    from tqdm.auto import tqdm
+except Exception:
+    # no-op fallback if tqdm isn't installed
+    def tqdm(x, **kwargs):
+        return x
+
+
+# --------------------------------------------------------------------------------------
+#                                       Config
+# --------------------------------------------------------------------------------------
 
 
 @dataclass
-class TrainHooks:
+class LoopConfig:
+    device: str = "cuda"
+    log_every: int = 50
+
+    # Optimization niceties
+    grad_clip: float | None = None  # e.g., 1.0
+    accum_steps: int = 1  # gradient accumulation; 1 = disabled
+    amp: bool = False  # use torch.cuda.amp for forward/backward
+    log_grad_norm_every: int = 0  # if >0, log grad-norm every k steps (cheap)
+
+    # Optional scheduler stepping
+    scheduler_on: bool = False  # if True, call scheduler.step() each optimizer step
+
+    # Risk/diagnostics
+    cvar_alpha: float = 0.1  # CVaR parameter for diagnostics
+
+    # When targets exist, treat success as primary scalar
+    primary_on_targets: bool = True
+
+    # UI
+    progress_bar: bool = True
+
+
+# --------------------------------------------------------------------------------------
+#                                 Metric pack helpers
+# --------------------------------------------------------------------------------------
+
+
+def build_metric_pack(
+    *,
+    with_targets: bool,
+    cvar_alpha: float = 0.1,
+):
     """
-    Optional callbacks fired during training.
+    Returns a dict of callables f(P, **aux) -> Dict[str, float], run under no_grad.
 
-    All callbacks are optional. Return values are ignored.
-    - on_batch_end(loss, step_idx, info): called after each optimization step.
-    - on_epoch_end(metrics): called once per epoch with aggregate metrics.
+    Expected aux keys (optional):
+      - "targets": LongTensor (K,) indices
     """
 
-    on_batch_end: Callable[[torch.Tensor, int, dict[str, torch.Tensor]], None] | None = None
-    on_epoch_end: Callable[[dict[str, float]], None] | None = None
+    def pack_mixing(P: torch.Tensor, **aux) -> dict[str, float]:
+        m = mixing_summary(P)  # TV/JS/Hellinger/L2/Entropy/KL(P||U)
+        return {
+            "tv": float(m.tv),
+            "js": float(m.js),
+            "hell": float(m.hellinger),
+            "l2": float(m.l2),
+            "H": float(m.entropy_p),
+            "kl_pu": float(m.kl_pu),
+        }
+
+    def pack_targeting(P: torch.Tensor, **aux) -> dict[str, float]:
+        targets = aux.get("targets", None)
+        if targets is None:
+            return {}
+        m = targeting_summary(P, targets=targets)
+        # success is the main signal; add CVaR(-log P[Ω]) optionally
+        with torch.no_grad():
+            p_omega = success_on_targets(P, targets, reduction="none")  # (batch,) or scalar
+            p_omega = torch.clamp(p_omega, min=1e-8)
+            neglog = (-p_omega.log()).reshape(-1)
+            cv = float(cvar(neglog, alpha=cvar_alpha).item())
+        return {
+            "success": float(m.success),
+            "maxp": float(m.maxp),
+            "gini": float(m.gini),
+            "tv_vsU": float(m.tv),
+            "js_vsU": float(m.js),
+            "H": float(m.entropy_p),
+            "KLpU": float(m.kl_pu),
+            "cvar_neglogOmega": cv,
+        }
+
+    if with_targets:
+        return {"mix": pack_mixing, "target": pack_targeting}
+    else:
+        return {"mix": pack_mixing}
 
 
-# -----------------------------------------------------------------------------
-# Utilities
-# -----------------------------------------------------------------------------
+@torch.no_grad()
+def log_metric_pack(
+    logger: MetricLogger,
+    pack: dict[str, Callable],
+    *,
+    P: torch.Tensor,
+    step: int,
+    prefix: str,
+    **aux,
+):
+    for name, fn in pack.items():
+        scalars = fn(P, **aux)
+        if scalars:
+            logger.log_dict(f"{prefix}{name}/", scalars, step=step)
 
 
-def _move_to_device(x: torch.Tensor | None, device: torch.device | None) -> torch.Tensor | None:
-    if x is None or device is None:
-        return x
-    return x.to(device=device)
+# --------------------------------------------------------------------------------------
+#                          Generic train/eval epoch loops
+# --------------------------------------------------------------------------------------
+
+# Contracts:
+#   rollout_fn:  P, aux = rollout_fn(model, batch)
+#       P   : (B, N) or (N,)
+#       aux : arbitrary dict (may include "targets" and/or "loss")
+#
+#   loss_builder (optional): loss = loss_builder(P, aux, batch)
+RolloutFn = Callable[[nn.Module, dict], tuple[torch.Tensor, dict]]
+LossBuilder = Callable[[torch.Tensor, dict, dict], torch.Tensor]
 
 
-def _grad_total_norm(parameters: Iterable[torch.nn.Parameter]) -> float:
+def _to_device_batch(batch: dict, device: torch.device) -> dict:
+    return {k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in batch.items()}
+
+
+def _is_finite(x: torch.Tensor) -> bool:
+    return torch.isfinite(x).all().item() if isinstance(x, torch.Tensor) else True
+
+
+def _grad_norm(parameters, norm_type: float = 2.0) -> float:
     total = 0.0
     for p in parameters:
         if p.grad is None:
             continue
-        param_norm = p.grad.data.norm(2).item()
-        total += param_norm * param_norm
-    return float(total**0.5)
+        param_norm = p.grad.data.norm(norm_type)
+        total += float(param_norm.item() ** 2)
+    return total**0.5
 
 
-# -----------------------------------------------------------------------------
-# Training loop
-# -----------------------------------------------------------------------------
-
-
-def train_one_epoch(
-    policy: GNNTemporalPolicy,
-    pm: PortMap,
-    edge_index: torch.Tensor,
-    data_loader: Iterable[dict[str, torch.Tensor]],
+def train_epoch(
+    model: nn.Module,
+    dataloader: Iterable[dict],
     optimizer: torch.optim.Optimizer,
+    logger: MetricLogger,
+    loop_cfg: LoopConfig,
+    rollout_fn: RolloutFn,
+    loss_builder: LossBuilder | None = None,
     *,
-    steps: int,
-    device: torch.device | None = None,
-    grad_clip: float | None = None,
+    step_start: int = 0,
     scheduler: torch.optim.lr_scheduler._LRScheduler | None = None,
-    reduction: str = "mean",
-    record_traj: bool = False,
-    hooks: TrainHooks | None = None,
-) -> dict[str, float]:
+) -> int:
     """
-    One epoch over `data_loader`.
+    One training epoch with:
+      • optional AMP (mixed precision)
+      • optional grad accumulation
+      • optional grad clipping
+      • periodic metric logging (mixing, targeting if targets exist)
+      • optional scheduler stepping
 
-    Expected batch dict keys
-    ------------------------
-    - "x":       (N, F) node features (torch.float)
-    - "psi0":    (A,) or (A,B) initial arc state (complex or real)
-    - "target":  int (scalar) or (B,) tensor of vertex indices
-    - "pos_enc": optional (N, P) extra node features (torch.float)
-
-    Parameters
-    ----------
-    policy : GNNTemporalPolicy
-        The composed policy (GCN -> GRU -> Head).
-    pm : PortMap
-        Port map for the simulator.
-    edge_index : torch.Tensor
-        Graph connectivity for the GCN, shape (2, E), dtype long.
-    data_loader : iterable of dicts
-        Each element is a batch dict as described above.
-    optimizer : torch.optim.Optimizer
-        Optimizer for the policy parameters.
-    steps : int
-        Number of DTQW steps per batch rollout.
-    device : torch.device, optional
-        If provided, move inputs and policy to this device for training.
-    grad_clip : float, optional
-        If provided, clip gradient norm (L2) to this value.
-    scheduler : lr scheduler, optional
-        Stepped once per batch (typical for simple schedulers).
-    reduction : {"mean","sum","none"}
-        Reduction applied in `rollout_and_loss` when batches are (A,B).
-    record_traj : bool
-        If True, `rollout_and_loss` also returns per-step trajectories.
-    hooks : TrainHooks, optional
-        Callbacks for batch/epoch logging.
-
-    Returns
-    -------
-    dict[str, float]
-        Aggregate metrics for the epoch: {"loss_mean", "loss_sum", "num_batches",
-        "grad_norm_last"}.
+    Returns next global step.
     """
-    if device is not None:
-        policy.to(device)
-        edge_index = edge_index.to(device=device, dtype=torch.long)
+    model.train()
+    device = torch.device(loop_cfg.device)
+    _device_type = device.type  # "cuda" | "cpu" | etc.
+    step = step_start
 
-    policy.train()
-    loss_sum = 0.0
-    num_batches = 0
-    grad_norm_last = 0.0
+    use_amp = bool(loop_cfg.amp and device.type == "cuda")
+    scaler = torch.amp.GradScaler(_device_type, enabled=use_amp)
 
-    for step_idx, batch in enumerate(data_loader):
-        num_batches += 1
-        x = _move_to_device(batch.get("x"), device)
-        psi0 = _move_to_device(batch.get("psi0"), device)
-        target = batch.get("target")
-        pos_enc = _move_to_device(batch.get("pos_enc"), device)
+    metric_pack = None
+    accum_steps = max(1, int(loop_cfg.accum_steps))
+    assert accum_steps >= 1
 
-        if x is None or psi0 is None or target is None:
-            raise ValueError("batch must contain 'x', 'psi0', and 'target' keys.")
+    optimizer.zero_grad(set_to_none=True)
 
-        # Forward + loss
-        optimizer.zero_grad(set_to_none=True)
-        loss, info = rollout_and_loss(
-            policy=policy,
-            pm=pm,
-            edge_index=edge_index,
-            x=x,  # type: ignore[arg-type]
-            pos_enc=pos_enc,  # type: ignore[arg-type]
-            steps=steps,
-            psi0=psi0,  # type: ignore[arg-type]
-            target_index=target,  # type: ignore[arg-type]
-            reduction=reduction,
-            record_traj=record_traj,
-        )
+    iterator = dataloader
+    if getattr(loop_cfg, "progress_bar", True):
+        total = len(dataloader) if hasattr(dataloader, "__len__") else None
+        iterator = tqdm(dataloader, total=total, desc="train", leave=False)
 
-        # Backward
-        loss.backward()
+    for bidx, batch in enumerate(iterator, start=1):
+        step += 1
+        batch = _to_device_batch(batch, device)
 
-        # Optional grad clipping
-        if grad_clip is not None and grad_clip > 0.0:
-            nn.utils.clip_grad_norm_(policy.parameters(), max_norm=float(grad_clip))
+        with torch.amp.autocast(device_type=_device_type, enabled=use_amp):
+            P, aux = rollout_fn(model, batch)  # P: (B,N) or (N,)
+            if isinstance(P, torch.Tensor) and P.ndim == 1:
+                P = P.unsqueeze(0)
 
-        grad_norm_last = _grad_total_norm(policy.parameters())
+            # Lazily init metric pack based on presence of targets
+            if metric_pack is None:
+                with_targets = ("targets" in aux) and (aux["targets"] is not None)
+                metric_pack = build_metric_pack(
+                    with_targets=with_targets, cvar_alpha=loop_cfg.cvar_alpha
+                )
 
-        # Step optimizer (+ scheduler if given)
-        optimizer.step()
-        if scheduler is not None:
-            scheduler.step()
+            if "loss" in aux and aux["loss"] is not None:
+                loss = aux["loss"]
+            else:
+                if loss_builder is None:
+                    raise ValueError("No loss provided by rollout_fn and no loss_builder supplied.")
+                loss = loss_builder(P, aux, batch)
 
-        loss_sum += float(loss.detach().item())
+            if not _is_finite(loss):
+                logger.log_text(
+                    "train/warn",
+                    f"Non-finite loss detected at step {step}. Skipping update.",
+                    step=step,
+                )
+                optimizer.zero_grad(set_to_none=True)
+                continue
 
-        # Hook
-        if hooks is not None and hooks.on_batch_end is not None:
-            hooks.on_batch_end(loss.detach(), step_idx, info)
+            # Normalize if accumulating
+            loss_scaled_for_accum = loss / float(accum_steps)
 
-    loss_mean = loss_sum / max(1, num_batches)
-    metrics = {
-        "loss_mean": loss_mean,
-        "loss_sum": loss_sum,
-        "num_batches": float(num_batches),
-        "grad_norm_last": grad_norm_last,
-    }
-    if hooks is not None and hooks.on_epoch_end is not None:
-        hooks.on_epoch_end(metrics)
+        # Backward (AMP-aware)
+        if use_amp:
+            scaler.scale(loss_scaled_for_accum).backward()
+        else:
+            loss_scaled_for_accum.backward()
 
-    return metrics
+        # Optimizer step every accum_steps
+        do_step = bidx % accum_steps == 0
+        if do_step:
+            # Grad clip (AMP-safe)
+            if loop_cfg.grad_clip is not None and loop_cfg.grad_clip > 0:
+                if use_amp:
+                    scaler.unscale_(optimizer)
+                nn.utils.clip_grad_norm_(model.parameters(), loop_cfg.grad_clip)
+
+            if use_amp:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
+
+            if loop_cfg.scheduler_on and scheduler is not None:
+                scheduler.step()
+
+            optimizer.zero_grad(set_to_none=True)
+
+        # Logging
+        if step % loop_cfg.log_every == 0:
+            logger.log_scalar("train/loss", float(loss.detach().item()), step=step)
+            log_metric_pack(logger, metric_pack, P=P.detach(), step=step, prefix="train/", **aux)
+
+            if loop_cfg.log_grad_norm_every and (step % loop_cfg.log_grad_norm_every == 0):
+                try:
+                    gnorm = _grad_norm(model.parameters())
+                    logger.log_scalar("train/grad_norm", gnorm, step=step)
+                except Exception:
+                    pass  # best-effort; don't break training
+
+    return step
+
+
+@torch.no_grad()
+def eval_epoch(
+    model: nn.Module,
+    dataloader: Iterable[dict],
+    logger: MetricLogger,
+    loop_cfg: LoopConfig,
+    rollout_fn: RolloutFn,
+    *,
+    step: int,
+) -> None:
+    """
+    Evaluation epoch:
+      • averages loss if aux["loss"] is provided by rollout
+      • aggregates metrics over batches and logs once
+    """
+    model.eval()
+    device = torch.device(loop_cfg.device)
+
+    metric_pack = None
+    loss_acc = 0.0
+    loss_count = 0
+
+    # Accumulate simple averages
+    agg: dict[str, float] = {}
+    n_batches = 0
+
+    def _merge(prefix: str, d: dict[str, float]):
+        for k, v in d.items():
+            key = f"{prefix}{k}"
+            agg[key] = agg.get(key, 0.0) + float(v)
+
+    iterator = dataloader
+    if getattr(loop_cfg, "progress_bar", True):
+        total = len(dataloader) if hasattr(dataloader, "__len__") else None
+        iterator = tqdm(dataloader, total=total, desc="eval", leave=False)
+
+    for batch in iterator:
+
+        n_batches += 1
+        batch = _to_device_batch(batch, device)
+        P, aux = rollout_fn(model, batch)
+        if isinstance(P, torch.Tensor) and P.ndim == 1:
+            P = P.unsqueeze(0)
+
+        if metric_pack is None:
+            with_targets = ("targets" in aux) and (aux["targets"] is not None)
+            metric_pack = build_metric_pack(
+                with_targets=with_targets, cvar_alpha=loop_cfg.cvar_alpha
+            )
+
+        # Per-batch metrics
+        for name, fn in metric_pack.items():
+            scalars = fn(P, **aux)
+            _merge(f"{name}/", scalars)
+
+        if "loss" in aux and aux["loss"] is not None:
+            loss_acc += float(aux["loss"].detach().item())
+            loss_count += 1
+
+    if n_batches == 0:
+        return
+
+    # Averages
+    for k in list(agg.keys()):
+        agg[k] /= float(n_batches)
+
+    if loss_count > 0:
+        logger.log_scalar("eval/loss", loss_acc / max(1, loss_count), step=step)
+
+    logger.log_dict("eval/", agg, step=step)

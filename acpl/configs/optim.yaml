@@ -1,8 +1,92 @@
 # acpl/configs/optim.yaml
-name: adam
-lr: 3.0e-3
-weight_decay: 0.0
-betas: [0.9, 0.999]
-eps: 1.0e-8
-# Optional gradient clipping (set null or 0.0 to disable)
-grad_clip: 1.0
+# -----------------------------------------------------------------------------
+# Optimizer & (optional) LR scheduler configuration, Hydra-friendly.
+# Matches contracts expected by scripts/train.py and acpl/train/loops.py.
+#
+# Notes
+# - `name` controls which torch optimizer to construct.
+# - `scheduler.kind` may be `none`, `cosine`, or `step` (kept simple for Phase A).
+# - Some runners also read `grad_clip` here for convenience, but the loop-level
+#   switch that actually clips is `loop.grad_clip` (see train.yaml). Keeping both
+#   lets you override from either place without breaking older code.
+# -----------------------------------------------------------------------------
+
+# -------------------------
+# Optimizer
+# -------------------------
+name: adam                 # adam | adamw | sgd
+lr: 3.0e-3                # base learning rate
+weight_decay: 0.0         # L2 (AdamW decouples this term if selected)
+betas: [0.9, 0.999]       # Adam/AdamW momentum coefficients
+eps: 1.0e-8               # numerical epsilon for Adam-family
+
+# Optional: momentum/Nesterov (used iff name=sgd)
+momentum: 0.9
+nesterov: true
+
+# Backward-compat / convenience (actual clipping applied by loop.grad_clip)
+grad_clip: 1.0            # L2 max-norm; set null/0 to disable (loop must enable)
+
+# -------------------------
+# Scheduler
+# -------------------------
+scheduler:
+  kind: none              # none | cosine | step | cosine_warmup
+  # Cosine annealing without restarts
+  cosine:
+    t_max: 1000           # number of optimizer steps for a full cosine period
+    eta_min: 1.0e-5       # final LR
+  # Step decay
+  step:
+    step_size: 200        # drop every N optimizer steps
+    gamma: 0.5            # multiplicative decay
+  # Cosine with linear warmup (common stable default)
+  cosine_warmup:
+    warmup_steps: 100     # linear ramp from 0 → lr over this many steps
+    t_max: 1000           # cosine horizon after warmup
+    eta_min: 1.0e-5
+
+# -----------------------------------------------------------------------------
+# Presets (copy/merge one of these blocks above via CLI or experiment config)
+# -----------------------------------------------------------------------------
+presets:
+
+  fast_sweep:
+    name: adam
+    lr: 5.0e-3
+    weight_decay: 0.0
+    betas: [0.9, 0.999]
+    eps: 1.0e-8
+    grad_clip: 1.0
+    scheduler:
+      kind: cosine_warmup
+      cosine_warmup:
+        warmup_steps: 50
+        t_max: 1000
+        eta_min: 3.0e-5
+
+  conservative:
+    name: adamw
+    lr: 2.0e-3
+    weight_decay: 1.0e-4
+    betas: [0.9, 0.999]
+    eps: 1.0e-8
+    grad_clip: 0.8
+    scheduler:
+      kind: step
+      step:
+        step_size: 400
+        gamma: 0.5
+
+  sgd_baseline:
+    name: sgd
+    lr: 1.0e-2
+    momentum: 0.9
+    nesterov: true
+    weight_decay: 0.0
+    grad_clip: 1.0
+    scheduler:
+      kind: cosine
+      cosine:
+        t_max: 1500
+        eta_min: 1.0e-4

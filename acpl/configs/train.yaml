@@ -1,77 +1,141 @@
 # acpl/configs/train.yaml
-# Single-run config for Phase A
-# - Graph: line, N=64
-# - Steps: T=64
-# - Task: transfer (target a single vertex)
-# - Model: GCN (2-layer) + GRU controller + linear head -> SU(2) coin
-# - Optim: Adam
+# ==============================================================================
+# Single-run config (Hydra-compatible) for Phase A
+# - Graph: line/grid/regular/ER/WS; defaults to line, N=64
+# - Simulator: T time-steps (default 64), arc-basis state
+# - Task: state-transfer to a target vertex with flexible loss (NLL/CVaR/Hinge)
+# - Policy: GCN encoder + temporal controller (GRU or Transformer) + SU(2) coin head
+# - Training: Adam, optional scheduler, AMP, grad-accum, clipping
+# ==============================================================================
 
 # -------------------------
 # Repro & runtime
 # -------------------------
 seed: 42
-device: auto           # "auto" | "cpu" | "cuda"
-dtype: float32         # torch dtype for real tensors
+device: auto                  # "auto" | "cpu" | "cuda"
+dtype: float32                # real dtype for node features; complex state uses complex64 internally
 
 # -------------------------
-# Graph / data
+# Data / graph
 # -------------------------
 data:
-  graph: line          # graph family
-  num_nodes: 64        # N
-  # Node features: degree + normalized coordinate (from data.features.node_features_line)
-  features: degree_coord
-  # Optional positional encodings (kept simple for Phase A)
-  pos_enc: none        # none | coords | time_scalar
+  # family: line | cycle | grid | cube | regular | er | ws | custom
+  family: line
+  num_nodes: 64               # N (ignored for grid if Lx*Ly specified)
+  Lx: 8                       # for grid: width
+  Ly: 8                       # for grid: height
+  d_reg: 3                    # for regular graphs
+  er:
+    p: 0.05                   # Erdos–Renyi edge prob
+  ws:
+    kx: 1                     # Watts–Strogatz neighborhood (x)
+    ky: 1                     # Watts–Strogatz neighborhood (y)
+    beta: 0.2                 # rewiring prob
+    torus: false              # wrap grid edges (periodic boundary)
+  coalesce: true              # merge duplicate undirected edges
+  # Features to assemble (see acpl/data/features.py)
+  features:
+    use_degree: true
+    use_coords: true          # normalized [0,1] coords (line/grid)
+    use_lap_pe: true          # Laplacian eigen PE (top-K)
+    lap_pe_dim: 8
+    lap_pe_norm: true
+    use_role: false           # optional role encodings (bins)
+    role_bins: 16
+  # Optional per-episode split/router (Phase A single-episode by default)
+  split:
+    method: holdout           # holdout | kfold
+    ratios: [0.7, 0.15, 0.15]
+    k: 5
+    fold: 0
+    seed: 2025
+    group: false
+    group_pin: false
+    stratify: false
 
 # -------------------------
 # Simulation
 # -------------------------
 sim:
-  steps: 64            # T
-  # initial state options (Phase A typically one-hot on an arc or uniform by node)
-  init_state: node0_uniform_ports   # node0_uniform_ports | custom
-  # If custom, your script can override at runtime.
+  steps: 64                   # T (horizon)
+  # Initial state over arcs:
+  # - node0_uniform_ports : uniform over outgoing ports of node 0
+  # - node_center_uniform_ports : middle node (for line/grid)
+  # - uniform_over_arcs : fully uniform over all arcs
+  # - custom : your script provides psi0
+  init_state: node0_uniform_ports
+  # Keep trajectory for debugging/plots (heavier memory)
+  keep_trajectory: false
 
 # -------------------------
-# Task / objective
+# Task / objective (transfer)
 # -------------------------
 task:
   name: transfer
-  # Target vertex index j*: default last node (N-1)
-  target_index: 63
-  reduction: mean      # mean | sum | none
-  # Safety: renormalize P before computing the loss
-  renorm: true
-  # Optionally assert prob validity (off for speed; renorm already on)
-  check_prob: false
+  target_index: 63            # default: last node for line(64)
+  # Loss family: nll | cvar_nll | neg_prob | hinge
+  loss: nll
+  # Time aggregation: last | mean | max | softmax
+  time_agg: last
+  tau: 0.2                    # softmax temperature over time (used if time_agg=softmax)
+  label_smoothing: 0.0        # ε in [0,1) for smoothed NLL
+  cvar_alpha: 0.1             # CVaR tail for cvar_nll
+  margin: 0.0                 # hinge margin on p(Ω) - max_{¬Ω} p
+  reduce: mean                # mean | sum
+  eps: 1.0e-8                 # numeric floor for logs/normalization
+  # Probability handling
+  normalize_prob: true        # renormalize P before loss
+  check_simplex: false        # assert simplexes (debug)
 
 # -------------------------
-# Model (policy)
+# Policy (π_ω = HEAD ∘ CONTROLLER ∘ GNN)
 # -------------------------
 model:
-  # Input dim is inferred from data.features (here: 2 dims).
+  # Encoder (GCN)
   gnn:
-    kind: gcn
+    kind: gcn                 # currently we ship GCN; swap when we add gat/gin/pna
     hidden: 64
+    out: 64
+    activation: gelu          # relu | tanh | gelu
     dropout: 0.0
+    layernorm: true
+    residual: true
+    dropedge: 0.0             # stochastic edge-drop in message passing (0–1)
+  # Temporal positional encoding (Fourier)
+  time_pe:
+    dim: 32                   # must be even (sin/cos pairs)
+    learned_scale: true
+  # Controller over time
   controller:
-    kind: gru
-    hidden: 64          # if null, defaults to gnn.hidden
+    kind: gru                 # gru | transformer
+    hidden: 64                # controller hidden
     layers: 1
     dropout: 0.0
-    bidirectional: false
+    layernorm: true
+    bidirectional: false      # keep False for causal rollouts
+  # Head → Euler angles (α,β,γ)
   head:
-    angle_range: tanh_pi   # "unbounded" | "tanh_pi"
+    hidden: 0                 # 0 = linear head
+    out_scale: 1.0            # scale logits before wrap
+    layernorm: true
     dropout: 0.0
-  # Optional tiny time embedding added to GCN output
-  use_time_embed: true
 
 # -------------------------
 # Coin / lift
 # -------------------------
 coin:
-  family: su2           # su2 | exp | cayley (Phase A uses su2)
+  family: su2                 # Phase A uses SU(2) per deg-2 vertex
+  dtype: complex64
+  normalize: true             # polar + det=1 projection (policy path uses exact SU(2) anyway)
+  check: false                # expensive safety checks (for debugging)
+
+# -------------------------
+# Regularizers on angles θ (physics-informed)
+# -------------------------
+regularizer:
+  smooth_theta: 0.0           # λ * sum_t>0 ||θ_t - θ_{t-1}||^2
+  l2_theta: 0.0               # λ * sum_t ||θ_t||^2
+  grad_clip_norm: null        # (kept for future; grad clip lives in loop.optim.grad_clip)
 
 # -------------------------
 # Optimization
@@ -81,11 +145,9 @@ optim:
   lr: 3.0e-3
   weight_decay: 0.0
   betas: [0.9, 0.999]
-  grad_clip: 1.0        # L2 max-norm; set 0 or null to disable
-  # Scheduler (optional)
+  # Optional scheduler (disabled by default; enable via loop.scheduler_on=true)
   scheduler:
-    name: none          # none | cosine | step
-    # If you enable:
+    kind: none                # none | cosine | step
     cosine:
       t_max: 1000
       eta_min: 1.0e-5
@@ -96,21 +158,49 @@ optim:
 # -------------------------
 # Training loop
 # -------------------------
+loop:
+  log_every: 50
+  device: ${device}
+  grad_clip: 1.0              # L2 max-norm; set null/0 to disable
+  accum_steps: 1              # gradient accumulation steps
+  amp: false                  # enable AMP (CUDA) for speed
+  log_grad_norm_every: 0      # 0 disables
+  scheduler_on: false         # if true, call scheduler.step() after optimizer.step()
+  cvar_alpha: 0.1             # mirrored into metrics
+  primary_on_targets: true
+
 train:
   epochs: 1
-  batch_size: 1         # Phase A: single-episode batches
-  record_traj: false    # enable for diagnostics/plots
+  batch_size: 1               # Phase A: single-episode batches
+  num_workers: 0
+  pin_memory: false
 
 # -------------------------
-# Logging (stubs)
+# Logging
 # -------------------------
 log:
-  backend: console      # console | tensorboard | wandb
-  interval: 1           # batches
+  backend: console            # console | tensorboard | wandb
+  interval: 1                 # batches between metric logs (in addition to loop.log_every)
+  console:
+    precision: 4
   tensorboard:
+    enabled: false
     log_dir: runs/acpl-qwalk
   wandb:
     enabled: false
     project: acpl-qwalk
     entity: null
     run_name: A6_line64_T64_gcn_gru_su2
+
+# -------------------------
+# Hydra (optional conveniences)
+# -------------------------
+hydra:
+  run:
+    dir: outputs/${now:%Y%m%d_%H%M%S}
+  sweep:
+    dir: multirun/${now:%Y%m%d_%H%M%S}
+    subdir: ${hydra.job.num}
+  job:
+    config:
+      override_dirname: true

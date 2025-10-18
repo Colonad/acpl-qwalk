@@ -1,181 +1,297 @@
 # acpl/sim/shift.py
 from __future__ import annotations
 
-import numpy as np
+from dataclasses import dataclass
+
+import torch
+
+try:
+    # If available (PyTorch >= 2.5), use real alias for complex dtypes
+    ComplexDType = torch.complex64.__class__
+except Exception:  # pragma: no cover
+    ComplexDType = object  # type: ignore
 
 from .portmap import PortMap
 
-try:  # optional torch support
-    import torch
-except Exception:  # pragma: no cover - torch may be absent
-    torch = None  # type: ignore[assignment]
+__all__ = [
+    "ShiftOp",
+    "build_shift",
+    "perm_from_portmap",
+    "sparse_from_portmap",
+    "apply_shift",
+    "check_shift_unitarity",
+]
 
-try:  # optional scipy (useful for debugging / CPU checks)
-    import scipy.sparse as sp
-except Exception:  # pragma: no cover - scipy may be absent
-    sp = None  # type: ignore[assignment]
-
-
-# ---------------------------------------------------------------------------
-# Core constructors
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+#                               Core definition                               #
+# --------------------------------------------------------------------------- #
 
 
-def build_shift_index(pm: PortMap) -> np.ndarray:
+@dataclass(frozen=True)
+class ShiftOp:
     """
-    Return an integer mapping 'dest' such that, for an arc-indexed state vector psi:
-        psi_next = psi[dest]
-    implements the flip-flop shift S (i.e., maps each arc to its reverse arc).
+    Flip–flop shift operator S on the arc basis.
 
-    Parameters
-    ----------
-    pm : PortMap
-        Port map with 'rev' pairing (u->v) <-> (v->u).
+    The shift S is a permutation unitary determined entirely by the PortMap:
+      • Involutive: S^2 = I (equivalently, perm[perm] = arange(A)).
+      • Hermitian and unitary: S† = S = S^{-1}.
+      • Acts by reindexing amplitudes between reverse arcs.
 
-    Returns
-    -------
-    dest : np.ndarray (num_arcs,), dtype=int64
-        For every column index 'a', the destination row index is dest[a] = pm.rev[a].
-        Equivalently, S has ones at coordinates (row=dest[a], col=a).
+    Storage:
+      - `perm`: (A,) long tensor giving the reindexing: psi_out[i] = psi_in[perm[i]].
+      - `A`:    number of arcs (total coin dimension).
+      - `device`: CUDA/CPU device of the permutation.
     """
-    # Copy to avoid accidental in-place modification later.
-    return pm.rev.copy()
 
+    perm: torch.Tensor  # (A,) long
+    A: int
+    device: torch.device
 
-def build_shift_torch(
-    pm: PortMap,
-    device: torch.device | None = None,
-    dtype: torch.dtype | None = None,
-) -> torch.Tensor:
-    """
-    Build the flip-flop shift as a Torch sparse COO permutation matrix s.
+    # ------------------------------- Constructors --------------------------- #
 
-    The convention is column-vector multiplication: psi_next = s @ psi.
-    Therefore, s[row, col] = 1 when row = pm.rev[col].
-    """
-    if torch is None:  # pragma: no cover
-        raise RuntimeError("PyTorch is not available, cannot build a torch sparse S.")
+    @staticmethod
+    def from_portmap(pm: PortMap) -> ShiftOp:
+        """
+        Build S from a PortMap. This is just the `rev` involution.
+        """
+        perm = pm.to_shift_permutation()  # (A,)
+        return ShiftOp(perm=perm, A=int(perm.numel()), device=perm.device)
 
-    a = pm.num_arcs
-    cols = torch.arange(a, device=device, dtype=torch.int64)
-    rows = torch.as_tensor(pm.rev, device=device, dtype=torch.int64)
+    # --------------------------------- APIs -------------------------------- #
 
-    if dtype is None:
-        dtype = torch.float32
+    def to_sparse(self, dtype: torch.dtype = torch.complex64) -> torch.Tensor:
+        """
+        Return a sparse COO matrix S of shape (A, A) with ones at (i, perm[i]).
+        """
+        A = self.A
+        if A == 0:
+            idx = torch.empty((2, 0), dtype=torch.long, device=self.device)
+            val = torch.empty((0,), dtype=dtype, device=self.device)
+            return torch.sparse_coo_tensor(
+                idx, val, (0, 0), dtype=dtype, device=self.device
+            ).coalesce()
 
-    indices = torch.stack([rows, cols], dim=0)  # shape (2, A)
-    values = torch.ones(a, device=device, dtype=dtype)
-    shape = (a, a)
-    s = torch.sparse_coo_tensor(indices, values, shape, device=device, dtype=dtype)
-    # Ensure canonical (coalesced) form.
-    s = s.coalesce()
-    return s
+        rows = torch.arange(A, device=self.device, dtype=torch.long)
+        cols = self.perm
+        idx = torch.stack([rows, cols], dim=0)
+        val = torch.ones(A, dtype=dtype, device=self.device)
+        return torch.sparse_coo_tensor(idx, val, (A, A), dtype=dtype, device=self.device).coalesce()
 
+    def apply(self, psi: torch.Tensor, *, out: torch.Tensor | None = None) -> torch.Tensor:
+        """
+        Apply S to a statevector ψ laid out in the arc basis.
 
-def build_shift_scipy(pm: PortMap, dtype: np.dtype = np.float32) -> sp.coo_matrix:
-    """
-    Build the flip-flop shift as a SciPy sparse COO permutation matrix s.
+        Accepted shapes:
+          - (A,) complex
+          - (B, A) complex (batched first)
 
-    psi_next = s @ psi (column-vector convention).
-    """
-    if sp is None:  # pragma: no cover
-        raise RuntimeError("SciPy is not available, cannot build a SciPy sparse S.")
+        Returns:
+          same shape as `psi`.
+        """
+        if psi.numel() == 0:
+            return psi
 
-    a = pm.num_arcs
-    rows = pm.rev
-    cols = np.arange(a, dtype=np.int64)
-    data = np.ones(a, dtype=dtype)
-    return sp.coo_matrix((data, (rows, cols)), shape=(a, a))
+        if psi.shape[-1] != self.A:
+            raise ValueError(f"psi last-dim must be {self.A} (got {psi.shape[-1]})")
 
+        if not psi.is_complex():
+            raise TypeError("psi must be a complex tensor (complex64/complex128).")
 
-# ---------------------------------------------------------------------------
-# Convenience (vector-only) applications
-# ---------------------------------------------------------------------------
-
-
-def apply_shift_numpy(psi: np.ndarray, dest: np.ndarray) -> np.ndarray:
-    """
-    Apply the shift to a numpy state vector using the index mapping.
-
-    Parameters
-    ----------
-    psi : np.ndarray (A,) or (A, k)
-        Arc-indexed state (real or complex). If 2-D, columns are treated as
-        independent vectors.
-    dest : np.ndarray (A,), dtype=int64
-        Mapping as returned by `build_shift_index`.
-
-    Returns
-    -------
-    psi_next : np.ndarray
-        psi_next = psi[dest] (row-wise for 1-D; along axis=0 for 2-D).
-    """
-    if psi.ndim == 1:
-        return psi[dest]
-    if psi.ndim == 2:
-        return psi[dest, :]
-    raise ValueError(f"psi must be 1-D or 2-D (got ndim={psi.ndim})")
-
-
-def apply_shift_torch(
-    psi: torch.Tensor,
-    dest: torch.Tensor,
-) -> torch.Tensor:
-    """
-    Apply the shift to a torch state vector using an index mapping tensor.
-
-    Parameters
-    ----------
-    psi : torch.Tensor (A,) or (A, k)
-        Arc-indexed state tensor on some device (real or complex).
-    dest : torch.Tensor (A,), dtype=torch.long
-        Destination index mapping (e.g., torch.from_numpy(pm.rev)) on the same device.
-
-    Returns
-    -------
-    psi_next : torch.Tensor
-        psi_next = psi.index_select(0, dest). For 2-D input, selection is
-        along dim=0 (rows).
-    """
-    if psi.ndim == 1:
-        return psi.index_select(0, dest)
-    if psi.ndim == 2:
-        return psi.index_select(0, dest)
-    raise ValueError(f"psi must be 1-D or 2-D (got ndim={psi.ndim})")
-
-
-# ---------------------------------------------------------------------------
-# Diagnostics
-# ---------------------------------------------------------------------------
-
-
-def is_permutation_matrix_numpy(mat: object) -> bool:
-    """
-    Quick check: matrix should be square, binary {0,1}, and each row/col sums to 1.
-    Works for numpy arrays or scipy.sparse matrices.
-    """
-    # Accept dense ndarray
-    if isinstance(mat, np.ndarray):
-        if mat.ndim != 2 or mat.shape[0] != mat.shape[1]:
-            return False
-        if not np.all((mat == 0) | (mat == 1)):
-            return False
-        row_ok = np.allclose(mat.sum(axis=1), 1)
-        col_ok = np.allclose(mat.sum(axis=0), 1)
-        return bool(row_ok and col_ok)
-
-    # Accept scipy sparse
-    if sp is not None and sp.issparse(mat):  # pragma: no cover (simple)
-        if mat.shape[0] != mat.shape[1]:
-            return False
-        ones = np.ones(mat.shape[0], dtype=np.float32)
-        row_ok = np.allclose(np.asarray(mat @ ones).ravel(), ones)
-        col_ok = np.allclose(np.asarray(mat.T @ ones).ravel(), ones)
-        # Check binary data
-        if hasattr(mat, "data"):
-            data_ok = np.all((mat.data == 0) | (mat.data == 1))
+        # Gathering along the last dimension is the fastest realization of a permutation.
+        if psi.ndim == 1:
+            result = psi.index_select(0, self.perm)
+            if out is not None:
+                out.copy_(result)
+                return out
+            return result
+        elif psi.ndim == 2:
+            # (B, A) -> gather columns per row using the same perm
+            result = psi.index_select(1, self.perm)
+            if out is not None:
+                out.copy_(result)
+                return out
+            return result
         else:
-            data_ok = True
-        return bool(row_ok and col_ok and data_ok)
+            raise ValueError("psi must be rank-1 or rank-2 (batched) over the arc axis.")
 
-    return False
+    # ------------------------------- Properties ----------------------------- #
+
+    @property
+    def sparse(self) -> torch.Tensor:
+        """Alias for `to_sparse()` with default dtype=complex64."""
+        return self.to_sparse(dtype=torch.complex64)
+
+    # ------------------------------- Invariants ----------------------------- #
+
+    def check(self, strict: bool = True) -> None:
+        """
+        Validate S invariants: permutation, involution, and device consistency.
+        """
+        perm = self.perm
+        A = self.A
+        if perm.dtype != torch.long:
+            raise AssertionError("perm must be torch.long.")
+        if perm.device != self.device:
+            raise AssertionError("perm/device mismatch.")
+        if int(perm.numel()) != A:
+            raise AssertionError("perm length != A.")
+        # Check it's a true permutation of [0..A-1]
+        if A > 0:
+            if torch.unique(perm).numel() != A or perm.min() < 0 or perm.max() >= A:
+                raise AssertionError("perm is not a valid permutation.")
+            # Flip–flop involution: S^2 = I  <=>  perm[perm] == arange(A)
+            if strict:
+                if not torch.equal(perm[perm], torch.arange(A, device=self.device)):
+                    raise AssertionError("S must be an involution: perm[perm] != arange(A).")
+
+
+# --------------------------------------------------------------------------- #
+#                         Functional convenience layer                        #
+# --------------------------------------------------------------------------- #
+
+
+def perm_from_portmap(pm: PortMap) -> torch.Tensor:
+    """
+    Convenience: return the shift permutation (A,) from a PortMap.
+    """
+    return pm.to_shift_permutation()
+
+
+def sparse_from_portmap(pm: PortMap, dtype: torch.dtype = torch.complex64) -> torch.Tensor:
+    """
+    Convenience: return the sparse COO matrix for S built from a PortMap.
+    """
+    return ShiftOp.from_portmap(pm).to_sparse(dtype=dtype)
+
+
+def build_shift(pm: PortMap) -> ShiftOp:
+    """
+    High-level constructor used by the simulator.
+    """
+    op = ShiftOp.from_portmap(pm)
+    op.check(strict=True)
+    return op
+
+
+# --------------------------------------------------------------------------- #
+#                             Application utilities                           #
+# --------------------------------------------------------------------------- #
+
+
+def _ensure_complex_dtype(dtype: torch.dtype) -> torch.dtype:
+    if dtype not in (torch.complex64, torch.complex128):
+        raise TypeError("Expected complex64 or complex128 dtype for quantum state tensors.")
+    return dtype
+
+
+def apply_shift(
+    psi: torch.Tensor,
+    shift: ShiftOp | torch.Tensor,
+    *,
+    out: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """
+    Apply the flip–flop shift to `psi`.
+
+    Args
+    ----
+    psi : Tensor
+        Statevector in the arc basis. Shape (A,) or (B, A). Complex dtype required.
+    shift : ShiftOp | Tensor
+        Either a `ShiftOp` or a permutation tensor `perm` of shape (A,) (torch.long).
+    out : Optional[Tensor]
+        Optional pre-allocated output tensor (same shape & dtype as `psi`).
+
+    Returns
+    -------
+    Tensor
+        S @ psi, same shape as input.
+
+    Notes
+    -----
+    - This is purely an index permutation; it preserves norms exactly.
+    - Gradients flow through `psi` only (no learnable parameters here).
+    """
+    _ensure_complex_dtype(psi.dtype)
+
+    if isinstance(shift, ShiftOp):
+        return shift.apply(psi, out=out)
+
+    # Assume `shift` is a (A,) long permutation
+    perm = shift
+    if perm.dtype != torch.long:
+        raise TypeError("`shift` as Tensor must be torch.long permutation of shape (A,).")
+
+    A = perm.numel()
+    if psi.shape[-1] != A:
+        raise ValueError(f"psi last-dim must be {A} (got {psi.shape[-1]}).")
+
+    if psi.ndim == 1:
+        result = psi.index_select(0, perm)
+        if out is not None:
+            out.copy_(result)
+            return out
+        return result
+    elif psi.ndim == 2:
+        result = psi.index_select(1, perm)
+        if out is not None:
+            out.copy_(result)
+            return out
+        return result
+    else:
+        raise ValueError("psi must be rank-1 or rank-2 (batched) over the arc axis.")
+
+
+# --------------------------------------------------------------------------- #
+#                                Diagnostics                                  #
+# --------------------------------------------------------------------------- #
+
+
+def check_shift_unitarity(
+    shift: ShiftOp | torch.Tensor,
+    *,
+    atol: float = 0.0,
+) -> None:
+    """
+    Assert that S is a valid permutation unitary.
+
+    Conditions:
+      1) perm is a permutation of [0..A-1]
+      2) S^2 = I (involution)  <=>  perm[perm] == arange(A)
+
+    For sparse matrices, you’d use algebraic checks; here we operate on perms.
+    """
+    if isinstance(shift, ShiftOp):
+        shift.check(strict=True)
+        return
+
+    perm = shift
+    if perm.dtype != torch.long:
+        raise AssertionError("Permutation must be torch.long.")
+    A = int(perm.numel())
+    if A == 0:
+        return
+    if torch.unique(perm).numel() != A or perm.min() < 0 or perm.max() >= A:
+        raise AssertionError("Not a permutation over [0..A-1].")
+    if not torch.equal(perm[perm], torch.arange(A, device=perm.device)):
+        # If `atol` > 0 were meaningful we’d allow “nearly equal”, but indices are exact.
+        raise AssertionError("Involution failed: perm[perm] != arange(A).")
+
+
+# --------------------------------------------------------------------------- #
+#                               Module self-test                              #
+# --------------------------------------------------------------------------- #
+
+if __name__ == "__main__":  # pragma: no cover
+    # Tiny sanity check on a 3-node path 1-2-3:
+    # arcs: [1->2, 2->1, 2->3, 3->2]
+    perm = torch.tensor([1, 0, 3, 2], dtype=torch.long)
+    S = ShiftOp(perm=perm, A=perm.numel(), device=perm.device)
+    S.check()
+
+    psi = torch.tensor([1, 2, 3, 4], dtype=torch.complex64)
+    out = S.apply(psi)
+    assert torch.equal(out, torch.tensor([2, 1, 4, 3], dtype=torch.complex64))
+
+    check_shift_unitarity(S)
+    print("shift.py self-test passed.")

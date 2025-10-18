@@ -87,6 +87,9 @@ ignore = []
 [tool.ruff.lint.per-file-ignores]
 # In tests, allow long lines, non-lowercase vars, and skip annotation rules
 "tests/*" = ["E501", "N806", "ANN"]
+# In the training script, we intentionally use short uppercase math symbols (X, T, P, H...)
+"scripts/train.py" = ["N806"]
+
 
 [tool.pyright]
 pythonVersion = "3.11"

@@ -1,4 +1,80 @@
 # acpl/configs/data/graphs.yaml
-family: line       # graph family
-num_nodes: 64      # N (override from train.yaml if needed)
-seed: 42           # dataset/graph RNG seed
+# -----------------------------------------------------------------------------
+# Graph generation config (Hydra-friendly).
+# This selects the graph *family* and the parameters used by
+# acpl/data/graphs.py to build an undirected simple graph and its CSR/arc view.
+#
+# Minimal usage (requested):
+#   family: line
+#   N: 64
+#   seed: 1234
+#
+# You can override any field from the CLI, e.g.:
+#   python scripts/train.py +data=@data/graphs.yaml data.family=grid data.grid.Lx=10 data.grid.Ly=8
+# -----------------------------------------------------------------------------
+
+# Master switch
+family: line        # line | cycle | grid | cube | regular | er | ws
+
+# Global options
+seed: 1234          # RNG seed for generators that use randomness (ER/WS/regular ties)
+coalesce: true      # merge duplicate undirected edges & remove self-loops
+
+# --- Shared scalar size knobs -------------------------------------------------
+# Used by families that specify a single size:
+N: 64               # line/cycle/regular/er default number of nodes
+
+# --- Family-specific parameter blocks ----------------------------------------
+
+line:
+  # Path graph on {0,…,N-1}
+  N: ${..N}         # inherit from top-level N
+
+cycle:
+  # Cycle graph on {0,…,N-1}
+  N: ${..N}
+
+grid:
+  # Rectangular grid (no wrap unless ws.torus=true). Total nodes Lx*Ly.
+  Lx: 8
+  Ly: 8
+
+cube:
+  # Hypercube Q_d (N = 2^d). If you set d, N is ignored for this family.
+  d: 6              # 6 → N = 64
+
+regular:
+  # d-regular simple graph on N nodes.
+  # Generator retries until success (degree feasibility required: 0 <= d < N)
+  N: ${..N}
+  d: 3
+  max_retries: 50
+
+er:
+  # Erdős–Rényi G(N, p) with coalesced undirected edges, no self-loops.
+  N: ${..N}
+  p: 0.05           # edge probability in [0,1]
+
+ws:
+  # Watts–Strogatz small-world on a 2D grid lattice with local neighborhoods.
+  # We start with axis-aligned neighbors (kx in +x, ky in +y) then rewire each
+  # lattice edge (u,v) to (u,w) with probability beta. If torus=true, the base
+  # lattice is periodic on both axes.
+  Lx: 10
+  Ly: 10
+  kx: 1             # neighborhood radius in +x
+  ky: 1             # neighborhood radius in +y
+  beta: 0.2         # rewiring probability in [0,1]
+  torus: false      # wrap-around grid
+
+# --- Validation guards (checked by your runner, optional) ---------------------
+validate:
+  allow_isolated: false   # assert min degree >= 1 after construction if false
+  max_degree: null        # e.g., 16 -> assert deg(u) <= 16 for all u
+
+# --- Notes --------------------------------------------------------------------
+# • graphs.py returns: edge_index (2,E), degrees (N,), coords (N,2 or None),
+#   and arc_slices (N+1,) to index per-node arc ranges.
+# • For line/cycle/grid/cube we also emit normalized [0,1] coordinates; ER/regular/WS
+#   fall back to simple 1D coords (i/(N-1), 0) unless your features builder overrides.
+# • coalesce=true guarantees a simple undirected graph view, matching the DTQW simulator.

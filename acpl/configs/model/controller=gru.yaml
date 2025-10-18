@@ -1,6 +1,62 @@
 # acpl/configs/model/controller=gru.yaml
-kind: gru
-hidden: 64       # hidden size (H)
-layers: 1        # number of stacked GRU layers
-dropout: 0.0     # only active if layers > 1
-bidirectional: false
+# -----------------------------------------------------------------------------
+# Controller-only configuration fragment (Hydra-friendly).
+# This maps directly to ACPLPolicyConfig controller fields and is designed
+# for Phase A (causal rollouts), where the temporal backbone is a GRU that
+# consumes per-node encodings concatenated with time positional embeddings.
+#
+# Theory tie-in:
+# - We want a causal, stable temporal policy over θ_t(v) (Euler angles).
+# - GRU is a good inductive bias for smooth coin schedules and works well
+#   with our temporal smoothness regularizer in training.
+# -----------------------------------------------------------------------------
+
+controller:
+  kind: gru            # gru | transformer
+  hidden: 64           # <- primary knob: controller state width
+  layers: 1            # stacked GRU layers (keep small for stability)
+  dropout: 0.00        # applied between stacked layers when layers > 1
+  layernorm: true      # LayerNorm on GRU outputs across feature dim
+  bidirectional: false # MUST be false for causal DTQW rollouts
+
+# -----------------------------------------------------------------------------
+# Presets you can select by manual merge/override (copy desired block above)
+# -----------------------------------------------------------------------------
+presets:
+
+  # Slightly larger controller for harder tasks (e.g., longer horizons T,
+  # more irregular graphs). Adds mild dropout to curb temporal overfit.
+  medium:
+    controller:
+      hidden: 96
+      layers: 2
+      dropout: 0.10
+      layernorm: true
+      bidirectional: false
+
+  # Heavier controller; use with care (may require lower LR or stronger
+  # angle smoothness regularization to avoid jittery schedules).
+  large:
+    controller:
+      hidden: 128
+      layers: 2
+      dropout: 0.10
+      layernorm: true
+      bidirectional: false
+
+  # Speed-first tiny baseline for quick sweeps/CI.
+  tiny:
+    controller:
+      hidden: 32
+      layers: 1
+      dropout: 0.00
+      layernorm: true
+      bidirectional: false
+
+# -----------------------------------------------------------------------------
+# Notes:
+# - hidden should generally match (or be close to) the GNN out dimension.
+# - Keep bidirectional=false to preserve causal semantics with step-wise coins.
+# - If you observe temporal noise in θ, consider: increase layers to 2 and set
+#   dropout≈0.1, or enable a small angle smoothness penalty in training.
+# -----------------------------------------------------------------------------

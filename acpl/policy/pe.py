@@ -1,70 +1,121 @@
 # acpl/policy/pe.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+import math
+
 import torch
-from torch import nn
+import torch.nn as nn
+
+__all__ = ["TimeFourierPE", "TimeFourierPEConfig"]
 
 
-class PositionalEncodingStub(nn.Module):
+@dataclass
+class TimeFourierPEConfig:
     """
-    Minimal PE wrapper for Phase A.
+    Fourier-style time positional encoding configuration.
 
-    Behavior
-    --------
-    - If neither pos nor t_over_t is provided: returns x unchanged.
-    - If pos is provided (shape (N, P)): concatenates as extra features.
-    - If t_over_t is provided: appends a (N, 1) column with that scalar.
+    Fields
+    ------
+    dim : even number of channels = 2 * (#frequencies)
+    base : geometric span for frequencies; larger → wider spectrum
+    learned_scale : learn a global scalar s so that t_eff = s * t
 
-    Parameters
-    ----------
-    use_time_scalar : bool
-        If True, include the time scalar when t_over_t is passed to forward.
+    Optional (stable defaults preserve old behavior):
+    normalize : apply LayerNorm over the PE channels
+    dropout   : dropout on PE (useful regularizer at the controller input)
+    learned_phase : learn per-frequency phase φ_k (shifts sin/cos arguments)
+    learned_freqs : learn per-frequency multipliers ω_k (initialized from base)
     """
 
-    def __init__(self, use_time_scalar: bool = True) -> None:
+    dim: int = 32
+    base: float = 10000.0
+    learned_scale: bool = True
+
+    # extras (off by default; keep backward-compat)
+    normalize: bool = False
+    dropout: float = 0.0
+    learned_phase: bool = False
+    learned_freqs: bool = False
+
+
+class TimeFourierPE(nn.Module):
+    r"""
+    Fourier time embeddings:
+        PE_k(t) = [sin(ω_k t_eff + φ_k), cos(ω_k t_eff + φ_k)],
+        with t_eff = s * t, where s is learned if `learned_scale=True`.
+
+    Notes
+    -----
+    * This module is intentionally **stateless wrt T**; you can call it for any T.
+    * Defaults reproduce the previous implementation exactly (learned global scale,
+      fixed log-spaced ω_k, zero phase, no norm/dropout).
+    * We keep the simple call contract used by policy:
+          pe = TimeFourierPE(...)(T, device=X.device)  # (T, dim)
+      You may also pass `dtype` explicitly if needed.
+    """
+
+    def __init__(self, cfg: TimeFourierPEConfig):
         super().__init__()
-        self.use_time_scalar = use_time_scalar
+        if cfg.dim % 2 != 0:
+            raise ValueError("TimeFourierPE dim must be even.")
+        self.cfg = cfg
 
-    @staticmethod
-    def _as_scalar_tensor(
-        val: float | torch.Tensor | None,
-        device: torch.device,
-        dtype: torch.dtype,
-    ) -> torch.Tensor | None:
-        if val is None:
-            return None
-        if isinstance(val, (int, float)):
-            return torch.tensor(float(val), device=device, dtype=dtype)
-        return torch.as_tensor(val, device=device, dtype=dtype).reshape(())
+        # scale s (global)
+        if cfg.learned_scale:
+            self.scale = nn.Parameter(torch.tensor(1.0, dtype=torch.float32))
+        else:
+            self.register_buffer("scale", torch.tensor(1.0, dtype=torch.float32), persistent=False)
+
+        d = cfg.dim // 2
+
+        # base frequencies ω_k (log-spaced), in float32 (moved to device on forward)
+        # ω_k = base^{-k/(d-1)}  for k=0..d-1  (robust when d==1)
+        k = torch.arange(d, dtype=torch.float32)
+        denom = max(d - 1, 1)
+        w0 = torch.exp(-k * math.log(cfg.base) / denom)  # shape: (d,)
+
+        if cfg.learned_freqs:
+            self.freqs = nn.Parameter(w0)  # learnable ω_k
+        else:
+            self.register_buffer("freqs", w0, persistent=False)
+
+        if cfg.learned_phase:
+            self.phase = nn.Parameter(torch.zeros(d, dtype=torch.float32))  # φ_k
+        else:
+            self.register_buffer("phase", torch.zeros(d, dtype=torch.float32), persistent=False)
+
+        self.norm = nn.LayerNorm(cfg.dim) if cfg.normalize else nn.Identity()
+        self.do = nn.Dropout(cfg.dropout) if cfg.dropout and cfg.dropout > 0 else nn.Identity()
 
     def forward(
         self,
-        x: torch.Tensor,  # (N, F)
-        *,
-        pos: torch.Tensor | None = None,  # (N, P) optional
-        t_over_t: float | torch.Tensor | None = None,
+        T: int,
+        device: torch.device | None = None,
+        dtype: torch.dtype = torch.float32,
     ) -> torch.Tensor:
         """
-        Concatenate optional positional encodings and/or a temporal scalar.
+        Build PE for time indices t = 0,1,...,T-1
 
         Returns
         -------
-        torch.Tensor
-            Feature tensor with any requested encodings appended along dim=1.
+        pe : (T, dim) tensor on the requested device/dtype
         """
-        if x.ndim != 2:
-            raise ValueError(f"x must be 2-D (N, F), got {tuple(x.shape)}")
+        if T <= 0:
+            raise ValueError("T must be positive.")
 
-        feats = x
-        if pos is not None:
-            if pos.ndim != 2 or pos.size(0) != x.size(0):
-                raise ValueError("pos must have shape (N, P) with same N as x")
-            feats = torch.cat([feats, pos.to(device=x.device, dtype=x.dtype)], dim=1)
+        d = self.cfg.dim // 2
 
-        if self.use_time_scalar and t_over_t is not None:
-            scalar = self._as_scalar_tensor(t_over_t, device=x.device, dtype=x.dtype)
-            # Broadcast to a (N, 1) column and append
-            tcol = scalar.expand(x.size(0), 1)  # type: ignore[arg-type]
-            feats = torch.cat([feats, tcol], dim=1)
+        # Ensure parameters/buffers are on the target device/dtype
+        scale = self.scale.to(device=device, dtype=dtype)
+        freqs = self.freqs.to(device=device, dtype=dtype)
+        phase = self.phase.to(device=device, dtype=dtype)
 
-        return feats
+        t = torch.arange(T, dtype=dtype, device=device) * scale  # (T,)
+        # arg = t[:,None] * ω[None,:] + φ[None,:]
+        arg = t.unsqueeze(1) * freqs.unsqueeze(0) + phase.unsqueeze(0)  # (T, d)
+
+        pe = torch.cat([torch.sin(arg), torch.cos(arg)], dim=1)  # (T, 2d)
+        pe = self.do(pe)
+        pe = self.norm(pe)
+        return pe

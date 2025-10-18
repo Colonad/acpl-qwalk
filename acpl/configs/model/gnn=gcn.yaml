@@ -1,7 +1,159 @@
 # acpl/configs/model/gnn=gcn.yaml
-# Two-layer GCN with hidden width H=64 (L=2 is implicit in the architecture)
+# Model-only configuration (Phase A6)
+# -----------------------------------------------------------------------------
+# This file defines a *permanent* set of robust defaults for the ACPL policy
+# when the encoder is a GCN. It maps 1:1 to ACPLPolicyConfig fields and adds
+# a few commented presets you can quickly toggle for different regimes.
+#
+# Philosophy (short):
+# - Permutation-equivariant encoder (GCN, shallow+residual) → stable node codes
+# - Lightweight causal controller over normalized time τ=t/T (GRU by default)
+# - Physically valid SU(2) coin head (Euler ZYZ angles) with STE-wrapped logits
+# - Mild regularization (DropEdge, LayerNorm) for stability and transfer
+# -----------------------------------------------------------------------------
 
-kind: gcn
-hidden: 64         # H
-layers: 2          # L (TwoLayerGCN is fixed to 2 internally; keep for clarity)
-dropout: 0.0
+# -------------------------
+# Encoder: GCN
+# -------------------------
+gnn:
+  kind: gcn                # gcn | gin | sage | gat | pna (this file is the GCN variant)
+  hidden: 64               # internal width for GNN layers (maps to gnn_hidden)
+  out: 64                  # output width given to the temporal controller (maps to gnn_out)
+  activation: gelu         # relu | gelu | tanh  (maps to gnn_activation)
+  dropout: 0.10            # feature dropout inside the GNN (maps to gnn_dropout)
+  layernorm: true          # LayerNorm after GNN (maps to gnn_layernorm)
+  residual: true           # residual/skip in GNN (maps to gnn_residual)
+  dropedge: 0.00           # probability to drop edges during training (maps to gnn_dropedge)
+
+  # Notes:
+  # - Keep depth small (2–3 effective layers inside the GCN module used by the codebase).
+  # - For heterophily/degree skew, consider switching to pna or gat in a sibling config.
+
+# -------------------------
+# Time Positional Encoding
+# -------------------------
+time_pe:
+  dim: 32                  # even number; [sin,cos] pairs (maps to time_pe_dim)
+  learned_scale: true      # learn scalar s so that t_eff = s * t (maps to time_pe_learned_scale)
+
+# -------------------------
+# Controller
+# -------------------------
+controller:
+  kind: gru                # gru | transformer  (maps to controller)
+  hidden: 64               # controller state width (maps to ctrl_hidden)
+  layers: 1                # # stacked GRU layers (maps to ctrl_layers)
+  dropout: 0.00            # stacked-layer dropout if layers>1 (maps to ctrl_dropout)
+  layernorm: true          # post-output LayerNorm over time dimension (maps to ctrl_layernorm)
+  bidirectional: false     # must remain false for causal rollouts (maps to ctrl_bidirectional)
+
+  # If you switch to 'transformer', typical additional knobs used by the code:
+  #   num_heads: 4           # automatically inferred in ACPLPolicy if omitted
+  #   mlp_ratio: 2.0
+  #   dropout: 0.10
+  #   layernorm: true
+  #
+  # Rationale:
+  # - GRU is strong by default (stable, cheap, causal).
+  # - The controller consumes [z_v ; τ ; optional PE] per node, per time.
+
+# -------------------------
+# Head (SU(2) angles)
+# -------------------------
+head:
+  hidden: 0                # 0 → linear head (maps to head_hidden)
+  out_scale: 1.0           # scale angles before wrap; good default=1.0 (maps to head_out_scale)
+  layernorm: true          # LayerNorm on 3-angle vector [α,β,γ] (maps to head_layernorm)
+  dropout: 0.00            # optional dropout in head MLP if hidden>0 (maps to head_dropout)
+
+  # Implementation detail:
+  # - Angles are wrapped to (-π, π] with a straight-through estimator so gradients are stable.
+  # - The SU(2) lift downstream guarantees unitary, det=1 coins exactly.
+
+# -------------------------
+# Sanity/robustness presets
+# -------------------------
+# Toggle these blocks manually if you need stronger regularization or lighter models.
+presets:
+
+  # Mild regularization for larger graphs or noisy objectives
+  regularized:
+    gnn:
+      dropout: 0.20
+      dropedge: 0.10
+      layernorm: true
+      residual: true
+    controller:
+      dropout: 0.10
+      layernorm: true
+    head:
+      hidden: 64
+      dropout: 0.10
+      layernorm: true
+
+  # Speed-first / tiny (useful for quick sweeps or ablations)
+  tiny:
+    gnn:
+      hidden: 32
+      out: 32
+      dropout: 0.00
+      layernorm: true
+      residual: true
+      dropedge: 0.00
+    controller:
+      hidden: 32
+      layers: 1
+      dropout: 0.00
+      layernorm: true
+    head:
+      hidden: 0
+      dropout: 0.00
+      layernorm: true
+
+  # Transformer controller (keep encoder the same)
+  transformer_ctrl:
+    controller:
+      kind: transformer
+      hidden: 64
+      layers: 2
+      dropout: 0.10
+      layernorm: true
+      # heads and mlp_ratio are inferred by ACPLPolicy if absent; can be set explicitly:
+      # num_heads: 4
+      # mlp_ratio: 2.0
+
+# -------------------------
+# Notes for integration
+# -------------------------
+# This YAML is intended to be merged into a higher-level experiment config (e.g.,
+# acpl/configs/train.yaml) where data/sim/task/optim/loop are specified.
+#
+# Mapping summary -> ACPLPolicyConfig:
+#   gnn.hidden        → gnn_hidden
+#   gnn.out           → gnn_out
+#   gnn.activation    → gnn_activation
+#   gnn.dropout       → gnn_dropout
+#   gnn.layernorm     → gnn_layernorm
+#   gnn.residual      → gnn_residual
+#   gnn.dropedge      → gnn_dropedge
+#
+#   time_pe.dim             → time_pe_dim
+#   time_pe.learned_scale   → time_pe_learned_scale
+#
+#   controller.kind         → controller
+#   controller.hidden       → ctrl_hidden
+#   controller.layers       → ctrl_layers
+#   controller.dropout      → ctrl_dropout
+#   controller.layernorm    → ctrl_layernorm
+#   controller.bidirectional→ ctrl_bidirectional
+#
+#   head.hidden       → head_hidden
+#   head.out_scale    → head_out_scale
+#   head.layernorm    → head_layernorm
+#   head.dropout      → head_dropout
+#
+# Practical tips:
+# - Keep GRU bidirectional=false for causality and to match the simulator’s step order.
+# - Increase gnn.out if you plan a heavier head; otherwise keep encoder→controller widths aligned.
+# - If you see temporal jitter in angles near convergence, consider a small head.dropout (0.05–0.10)
+#   and enable controller.layernorm=true (already default here).

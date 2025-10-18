@@ -1,378 +1,477 @@
 # acpl/data/features.py
 from __future__ import annotations
 
-import numpy as np
+from dataclasses import dataclass
+import math
+from typing import Literal
+
+import torch
 
 __all__ = [
-    "node_features_line",
-    "laplacian_pe",
-    "laplacian_positional_encodings",  # already defined later; export it too
-    "degree_role_onehot",
-    "role_encodings_onehot",  # <— add this
-    "hypercube_bitstrings",
-    "safe_concat",
+    "FeatureSpec",
+    "build_node_features",
+    "node_features_line",  # (degree + 1D normalized coord)
+    "laplacian_positional_encoding",
+    "random_walk_structural_encoding",
+    "normalize_degree",
+    "degree_one_hot",
+    "sinusoidal_coords",
+    "build_arc_features",
 ]
 
 
-# ---------------------------------------------------------------------
-# Phase-A line features (unchanged)
-# ---------------------------------------------------------------------
+# --------------------------------------------------------------------------------------
+# Spec and simple helpers
+# --------------------------------------------------------------------------------------
 
 
-def node_features_line(
-    degrees: np.ndarray,
-    coords: np.ndarray,
-    *,
-    normalize_degree: bool = True,
-    dtype: np.dtype = np.float32,
-) -> np.ndarray:
+@dataclass
+class FeatureSpec:
     """
-    Build node features for the Phase-A line graph.
+    Configuration of node- and arc-level features.
 
-    Features (per node)
-    -------------------
-    1) degree (optionally normalized by max degree)
-    2) 1-D coordinate in [0, 1] (already normalized)
+    Node features (stacked in this order when enabled):
+      1) degree statistics (raw, normalized)
+      2) degree one-hot up to K (optional)
+      3) geometry coords (as provided by graphs)
+      4) sinusoidal coords (periodic embeddings of coords)
+      5) Laplacian Positional Encodings (LapPE, top-k eigenvectors)
+      6) Random-Walk Structural Encoding (RWSE) up to K steps
 
-    Parameters
-    ----------
-    degrees : (n,) int64
-    coords  : (n,1) float
-    normalize_degree : bool
-    dtype : np.dtype
+    Arc features (optional):
+      - direction vector (dst - src), L2 normalized (+ distance)
+      - local polar angle on 2D coords (if available)
 
-    Returns
-    -------
-    (n, 2) array
+    Notes
+    -----
+    - All tensors are returned as float32 by default except where noted.
+    - LapPE is sign-deterministic via 'random_sign=False' or seeded generator.
     """
-    if degrees.ndim != 1:
-        raise ValueError(f"degrees must be 1-D (got shape {degrees.shape})")
-    if coords.ndim != 2 or coords.shape[1] != 1:
-        raise ValueError(f"coords must have shape (n, 1) (got {coords.shape})")
-    if degrees.shape[0] != coords.shape[0]:
-        raise ValueError(
-            f"degrees and coords must have the same rows: {degrees.shape[0]} != {coords.shape[0]}"
-        )
 
-    n = degrees.shape[0]
+    # Node
+    use_degree: bool = True
+    degree_norm: Literal["none", "max", "log", "inv_sqrt"] = "inv_sqrt"
+    degree_onehot_K: int = 0  # 0 disables one-hot
+    use_coords: bool = True
+    use_sinusoidal_coords: bool = False
+    sinusoidal_dims: int = 0  # if >0 and use_sinusoidal_coords=True
+    sinusoidal_base: float = 10000.0
+    use_lap_pe: bool = False
+    lap_pe_k: int = 0  # number of eigenvectors
+    lap_pe_norm: Literal["sym", "rw"] = "sym"
+    lap_pe_random_sign: bool = True
+    use_rwse: bool = False
+    rwse_K: int = 0  # steps for P^k
+    rwse_aggregation: Literal["row"] = "row"  # reserved for future
+    # Arc
+    build_arcs: bool = False
+    arc_use_direction: bool = True
+    arc_use_distance: bool = True
+    arc_use_angle2d: bool = True  # only if coords dim==2
 
-    # Degree feature (optionally normalized)
-    deg = degrees.astype(np.float64, copy=False)
-    if normalize_degree:
-        max_deg = float(deg.max()) if n > 0 else 0.0
-        scale = max(max_deg, 1.0)  # avoid divide-by-zero
-        deg = deg / scale
-
-    # Coordinate feature (already normalized to [0,1] by graphs.py)
-    coord = coords.astype(np.float64, copy=False).reshape(n)
-
-    feats = np.stack([deg, coord], axis=1).astype(dtype, copy=False)
-    return feats
-
-
-# ---------------------------------------------------------------------
-# Laplacian positional encodings (NumPy-only, deterministic sign)
-# ---------------------------------------------------------------------
+    # Misc
+    eps: float = 1e-12
+    seed: int | None = None  # for deterministic LapPE sign jitter, etc.
 
 
-def _deterministic_sign(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+# --------------------------------------------------------------------------------------
+# Degree features and simple encodings
+# --------------------------------------------------------------------------------------
+
+
+def normalize_degree(
+    degrees: torch.Tensor, mode: str = "inv_sqrt", eps: float = 1e-12
+) -> torch.Tensor:
     """
-    Fix the sign of an eigenvector deterministically:
-    - Prefer sign such that the sum is nonnegative.
-    - If sum ~ 0, flip to make the first nonzero entry positive.
+    Normalize degrees into a single scalar feature per node.
+
+    modes:
+      - "none": return degrees as float
+      - "max":  d / max(d)
+      - "log":  log1p(d)
+      - "inv_sqrt": 1 / sqrt(max(d,1))
     """
-    s = float(x.sum())
-    if abs(s) > eps:
-        return x if s >= 0.0 else -x
-    nz = np.where(np.abs(x) > eps)[0]
-    if nz.size == 0:
-        return x  # zero vector; nothing to fix
-    return x if x[nz[0]] >= 0.0 else -x
+    d = degrees.to(torch.float32)
+    if mode == "none":
+        return d
+    if mode == "max":
+        m = torch.clamp(d.max(), min=1.0)
+        return d / m
+    if mode == "log":
+        return torch.log1p(d)
+    if mode == "inv_sqrt":
+        return 1.0 / torch.sqrt(torch.clamp(d, min=1.0))
+    raise ValueError(f"Unknown degree normalization mode: {mode}")
 
 
-def laplacian_pe(
-    edge_index: np.ndarray,
-    n: int | None = None,
-    *,
-    k: int = 8,
-    normalized: bool = True,
-    dtype: np.dtype = np.float32,
-) -> np.ndarray:
+def degree_one_hot(degrees: torch.Tensor, K: int) -> torch.Tensor:
     """
-    Compute the first k Laplacian eigenvectors (skip the trivial constant one).
-
-    - If normalized=True, use the symmetric normalized Laplacian:
-        L = I - D^{-1/2} A D^{-1/2}
-      Otherwise, use the combinatorial Laplacian:
-        L = D - A
-    - Eigenvectors have deterministic sign.
-
-    Parameters
-    ----------
-    edge_index : (2, E) int64
-        Undirected, canonically coalesced (u < v) is preferred but not required.
-    n : int, optional
-        Number of nodes. If None, inferred as 1 + max(edge_index).
-    k : int
-        Number of non-trivial eigenvectors to return.
-    normalized : bool
-        Use symmetric normalized Laplacian if True.
-    dtype : np.dtype
-        Output dtype.
-
-    Returns
-    -------
-    (n, k) float32/float64 (dtype)
+    Degree one-hot up to K (clamps larger degrees into the last bin).
+    Returns (N, K+1) float32 if K>0 else empty (N,0).
     """
-    if edge_index.ndim != 2 or edge_index.shape[0] != 2:
-        raise ValueError("edge_index must have shape (2, E)")
-
-    if edge_index.size == 0:
-        n = 0 if n is None else int(n)
-    else:
-        n_infer = int(edge_index.max()) + 1
-        n = n_infer if n is None else int(n)
-
-    if n <= 0:
-        return np.zeros((0, k), dtype=dtype)
-
-    # Build dense adjacency (NumPy-only for portability/simplicity).
-    a = np.zeros((n, n), dtype=np.float64)
-    if edge_index.size:
-        u = edge_index[0].astype(np.int64, copy=False)
-        v = edge_index[1].astype(np.int64, copy=False)
-        a[u, v] = 1.0
-        a[v, u] = 1.0
-
-    d = a.sum(axis=1)
-    if normalized:
-        with np.errstate(divide="ignore"):
-            inv_sqrt = 1.0 / np.sqrt(np.maximum(d, 1e-12))
-        inv_sqrt[d <= 0.0] = 0.0
-        d_inv = np.diag(inv_sqrt)
-        # L = I - D^{-1/2} A D^{-1/2}
-        lap = np.eye(n, dtype=np.float64) - d_inv @ a @ d_inv
-    else:
-        # L = D - A
-        lap = np.diag(d) - a
-
-    # Eigen-decomposition (symmetric)
-    w, vecs = np.linalg.eigh(lap)
-    # Sort by eigenvalue ascending
-    order = np.argsort(w)
-    w = w[order]
-    vecs = vecs[:, order]
-
-    # Skip the trivial constant eigenvector (index 0) if present
-    start = 1 if w.size > 0 else 0
-    # Take up to k vectors
-    take = max(0, min(k, vecs.shape[1] - start))
-    if take == 0:
-        return np.zeros((n, 0), dtype=dtype)
-
-    pe = vecs[:, start : start + take]
-    # Deterministic sign per vector
-    for j in range(pe.shape[1]):
-        pe[:, j] = _deterministic_sign(pe[:, j])
-
-    return pe.astype(dtype, copy=False)
-
-
-# ---------------------------------------------------------------------
-# Role encodings (simple degree one-hot)
-# ---------------------------------------------------------------------
-
-
-def degree_role_onehot(
-    degrees: np.ndarray,
-    *,
-    max_deg: int | None = None,
-    dtype: np.dtype = np.float32,
-) -> np.ndarray:
-    """
-    Degree-based role encoding: one-hot bins over {0,1,...,max_deg}.
-
-    Parameters
-    ----------
-    degrees : (n,) int64
-    max_deg : int, optional
-        If None, use degrees.max(). Caps the number of columns to max_deg+1.
-    dtype : np.dtype
-
-    Returns
-    -------
-    (n, max_deg+1) array
-    """
-    if degrees.ndim != 1:
-        raise ValueError(f"degrees must be 1-D (got {degrees.shape})")
-    d = degrees.astype(np.int64, copy=False)
-    n = d.shape[0]
-    dmax = int(d.max()) if n > 0 else 0
-    bins = max_deg if max_deg is not None else dmax
-    bins = max(0, int(bins))
-    out = np.zeros((n, bins + 1), dtype=dtype)
-    # clamp to [0, D] then set one-hot
-    d_clamp = np.clip(d, 0, bins)
-    rows = np.arange(n, dtype=np.int64)
-    out[rows, d_clamp] = 1.0
+    if K <= 0:
+        return torch.zeros(degrees.numel(), 0, dtype=torch.float32, device=degrees.device)
+    d = torch.clamp(degrees, min=0, max=K).to(torch.long)
+    N = degrees.numel()
+    out = torch.zeros(N, K + 1, dtype=torch.float32, device=degrees.device)
+    out.scatter_(1, d.view(-1, 1), 1.0)
     return out
 
 
-# Backwards-compat alias expected by EpisodeGenerator
-role_encodings_onehot = degree_role_onehot
-
-
-# ---------------------------------------------------------------------
-# Bitstrings for hypercubes (2^dim nodes, lexicographic order)
-# ---------------------------------------------------------------------
-
-
-def hypercube_bitstrings(
-    dim: int,
-    *,
-    dtype: np.dtype = np.float32,
-) -> np.ndarray:
+def sinusoidal_coords(coords: torch.Tensor, dims: int, base: float = 10000.0) -> torch.Tensor:
     """
-    Return bitstring features for Q_dim with nodes labeled 0..2^dim-1.
-
-    Parameters
-    ----------
-    dim : int
-        Hypercube dimension (>= 0).
-    dtype : np.dtype
-
-    Returns
-    -------
-    (2^dim, dim) array with entries in {0,1} (as floats).
+    Sinusoidal positional encoding (Vaswani-style) for each coordinate dimension.
+    coords : (N, C) in [0,1] or reasonable scale
+    dims   : number of features per coordinate dimension (must be even, we use sin/cos pairs)
+    returns: (N, C*dims)
     """
-    if dim < 0:
-        raise ValueError("dim must be >= 0")
-    n = 1 << dim
-    if n == 0:
-        return np.zeros((0, dim), dtype=dtype)
-    # Build by bit masking
-    bits = np.zeros((n, dim), dtype=np.uint8)
-    for b in range(dim):
-        mask = 1 << (dim - 1 - b)  # MSB first for a nice lexicographic layout
-        bits[:, b] = ((np.arange(n, dtype=np.int64) & mask) > 0).astype(np.uint8)
-    return bits.astype(dtype, copy=False)
+    if dims <= 0:
+        return torch.zeros(coords.shape[0], 0, dtype=torch.float32, device=coords.device)
+    if dims % 2 != 0:
+        raise ValueError("sinusoidal_dims must be even (sin/cos pairs).")
+    N, C = coords.shape
+    pe_list = []
+    # frequencies
+    half = dims // 2
+    div = torch.exp(
+        torch.arange(0, half, dtype=torch.float32, device=coords.device)
+        * (-math.log(base) / max(half - 1, 1))
+    )
+    for c in range(C):
+        x = coords[:, c].unsqueeze(1)  # (N,1)
+        scaled = x * div  # (N, half)
+        pe_list.append(torch.sin(scaled))
+        pe_list.append(torch.cos(scaled))
+    return torch.cat(pe_list, dim=1)
 
 
-# ---------------------------------------------------------------------
-# Utilities
-# ---------------------------------------------------------------------
+# --------------------------------------------------------------------------------------
+# Laplacian PE (robust, sparse-friendly)
+# --------------------------------------------------------------------------------------
 
 
-def safe_concat(
-    *arrays: np.ndarray,
-    axis: int = 1,
-    dtype: np.dtype = np.float32,
-) -> np.ndarray:
+def _build_undirected_adj(edge_index: torch.Tensor, num_nodes: int) -> torch.Tensor:
     """
-    Concatenate feature blocks that may be None or have zero columns.
-
-    - Skips None inputs.
-    - Casts to `dtype`.
-    - If all inputs are None/empty, returns shape (n, 0).
-
-    All inputs must share the same number of rows.
+    Build a symmetric sparse adjacency (float32) from oriented arcs edge_index (2,A).
+    Self-loops removed.
     """
-    blocks: list[np.ndarray] = []
-    n: int | None = None
-    for arr in arrays:
-        if arr is None:
-            continue
-        if arr.ndim != 2:
-            raise ValueError("all arrays must be 2-D")
-        if n is None:
-            n = arr.shape[0]
-        elif arr.shape[0] != n:
-            raise ValueError("all arrays must have the same number of rows")
-        if arr.shape[1] == 0:
-            continue
-        blocks.append(arr.astype(dtype, copy=False))
+    if edge_index.ndim != 2 or edge_index.shape[0] != 2:
+        raise ValueError("edge_index must be (2, A)")
+    src, dst = edge_index[0], edge_index[1]
+    mask = src != dst
+    src = src[mask]
+    dst = dst[mask]
+    # Take only one direction for undirected (min,max) coalescing
+    a = torch.minimum(src, dst)
+    b = torch.maximum(src, dst)
+    undirected = torch.stack([a, b], dim=0)
+    # sort/unique
+    key = a * num_nodes + b
+    uniq, idx = torch.unique(key, sorted=True, return_inverse=False, return_counts=False), None
+    # recover pairs from uniq keys
+    uu = (uniq // num_nodes).to(torch.long)
+    vv = (uniq % num_nodes).to(torch.long)
 
-    if n is None:
-        return np.zeros((0, 0), dtype=dtype)
-    if not blocks:
-        return np.zeros((n, 0), dtype=dtype)
+    # Now build symmetric COO
+    ii = torch.cat([uu, vv], dim=0)
+    jj = torch.cat([vv, uu], dim=0)
+    vv_data = torch.ones_like(ii, dtype=torch.float32)
+    A = torch.sparse_coo_tensor(torch.stack([ii, jj]), vv_data, (num_nodes, num_nodes))
+    return A.coalesce()
 
-    return np.concatenate(blocks, axis=axis)
+
+def _laplacian_from_adj(A: torch.Tensor, mode: str = "sym", eps: float = 1e-12) -> torch.Tensor:
+    """
+    Return sparse Laplacian:
+      - mode "sym": L = I - D^{-1/2} A D^{-1/2}
+      - mode "rw" : L_rw = I - D^{-1} A
+    """
+    assert A.is_sparse
+    N = A.size(0)
+    deg = torch.sparse.sum(A, dim=1).to_dense().clamp_min(0.0)  # (N,)
+    I_idx = torch.arange(N, device=A.device)
+    if mode == "sym":
+        dinv_sqrt = (deg + eps).pow(-0.5)
+        # scale values of A by D^{-1/2} row and col
+        idx = A.indices()
+        val = A.values()
+        v = dinv_sqrt[idx[0]] * val * dinv_sqrt[idx[1]]
+        S = torch.sparse_coo_tensor(idx, v, A.shape).coalesce()
+        # L = I - S
+        I = torch.sparse_coo_tensor(
+            torch.stack([I_idx, I_idx]), torch.ones(N, device=A.device), A.shape
+        )
+        L = I - S
+        return L.coalesce()
+    elif mode == "rw":
+        dinv = (deg + eps).reciprocal()
+        idx = A.indices()
+        val = A.values()
+        v = dinv[idx[0]] * val
+        P = torch.sparse_coo_tensor(idx, v, A.shape).coalesce()  # row-stochastic
+        I = torch.sparse_coo_tensor(
+            torch.stack([I_idx, I_idx]), torch.ones(N, device=A.device), A.shape
+        )
+        Lrw = I - P
+        return Lrw.coalesce()
+    else:
+        raise ValueError("mode must be 'sym' or 'rw'.")
 
 
-def laplacian_positional_encodings(
-    edge_index: np.ndarray,
+@torch.no_grad()
+def laplacian_positional_encoding(
+    edge_index: torch.Tensor,
     num_nodes: int,
     k: int,
     *,
-    normalized: bool = True,
-    dtype: np.dtype = np.float32,
-) -> np.ndarray:
+    mode: Literal["sym", "rw"] = "sym",
+    random_sign: bool = True,
+    seed: int | None = None,
+    eps: float = 1e-12,
+) -> torch.Tensor:
     """
-    Compute Laplacian positional encodings (topologically-aware features).
+    Compute top-k (smallest) Laplacian eigenvectors as positional encodings.
 
-    Returns a matrix of shape (num_nodes, k) with the k smallest *nontrivial*
-    eigenvectors of the (normalized or unnormalized) Laplacian. Each eigenvector
-    has a deterministic sign: we flip it so that its entry with largest magnitude
-    is nonnegative.
-
-    Parameters
-    ----------
-    edge_index : (2, E) int64
-        Undirected edge list with u < v (duplicates ignored).
-    num_nodes : int
-        Number of nodes.
-    k : int
-        Number of nontrivial eigenvectors to return (clamped to available).
-    normalized : bool
-        If True, use L_sym = I - D^{-1/2} A D^{-1/2}, else L = D - A.
-    dtype : np.dtype
-        Output dtype (default float32).
+    - Works with disconnected graphs: we compute per-component eigenvectors implicitly
+      via full sparse->dense fallback (small graphs) or dense on small N;
+      for typical N (<= few thousands), dense eig is acceptable here.
+    - Returns (N, k) float32. If k==0 → shape (N,0).
+    - random_sign: multiply each eigenvector by ±1 consistently (fixes sign ambiguity).
     """
-    if num_nodes <= 0:
-        raise ValueError("num_nodes must be >= 1")
     if k <= 0:
-        return np.zeros((num_nodes, 0), dtype=dtype)
+        return torch.zeros(num_nodes, 0, dtype=torch.float32, device=edge_index.device)
+    A = _build_undirected_adj(edge_index, num_nodes)
+    L = _laplacian_from_adj(A, mode=mode, eps=eps)
 
-    # ----- Build symmetric adjacency A (n x n) -----
-    n = int(num_nodes)
-    a = np.zeros((n, n), dtype=np.float64)
-    if edge_index.size > 0:
-        if edge_index.shape != (2, edge_index.shape[1]):
-            raise ValueError("edge_index must have shape (2, E)")
-        u = edge_index[0].astype(np.int64, copy=False)
-        v = edge_index[1].astype(np.int64, copy=False)
-        a[u, v] = 1.0
-        a[v, u] = 1.0
+    # Dense fallback
+    Ld = L.to_dense()
+    # eigh for symmetric (real)
+    evals, evecs = torch.linalg.eigh(Ld)  # ascending
+    # take the smallest k (skip exact zeros if needed? keep as-is; zeros capture components)
+    evecs_k = evecs[:, :k].to(torch.float32)
 
-    d = a.sum(axis=1)
-    if normalized:
-        inv_sqrt = np.where(d > 0.0, 1.0 / np.sqrt(d), 0.0)
-        d_inv = np.diag(inv_sqrt)
-        lap = np.eye(n, dtype=np.float64) - d_inv @ a @ d_inv
+    if random_sign:
+        gen = torch.Generator(device=evecs_k.device)
+        if seed is not None:
+            gen.manual_seed(seed)
+        signs = torch.where(
+            torch.rand(1, k, generator=gen, device=evecs_k.device) > 0.5, 1.0, -1.0
+        ).to(evecs_k.dtype)
+        evecs_k = evecs_k * signs  # broadcast across rows
+
+    return evecs_k
+
+
+# --------------------------------------------------------------------------------------
+# RWSE: Random-walk structural encoding
+# --------------------------------------------------------------------------------------
+
+
+@torch.no_grad()
+def random_walk_structural_encoding(
+    edge_index: torch.Tensor,
+    num_nodes: int,
+    K: int,
+    *,
+    eps: float = 1e-12,
+) -> torch.Tensor:
+    """
+    RWSE up to K steps using the row-stochastic transition matrix P = D^{-1}A.
+    Returns (N, K) with columns corresponding to diag entries of P^k (or row-sums over powers).
+
+    We build P in sparse COO, then multiply dense vectors iteratively.
+    For simplicity and stability, we compute 'landing probability at the same node'
+    across k steps: diag(P^k). Realistically, you can also use row-sums of P^k (which are 1).
+    """
+    if K <= 0:
+        return torch.zeros(num_nodes, 0, dtype=torch.float32, device=edge_index.device)
+
+    # Build P
+    A = _build_undirected_adj(edge_index, num_nodes)  # symmetric 0/1
+    deg = torch.sparse.sum(A, dim=1).to_dense().clamp_min(0.0)  # (N,)
+    dinv = (deg + eps).reciprocal()
+    idx = A.indices()
+    val = A.values()
+    v = dinv[idx[0]] * val
+    P = torch.sparse_coo_tensor(idx, v, (num_nodes, num_nodes)).coalesce()
+
+    # Efficient multiplication by P using sparse @ dense
+    feats = torch.zeros(num_nodes, K, dtype=torch.float32, device=edge_index.device)
+    # Start with basis vectors e_i one-by-one via diagonal extraction trick:
+    # We track diag(P^k) without storing P^k: diag(P^k) = sum_j P^{k-1}_{i,j} * P_{j,i}
+    # Implement iterative forward over columns of P and gather diagonal.
+    # We'll use dense matmul for P@X with X dense (N,d).
+    X = torch.eye(num_nodes, dtype=torch.float32, device=edge_index.device)  # (N,N)
+    # To keep memory in check for moderate N; for larger N you can chunk X.
+    for k in range(1, K + 1):
+        X = torch.sparse.mm(P, X)  # (N,N)
+        # extract diagonal
+        feats[:, k - 1] = torch.diag(X)
+    return feats
+
+
+# --------------------------------------------------------------------------------------
+# Node feature assembly
+# --------------------------------------------------------------------------------------
+
+
+def node_features_line(degrees: torch.Tensor, coords: torch.Tensor) -> torch.Tensor:
+    """
+    Minimal line-graph features used in early Phase A2:
+    - normalized degree (inv_sqrt)
+    - 1D normalized coordinate
+
+    Expects:
+      degrees: (N,) int
+      coords : (N,1) float in [0,1]
+    Returns:
+      (N, 2) float32
+    """
+    deg_feat = normalize_degree(degrees, mode="inv_sqrt")  # (N,)
+    if coords.ndim != 2 or coords.shape[1] != 1:
+        raise ValueError("coords must be (N,1) for node_features_line.")
+    return torch.cat([deg_feat.view(-1, 1), coords.to(torch.float32)], dim=1)
+
+
+def build_node_features(
+    edge_index: torch.Tensor,
+    degrees: torch.Tensor,
+    coords: torch.Tensor,
+    *,
+    spec: FeatureSpec | None = None,
+    device: torch.device | None = None,
+) -> tuple(torch.Tensor, dict[str, tuple[int, int]]):
+    """
+    Assemble node features per FeatureSpec.
+    Returns:
+      X  : (N, F) float32
+      idx: dict mapping feature-block name -> (start, end) column indices
+    """
+    if spec is None:
+        spec = FeatureSpec()
+    if device is None:
+        device = degrees.device
+
+    N = degrees.numel()
+    blocks = []
+    index: dict[str, tuple[int, int]] = {}
+    col = 0
+
+    # 1) degree stats
+    if spec.use_degree:
+        dnorm = normalize_degree(degrees.to(device), mode=spec.degree_norm, eps=spec.eps).view(
+            -1, 1
+        )
+        blocks.append(dnorm)
+        index["deg_norm"] = (col, col + 1)
+        col += 1
+        if spec.degree_onehot_K > 0:
+            doh = degree_one_hot(degrees.to(device), spec.degree_onehot_K)
+            blocks.append(doh)
+            index["deg_onehot"] = (col, col + doh.shape[1])
+            col += doh.shape[1]
+
+    # 2) coords
+    if spec.use_coords and coords.numel() > 0:
+        C = coords.shape[1]
+        c = coords.to(device, dtype=torch.float32)
+        blocks.append(c)
+        index["coords"] = (col, col + C)
+        col += C
+
+        if spec.use_sinusoidal_coords and spec.sinusoidal_dims > 0:
+            sc = sinusoidal_coords(c, dims=spec.sinusoidal_dims, base=spec.sinusoidal_base)
+            blocks.append(sc)
+            index["coords_sin"] = (col, col + sc.shape[1])
+            col += sc.shape[1]
+
+    # 3) LapPE
+    if spec.use_lap_pe and spec.lap_pe_k > 0:
+        pe = laplacian_positional_encoding(
+            edge_index=edge_index.to(device),
+            num_nodes=N,
+            k=spec.lap_pe_k,
+            mode=spec.lap_pe_norm,
+            random_sign=spec.lap_pe_random_sign,
+            seed=spec.seed,
+            eps=spec.eps,
+        )
+        blocks.append(pe)
+        index["lap_pe"] = (col, col + pe.shape[1])
+        col += pe.shape[1]
+
+    # 4) RWSE
+    if spec.use_rwse and spec.rwse_K > 0:
+        rw = random_walk_structural_encoding(
+            edge_index=edge_index.to(device),
+            num_nodes=N,
+            K=spec.rwse_K,
+            eps=spec.eps,
+        )
+        blocks.append(rw)
+        index["rwse"] = (col, col + rw.shape[1])
+        col += rw.shape[1]
+
+    if len(blocks) == 0:
+        X = torch.zeros(N, 0, dtype=torch.float32, device=device)
     else:
-        lap = np.diag(d) - a
+        X = torch.cat(blocks, dim=1).to(torch.float32)
 
-    # ----- Eigen-decomposition (symmetric) -----
-    # eigh returns eigenvalues in ascending order for symmetric matrices
-    w, v = np.linalg.eigh(lap)  # v columns = eigenvectors
+    return X, index
 
-    # Skip the trivial eigenvector(s) with eigenvalue ~0; use a small threshold
-    tol = 1e-12
-    nontrivial_idx = np.where(w > tol)[0]
-    if nontrivial_idx.size == 0:
-        # Graph is totally disconnected (or n=1); return zeros
-        return np.zeros((n, min(k, max(0, n - 1))), dtype=dtype)
 
-    # Take the first k nontrivial eigenvectors
-    take = min(k, nontrivial_idx.size)
-    vecs = v[:, nontrivial_idx[:take]]  # (n, take)
+# --------------------------------------------------------------------------------------
+# Optional arc features (useful for advanced policies / diagnostics)
+# --------------------------------------------------------------------------------------
 
-    # Deterministic sign: flip each vector so its largest-magnitude entry is >= 0
-    for j in range(vecs.shape[1]):
-        col = vecs[:, j]
-        idx = int(np.argmax(np.abs(col)))
-        if col[idx] < 0:
-            vecs[:, j] = -col
 
-    return vecs.astype(dtype, copy=False)
+def build_arc_features(
+    edge_index: torch.Tensor,
+    coords: torch.Tensor,
+    *,
+    use_direction: bool = True,
+    use_distance: bool = True,
+    use_angle2d: bool = True,
+    eps: float = 1e-12,
+) -> torch.Tensor:
+    """
+    Simple geometric features per arc (i->j) given node coords:
+      - direction: (x_j - x_i) / ||x_j - x_i|| (if use_direction)
+      - distance : ||x_j - x_i||
+      - angle2d  : atan2(Δy, Δx) in [-pi,pi], sin/cos pair (if 2D and use_angle2d)
+
+    Returns (A, F) float32 (F depends on toggles and coord dimension).
+    If coords are empty or 1D and angle requested, angle is skipped safely.
+    """
+    if edge_index.ndim != 2 or edge_index.shape[0] != 2:
+        raise ValueError("edge_index must be (2, A)")
+    src, dst = edge_index[0], edge_index[1]
+    A = src.numel()
+
+    if coords.numel() == 0:
+        return torch.zeros(A, 0, dtype=torch.float32, device=edge_index.device)
+
+    Xi = coords[src]  # (A, C)
+    Xj = coords[dst]  # (A, C)
+    d = Xj - Xi
+    feats = []
+
+    if use_direction:
+        n = torch.linalg.norm(d, dim=1, keepdim=True).clamp_min(eps)
+        dir_unit = d / n  # (A, C)
+        feats.append(dir_unit)
+
+    if use_distance:
+        dist = torch.linalg.norm(d, dim=1, keepdim=True)
+        feats.append(dist)
+
+    if use_angle2d and coords.shape[1] >= 2:
+        dx = d[:, 0]
+        dy = d[:, 1]
+        ang = torch.atan2(dy, dx)  # (-pi, pi)
+        feats.append(torch.sin(ang).unsqueeze(1))
+        feats.append(torch.cos(ang).unsqueeze(1))
+
+    if len(feats) == 0:
+        return torch.zeros(A, 0, dtype=torch.float32, device=edge_index.device)
+    return torch.cat(feats, dim=1).to(torch.float32)

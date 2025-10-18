@@ -1,235 +1,560 @@
 # acpl/data/splits.py
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Sequence
 from dataclasses import dataclass
-from hashlib import blake2b
-import json
+import hashlib
+from typing import Literal
 
 import numpy as np
 
-SplitDict = dict[str, np.ndarray]
+__all__ = [
+    "SplitSpec",
+    "SplitIndices",
+    "stable_hash64",
+    "derive_seed64",
+    "normalize_ratios",
+    "holdout_split_indices",
+    "group_holdout_split_indices",
+    "stratified_group_holdout_split_indices",
+    "kfold_indices",
+    "group_kfold_indices",
+    "EpisodeRouter",
+]
 
 
-def _validate_probs(p_train: float, p_val: float, p_test: float) -> tuple[float, float, float]:
-    """Validate and (lightly) normalize split probabilities."""
-    if any(p < 0.0 for p in (p_train, p_val, p_test)):
-        raise ValueError("split probabilities must be non-negative")
-    s = p_train + p_val + p_test
-    if s <= 0.0:
-        raise ValueError("sum of split probabilities must be positive")
-    return (p_train / s, p_val / s, p_test / s)
+# --------------------------------------------------------------------------------------
+# Core utilities
+# --------------------------------------------------------------------------------------
 
 
-# ---------------------------------------------------------------------------
-# Seed-based splitter (Phase A compatibility)
-# ---------------------------------------------------------------------------
+def stable_hash64(x: str | bytes | int | tuple | Sequence) -> int:
+    """
+    Deterministic 64-bit hash via SHA-256 → lower 8 bytes interpreted as unsigned.
+    Accepts strings, bytes, ints, and (nested) sequences/tuples.
+    """
+
+    def _to_bytes(obj) -> bytes:
+        if isinstance(obj, bytes):
+            return obj
+        if isinstance(obj, str):
+            return obj.encode("utf-8")
+        if isinstance(obj, int):
+            return str(obj).encode("utf-8")
+        if isinstance(obj, (tuple, list)):
+            # include separators to avoid ambiguity
+            b = b"["
+            for i, el in enumerate(obj):
+                if i > 0:
+                    b += b","
+                b += _to_bytes(el)
+            b += b"]"
+            return b
+        # Fallback to repr for anything else that’s deterministic (e.g., dicts after sorting)
+        return repr(obj).encode("utf-8")
+
+    data = _to_bytes(x)
+    h = hashlib.sha256(data).digest()
+    return int.from_bytes(h[:8], byteorder="little", signed=False)
+
+
+def derive_seed64(*parts: str | int | bytes, base_seed: int | None = None) -> int:
+    """
+    Compose a 64-bit seed deterministically from arbitrary parts and an optional base_seed.
+    """
+    seq = list(parts)
+    if base_seed is not None:
+        seq.append(int(base_seed))
+    return stable_hash64(tuple(seq)) & ((1 << 64) - 1)
+
+
+def normalize_ratios(
+    ratios: tuple[float, float, float] | None = None,
+    sizes: tuple[int, int, int] | None = None,
+    total: int | None = None,
+) -> tuple[int, int, int]:
+    """
+    Convert either fractional ratios (train,val,test) or explicit sizes to integer sizes.
+    Ensures non-negative, sum == total, and small rounding is handled gracefully.
+    """
+    if (ratios is None) == (sizes is None):
+        raise ValueError("Provide exactly one of ratios or sizes.")
+    if sizes is not None:
+        if any(s < 0 for s in sizes):
+            raise ValueError("sizes must be non-negative.")
+        if total is None:
+            total = sum(sizes)
+        if sum(sizes) != total:
+            raise ValueError("sum(sizes) must equal total.")
+        return sizes
+    # ratios path
+    if total is None:
+        raise ValueError("total is required when using ratios.")
+    tr, va, te = ratios
+    if tr < 0 or va < 0 or te < 0:
+        raise ValueError("ratios must be non-negative.")
+    s_tr = int(round(tr * total))
+    s_va = int(round(va * total))
+    # keep the remainder in test to ensure sum matches
+    s_te = total - s_tr - s_va
+    if s_tr < 0 or s_va < 0 or s_te < 0:
+        raise ValueError("Ratios incompatible with total.")
+    return (s_tr, s_va, s_te)
+
+
+# --------------------------------------------------------------------------------------
+# Structures
+# --------------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
-class SeedSplitter:
+class SplitSpec:
     """
-    Deterministic router from episode seed -> split.
+    Declarative split specification.
 
-    Determinism comes from hashing the (seed, salt) pair into a stable RNG
-    (NumPy PCG64) and drawing a single U[0,1) to decide the split bucket.
+    method: "holdout" | "kfold"
+    group:  if True, split by groups (all items in the same group go to the same split)
+    stratify: if True, attempt to preserve label proportions (requires labels and groups for group-mode)
+    k: number of folds (for kfold)
+    fold: active fold index in [0, k-1] (for kfold)
+    ratios: (train,val,test) for holdout
+    seed: master seed for deterministic shuffles/hashes
     """
 
-    p_train: float = 0.8
-    p_val: float = 0.1
-    p_test: float = 0.1
-    salt: int = 0
+    method: Literal["holdout", "kfold"] = "holdout"
+    group: bool = True
+    stratify: bool = False
+    k: int = 5
+    fold: int = 0
+    ratios: tuple[float, float, float] = (0.8, 0.1, 0.1)
+    seed: int = 42
+    # streaming holdout behavior
+    # When method="holdout" and group=True:
+    # - group_pin=False (default): choose split by EPISODE key (better episode-level ratios)
+    # - group_pin=True:  choose split by GROUP id (keeps groups intact in streaming)
+    group_pin: bool = False
 
-    def __post_init__(self) -> None:
-        pt, pv, pte = _validate_probs(self.p_train, self.p_val, self.p_test)
-        object.__setattr__(self, "p_train", pt)
-        object.__setattr__(self, "p_val", pv)
-        object.__setattr__(self, "p_test", pte)
 
-    def route(self, seed: int) -> str:
-        """Deterministically route a single integer seed to 'train'/'val'/'test'."""
-        mix = np.uint64(seed) ^ (np.uint64(self.salt) * np.uint64(0x9E3779B97F4A7C15))
-        rng = np.random.Generator(np.random.PCG64(mix))
-        u = float(rng.random())
-        if u < self.p_train:
-            return "train"
-        if u < self.p_train + self.p_val:
-            return "val"
-        return "test"
+@dataclass(frozen=True)
+class SplitIndices:
+    """
+    Indices for train/val/test.
+    """
 
-    def assign_from_seeds(self, seeds: Iterable[int]) -> SplitDict:
-        """Assign a collection of integer seeds to splits, deterministically."""
-        train, val, test = [], [], []
-        for s in seeds:
-            bucket = self.route(int(s))
-            if bucket == "train":
-                train.append(int(s))
-            elif bucket == "val":
-                val.append(int(s))
+    train: np.ndarray
+    val: np.ndarray
+    test: np.ndarray
+
+    def as_lists(self) -> tuple[list[int], list[int], list[int]]:
+        return (self.train.tolist(), self.val.tolist(), self.test.tolist())
+
+    def counts(self) -> tuple[int, int, int]:
+        return (self.train.size, self.val.size, self.test.size)
+
+
+# --------------------------------------------------------------------------------------
+# Holdout splitting
+# --------------------------------------------------------------------------------------
+
+
+def holdout_split_indices(
+    n_items: int,
+    *,
+    ratios: tuple[float, float, float] = (0.8, 0.1, 0.1),
+    seed: int = 0,
+) -> SplitIndices:
+    """
+    Deterministic shuffle + split over item indices [0..n_items-1].
+    """
+    if n_items < 0:
+        raise ValueError("n_items must be non-negative.")
+    sizes = normalize_ratios(ratios=ratios, total=n_items)
+    gen = np.random.default_rng(derive_seed64("holdout", seed))
+    perm = np.arange(n_items, dtype=np.int64)
+    gen.shuffle(perm)
+    t, v, _ = sizes
+    train = perm[:t]
+    val = perm[t : t + v]
+    test = perm[t + v :]
+    return SplitIndices(train=train, val=val, test=test)
+
+
+def group_holdout_split_indices(
+    groups: Sequence[int | str],
+    *,
+    ratios: tuple[float, float, float] = (0.8, 0.1, 0.1),
+    seed: int = 0,
+) -> SplitIndices:
+    """
+    Holdout which assigns *groups* to splits and then expands to items.
+    All items with the same group stay in the same split.
+    """
+    n = len(groups)
+    # Map group value -> list of indices
+    group_to_ix: dict[int | str, list[int]] = {}
+    for i, g in enumerate(groups):
+        group_to_ix.setdefault(g, []).append(i)
+
+    uniq_groups = np.array(list(group_to_ix.keys()))
+    G = uniq_groups.size
+    sizes = normalize_ratios(ratios=ratios, total=G)
+
+    gen = np.random.default_rng(derive_seed64("group_holdout", seed))
+    order = np.arange(G, dtype=np.int64)
+    gen.shuffle(order)
+    t, v, _ = sizes
+    g_train = set(uniq_groups[order[:t]].tolist())
+    g_val = set(uniq_groups[order[t : t + v]].tolist())
+    g_test = set(uniq_groups[order[t + v :]].tolist())
+
+    train, val, test = [], [], []
+    for g, idxs in group_to_ix.items():
+        if g in g_train:
+            train.extend(idxs)
+        elif g in g_val:
+            val.extend(idxs)
+        else:
+            test.extend(idxs)
+
+    return SplitIndices(
+        train=np.array(train, dtype=np.int64),
+        val=np.array(val, dtype=np.int64),
+        test=np.array(test, dtype=np.int64),
+    )
+
+
+def stratified_group_holdout_split_indices(
+    labels: Sequence[int | str],
+    groups: Sequence[int | str],
+    *,
+    ratios: tuple[float, float, float] = (0.8, 0.1, 0.1),
+    seed: int = 0,
+) -> SplitIndices:
+    """
+    Group-aware *and* label-stratified holdout.
+
+    Strategy:
+      1) Aggregate by (group -> label histogram).
+      2) Shuffle groups deterministically.
+      3) Greedy bin-packing of groups into train/val/test to match target counts per label.
+         (Keeps groups intact. Deterministic and fast; approximate but effective.)
+    """
+    if len(labels) != len(groups):
+        raise ValueError("labels and groups must have the same length.")
+    n = len(labels)
+    # Enumerate labels to ints for histogram math
+    label_to_int: dict[int | str, int] = {}
+    y_int = np.empty(n, dtype=np.int64)
+    next_id = 0
+    for i, y in enumerate(labels):
+        if y not in label_to_int:
+            label_to_int[y] = next_id
+            next_id += 1
+        y_int[i] = label_to_int[y]
+    L = next_id
+
+    # Build group histograms
+    group_to_ix: dict[int | str, list[int]] = {}
+    for i, g in enumerate(groups):
+        group_to_ix.setdefault(g, []).append(i)
+
+    uniq_groups = np.array(list(group_to_ix.keys()))
+    G = uniq_groups.size
+
+    # Target totals per label per split
+    total_per_label = np.bincount(y_int, minlength=L).astype(np.int64)
+    tr, va, te = ratios
+    target_tr = (total_per_label * tr).round().astype(np.int64)
+    target_va = (total_per_label * va).round().astype(np.int64)
+    target_te = total_per_label - target_tr - target_va
+
+    # Prepare greedy accumulators
+    acc_tr = np.zeros(L, dtype=np.int64)
+    acc_va = np.zeros(L, dtype=np.int64)
+    acc_te = np.zeros(L, dtype=np.int64)
+
+    # Group order
+    gen = np.random.default_rng(derive_seed64("strat_group_holdout", seed))
+    order = np.arange(G, dtype=np.int64)
+    gen.shuffle(order)
+
+    g_train, g_val, g_test = [], [], []
+    # Greedy: assign each group to the split that minimizes L1 gap to target after adding this group
+    for gi in uniq_groups[order]:
+        idxs = group_to_ix[gi]
+        hist = np.bincount(y_int[idxs], minlength=L)
+
+        def score(acc, targ):
+            after = acc + hist
+            return np.abs(after - targ).sum()
+
+        s_tr = score(acc_tr, target_tr)
+        s_va = score(acc_va, target_va)
+        s_te = score(acc_te, target_te)
+
+        # choose smallest score; tie-break train > val > test deterministically
+        if s_tr <= s_va and s_tr <= s_te:
+            acc_tr += hist
+            g_train.append(gi)
+        elif s_va <= s_te:
+            acc_va += hist
+            g_val.append(gi)
+        else:
+            acc_te += hist
+            g_test.append(gi)
+
+    # Expand to item indices
+    train, val, test = [], [], []
+    for g, idxs in group_to_ix.items():
+        if g in g_train:
+            train.extend(idxs)
+        elif g in g_val:
+            val.extend(idxs)
+        else:
+            test.extend(idxs)
+
+    return SplitIndices(
+        train=np.array(train, dtype=np.int64),
+        val=np.array(val, dtype=np.int64),
+        test=np.array(test, dtype=np.int64),
+    )
+
+
+# --------------------------------------------------------------------------------------
+# K-fold cross-validation
+# --------------------------------------------------------------------------------------
+
+
+def kfold_indices(
+    n_items: int,
+    *,
+    k: int,
+    fold: int,
+    seed: int = 0,
+) -> SplitIndices:
+    """
+    Standard K-fold over items (no grouping). Fold acts as validation; test is empty.
+    """
+    if k <= 1:
+        raise ValueError("k must be >= 2.")
+    if not (0 <= fold < k):
+        raise ValueError("fold must be in [0, k-1].")
+    gen = np.random.default_rng(derive_seed64("kfold", seed))
+    order = np.arange(n_items, dtype=np.int64)
+    gen.shuffle(order)
+    # split order into k blocks as equal as possible
+    sizes = [n_items // k + (1 if i < (n_items % k) else 0) for i in range(k)]
+    offsets = np.cumsum([0] + sizes)
+    val_block = (offsets[fold], offsets[fold + 1])
+    val = order[val_block[0] : val_block[1]]
+    train = np.concatenate([order[: val_block[0]], order[val_block[1] :]], axis=0)
+    test = np.empty(0, dtype=np.int64)
+    return SplitIndices(train=train, val=val, test=test)
+
+
+def group_kfold_indices(
+    groups: Sequence[int | str],
+    *,
+    k: int,
+    fold: int,
+    seed: int = 0,
+) -> SplitIndices:
+    """
+    GroupKFold: split by unique groups into k folds; validation is one fold; test empty.
+    """
+    if k <= 1:
+        raise ValueError("k must be >= 2.")
+    if not (0 <= fold < k):
+        raise ValueError("fold must be in [0, k-1].")
+
+    group_to_ix: dict[int | str, list[int]] = {}
+    for i, g in enumerate(groups):
+        group_to_ix.setdefault(g, []).append(i)
+
+    uniq_groups = np.array(list(group_to_ix.keys()))
+    G = uniq_groups.size
+
+    gen = np.random.default_rng(derive_seed64("group_kfold", seed))
+    order = np.arange(G, dtype=np.int64)
+    gen.shuffle(order)
+
+    sizes = [G // k + (1 if i < (G % k) else 0) for i in range(k)]
+    offsets = np.cumsum([0] + sizes)
+
+    val_groups = set(uniq_groups[order[offsets[fold] : offsets[fold + 1]]].tolist())
+    train, val = [], []
+    for g, idxs in group_to_ix.items():
+        if g in val_groups:
+            val.extend(idxs)
+        else:
+            train.extend(idxs)
+    test = np.empty(0, dtype=np.int64)
+    return SplitIndices(
+        train=np.array(train, dtype=np.int64), val=np.array(val, dtype=np.int64), test=test
+    )
+
+
+# --------------------------------------------------------------------------------------
+# Router for episodic generators
+# --------------------------------------------------------------------------------------
+
+
+class EpisodeRouter:
+    """
+    Centralized, deterministic router for episodic data.
+
+    Typical usage:
+
+        router = EpisodeRouter(
+            spec=SplitSpec(method="holdout", group=True, stratify=True,
+                           ratios=(0.8, 0.1, 0.1), seed=13)
+        )
+
+        # For each episode 'i', with metadata:
+        #   key   : unique identifier for the episode (str) (e.g., JSON of cfg)
+        #   group : group id to avoid leakage (e.g., graph topology hash)
+        #   label : optional label for stratification (task type)
+        split, ep_seed = router.route(key=..., group=..., label=..., index=i)
+
+    The router provides:
+      - split membership ("train"/"val"/"test"),
+      - per-episode 64-bit seed derived from master seed + episode key/index.
+    """
+
+    def __init__(self, spec: SplitSpec):
+        self.spec = spec
+
+    # ---- split assignment helpers -------------------------------------------------- #
+
+    def _assign_holdout(
+        self,
+        n_items: int,
+        *,
+        groups: Sequence[int | str] | None = None,
+        labels: Sequence[int | str] | None = None,
+    ) -> SplitIndices:
+        s = self.spec
+        if s.group:
+            if s.stratify:
+                if labels is None or groups is None:
+                    raise ValueError("labels and groups are required for stratified group holdout.")
+                return stratified_group_holdout_split_indices(
+                    labels, groups, ratios=s.ratios, seed=s.seed
+                )
             else:
-                test.append(int(s))
-        return {
-            "train": np.asarray(train, dtype=np.int64),
-            "val": np.asarray(val, dtype=np.int64),
-            "test": np.asarray(test, dtype=np.int64),
-        }
+                if groups is None:
+                    raise ValueError("groups are required for group holdout.")
+                return group_holdout_split_indices(groups, ratios=s.ratios, seed=s.seed)
+        else:
+            # item-level split (no groups)
+            return holdout_split_indices(n_items, ratios=s.ratios, seed=s.seed)
 
-    def assign_from_count(self, n: int, *, start_seed: int = 0) -> SplitDict:
-        """Assign seeds {start_seed, ..., start_seed+n-1} deterministically."""
-        seeds = range(start_seed, start_seed + n)
-        return self.assign_from_seeds(seeds)
+    def _assign_kfold(
+        self,
+        n_items: int,
+        *,
+        groups: Sequence[int | str] | None = None,
+    ) -> SplitIndices:
+        s = self.spec
+        if s.group:
+            if groups is None:
+                raise ValueError("groups are required for group k-fold.")
+            return group_kfold_indices(groups, k=s.k, fold=s.fold, seed=s.seed)
+        else:
+            return kfold_indices(n_items, k=s.k, fold=s.fold, seed=s.seed)
 
+    # ---- public API ---------------------------------------------------------------- #
 
-def default_splitter(
-    p_train: float = 0.8,
-    p_val: float = 0.1,
-    p_test: float = 0.1,
-    *,
-    salt: int = 0,
-) -> SeedSplitter:
-    """Factory for a SeedSplitter with given probs and salt."""
-    return SeedSplitter(p_train=p_train, p_val=p_val, p_test=p_test, salt=salt)
+    def build_splits(
+        self,
+        n_items: int,
+        *,
+        groups: Sequence[int | str] | None = None,
+        labels: Sequence[int | str] | None = None,
+    ) -> SplitIndices:
+        """
+        Materialize train/val/test indices for a static collection of n_items.
+        """
+        if self.spec.method == "holdout":
+            return self._assign_holdout(n_items, groups=groups, labels=labels)
+        elif self.spec.method == "kfold":
+            return self._assign_kfold(n_items, groups=groups)
+        else:
+            raise ValueError(f"Unknown split method: {self.spec.method}")
 
+    def route(
+        self,
+        *,
+        key: str | int | bytes,
+        index: int,
+        group: int | str | None = None,
+        label: int | str | None = None,
+    ) -> tuple[str, int]:
+        s = self.spec
+        key_hash = stable_hash64(("route", key))
 
-def route_seed(
-    seed: int,
-    *,
-    p_train: float = 0.8,
-    p_val: float = 0.1,
-    p_test: float = 0.1,
-    salt: int = 0,
-) -> str:
-    """Stateless helper: route a single seed to 'train' / 'val' / 'test'."""
-    return default_splitter(p_train, p_val, p_test, salt=salt).route(seed)
-
-
-# ---------------------------------------------------------------------------
-# Triplet-based splitter (Phase B): (graph, config, task, seed)
-# ---------------------------------------------------------------------------
-
-
-def _stable_json(obj: dict[str, object] | None) -> str:
-    """
-    Deterministically serialize config dicts to a compact JSON string
-    (sorted keys, no whitespace). Accepts None -> "".
-    """
-    if obj is None:
-        return ""
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-
-
-@dataclass(frozen=True)
-class Triplet:
-    """
-    Describes an episode identity for splitting.
-
-    family : str
-        Graph family name (e.g., "line", "grid", "er", ...).
-    graph_cfg : dict[str, object] | None
-        Graph parameter dict; must be JSON-serializable with basic types.
-    task : str
-        Task ID/name (e.g., "transfer", "search", ...).
-    seed : int
-        Base episode seed (e.g., derived from manifest or index).
-    """
-
-    family: str
-    graph_cfg: dict[str, object] | None
-    task: str
-    seed: int
-
-
-@dataclass(frozen=True)
-class TripletSplitter:
-    """
-    Deterministic router from (graph family, graph config, task, seed) -> split.
-
-    We hash a compact, stable JSON representation of the triplet plus `salt`
-    using BLAKE2b (64-bit digest), map to U[0,1), then bucket by probs.
-    """
-
-    p_train: float = 0.8
-    p_val: float = 0.1
-    p_test: float = 0.1
-    salt: int = 0
-
-    def __post_init__(self) -> None:
-        pt, pv, pte = _validate_probs(self.p_train, self.p_val, self.p_test)
-        object.__setattr__(self, "p_train", pt)
-        object.__setattr__(self, "p_val", pv)
-        object.__setattr__(self, "p_test", pte)
-
-    def _score(
-        self, family: str, graph_cfg: dict[str, object] | None, task: str, seed: int
-    ) -> float:
-        payload = "|".join(
-            [
-                family.lower(),
-                _stable_json(graph_cfg),
-                task.lower(),
-                str(int(seed)),
-                str(int(self.salt)),
-            ]
-        ).encode("utf-8")
-        h = blake2b(payload, digest_size=8)
-        # Convert 64-bit digest to float in [0,1)
-        val = int.from_bytes(h.digest(), byteorder="big", signed=False)
-        return (val % (1 << 64)) / float(1 << 64)
-
-    def route(self, triplet: Triplet) -> str:
-        """Route a Triplet to 'train' / 'val' / 'test' deterministically."""
-        u = self._score(triplet.family, triplet.graph_cfg, triplet.task, triplet.seed)
-        if u < self.p_train:
-            return "train"
-        if u < self.p_train + self.p_val:
-            return "val"
-        return "test"
-
-    def assign_from_triplets(self, items: Iterable[Triplet]) -> SplitDict:
-        """Partition a collection of Triplet items."""
-        train, val, test = [], [], []
-        for t in items:
-            bucket = self.route(t)
-            if bucket == "train":
-                train.append(t)
-            elif bucket == "val":
-                val.append(t)
+        if s.method == "kfold":
+            # Group-aware: keep groups intact for kfold
+            if s.group and group is not None:
+                h = stable_hash64(("gkfold", group, s.seed)) % s.k
             else:
-                test.append(t)
-        # We return indices into the original iteration order when helpful, but for
-        # symmetry with SeedSplitter, we return arrays of the base seeds by default.
-        # Callers needing the full Triplets can keep their own lists.
-        return {
-            "train": np.asarray([ti.seed for ti in train], dtype=np.int64),
-            "val": np.asarray([ti.seed for ti in val], dtype=np.int64),
-            "test": np.asarray([ti.seed for ti in test], dtype=np.int64),
-        }
+                h = stable_hash64(("kfold", key_hash, s.seed)) % s.k
+            split = "val" if h == s.fold else "train"
+            ep_seed = derive_seed64("episode", key_hash, index, base_seed=s.seed)
+            return split, ep_seed
+
+        # ---- Holdout (streaming) ----
+        # For online episodes we target *episode-level* ratios. Even if group=True,
+        # we choose the split based on the episode key (not the group) to avoid
+        # coarse group-level variance that can skew ratios with few groups.
+        # ---- Holdout (streaming) ----
+        tr, va, te = s.ratios
+        total = tr + va + te
+        if total <= 0:
+            raise ValueError("Invalid ratios: sum must be positive.")
+
+        # Choose the hash base depending on group_pin behavior
+        if s.group and s.group_pin and group is not None:
+            # Group-pinned: every episode of this group goes to the same split.
+            # Strong mixing to avoid structured-ID skews; map to full [0,1) via 64-bit float.
+            h = stable_hash64(("group_holdout_router_v2", s.seed, group))
+            # 64-bit multiplicative hashing (Knuth/pcg-style) for additional scrambling
+            h = (h * 0x9E3779B97F4A7C15) & ((1 << 64) - 1)
+            # Convert to uniform in [0,1)
+            u = h / float(1 << 64)
+        else:
+            # Episode-mixed: split is chosen by episode key for better episode-level ratios.
+            h = stable_hash64(("item_holdout_router_v2", s.seed, key_hash))
+            h = (h * 0x9E3779B97F4A7C15) & ((1 << 64) - 1)
+            u = h / float(1 << 64)
+
+        c1 = tr / total
+        c2 = (tr + va) / total
+        if u < c1:
+            split = "train"
+        elif u < c2:
+            split = "val"
+        else:
+            split = "test"
+
+        ep_seed = derive_seed64("episode", key_hash, index, base_seed=s.seed)
+        return split, ep_seed
 
 
-def default_triplet_splitter(
-    p_train: float = 0.8,
-    p_val: float = 0.1,
-    p_test: float = 0.1,
-    *,
-    salt: int = 0,
-) -> TripletSplitter:
-    """Factory for a TripletSplitter with given probs and salt."""
-    return TripletSplitter(p_train=p_train, p_val=p_val, p_test=p_test, salt=salt)
+# --------------------------------------------------------------------------------------
+# Debug and invariants
+# --------------------------------------------------------------------------------------
 
 
-def route_triplet(
-    family: str,
-    graph_cfg: dict[str, object] | None,
-    task: str,
-    seed: int,
-    *,
-    p_train: float = 0.8,
-    p_val: float = 0.1,
-    p_test: float = 0.1,
-    salt: int = 0,
-) -> str:
+def _check_disjoint_and_cover(splits: SplitIndices, n_items: int) -> None:
     """
-    Stateless helper to route a (graph, config, task, seed) identity.
+    Internal: ensure disjointness and coverage of splits over [0..n_items-1].
     """
-    splitter = default_triplet_splitter(p_train, p_val, p_test, salt=salt)
-    return splitter.route(Triplet(family=family, graph_cfg=graph_cfg, task=task, seed=seed))
+    all_ix = np.concatenate([splits.train, splits.val, splits.test], axis=0)
+    uniq = np.unique(all_ix)
+    if uniq.size != n_items:
+        missing = set(range(n_items)) - set(uniq.tolist())
+        dup = [x for x in all_ix.tolist() if (all_ix == x).sum() > 1]
+        raise AssertionError(
+            f"Splits must cover all items exactly once. Missing={len(missing)}, dups={len(dup)}."
+        )

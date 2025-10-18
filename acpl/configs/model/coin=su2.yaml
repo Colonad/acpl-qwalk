@@ -1,8 +1,73 @@
 # acpl/configs/model/coin=su2.yaml
-family: su2
-parameterization: euler   # Euler angles (alpha, beta, gamma)
-init:
-  strategy: zeros         # start near identity; options: zeros | small_random
-  std: 0.0                # if small_random, set e.g. 0.05
-constraints:
-  angle_range: tanh_pi    # match head output: "unbounded" | "tanh_pi"
+# -----------------------------------------------------------------------------
+# Coin/lift configuration (Phase A): SU(2) at degree-2 vertices.
+# Parameterization: ZYZ Euler angles (α, β, γ) -> exact SU(2) unitary, det=1.
+# This file controls ONLY the coin family and its numerical safeguards.
+#
+# Theory tie-in:
+# - Phase A acts on degree-2 vertices with local SU(2) coins, identity elsewhere.
+# - We use a ZYZ Euler map with a straight-through wrapped angle head, which
+#   preserves gradient flow while keeping angles in (−π, π].
+# - The simulator applies block-diagonal coins followed by flip-flop shift.
+# -----------------------------------------------------------------------------
+
+coin:
+  family: su2                 # su2 | exp | cayley   (Phase A: su2)
+  parameterization: euler     # (Z-Y-Z Euler angles)
+  dtype: complex64            # complex64 recommended for speed; complex128 for diagnostics
+  normalize: true             # project to unitary & det=1 if needed (safety net)
+  check: false                # expensive: assert unitarity/det on forward (debug only)
+
+  # Angle handling (policy head produces angles; kept here for clarity/overrides)
+  angles:
+    wrap: ste_pi              # straight-through wrap to (−π, π]
+    out_scale: 1.0            # post-MLP scaling before wrapping (mirrors model.head.out_scale)
+
+  # Application semantics in the simulator:
+  # - apply_on_deg2: true → apply SU(2) only when deg==2; identity otherwise.
+  # - This matches acpl/sim/step.apply_coin_blockdiag behavior.
+  apply_on_deg2: true
+
+# -----------------------------------------------------------------------------
+# Presets (copy desired block to override above keys)
+# -----------------------------------------------------------------------------
+presets:
+
+  # Strict: use higher precision and runtime checks (slower; for verification)
+  strict_diagnostics:
+    coin:
+      dtype: complex128
+      normalize: true
+      check: true
+      angles:
+        out_scale: 1.0
+        wrap: ste_pi
+
+  # Fast: rely on exact analytic SU(2) lift from policy; skip checks
+  fast_train:
+    coin:
+      dtype: complex64
+      normalize: false        # policy path already yields exact SU(2)
+      check: false
+      angles:
+        out_scale: 1.0
+        wrap: ste_pi
+
+  # Conservative: keep projection but skip per-step assertions
+  safe_train:
+    coin:
+      dtype: complex64
+      normalize: true
+      check: false
+      angles:
+        out_scale: 1.0
+        wrap: ste_pi
+
+# -----------------------------------------------------------------------------
+# Notes:
+# - In Phase A we *do not* lift to higher-dim coins; non-deg-2 vertices receive I.
+# - If you later enable Phase B (exp/cayley families for deg>2), keep this file
+#   as the SU(2) profile and compose with a task-level coin router.
+# - The policy currently constructs SU(2) coins inline (exact det=1), so
+#   normalize=true here is a harmless safety net when using external coins.
+# -----------------------------------------------------------------------------

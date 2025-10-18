@@ -1,12 +1,57 @@
 # acpl/configs/task/transfer.yaml
+# -----------------------------------------------------------------------------
+# Phase A task config: **State transfer** on a single connected graph.
+# Default convention: source node = 0, target node = N-1 (last).
+# If your runner constructs the initial state from `source_index` and reads
+# the objective from `target_index`, this file is all you need to swap targets
+# or loss/aggregation behavior via CLI overrides.
+# -----------------------------------------------------------------------------
+
 name: transfer
 
-# Episode endpoints
+# -------------------------
+# Source / Target
+# -------------------------
+# By default we assume the episode builder will:
+#   • place the initial state on `source_index` (uniform over its outgoing ports)
+#   • compute the loss against `target_index`
+#
+# NOTE: We don’t do arithmetic in YAML; set target_index explicitly for your N.
+# For line-64 experiments, that’s 63. For general N, override at launch:
+#   python scripts/train.py data.num_nodes=128 task.target_index=127
 source_index: 0
-# Uses OmegaConf eval to set target = data.num_nodes - 1
-target_index: ${oc.eval:"${data.num_nodes} - 1"}
+target_index: 63     # set explicitly for your graph size; override from CLI if needed
 
-# Loss settings
-reduction: mean      # mean | sum | none
-renorm: true         # clamp & renormalize P before loss (numerical stability)
-check_prob: false    # keep off if renorm is true for speed
+# -------------------------
+# Loss family
+# -------------------------
+# nll        : −log P_t(target) after time aggregation
+# cvar_nll   : CVaR_α of −log P_t(target) (risk-sensitive)
+# neg_prob   : − P_t(target) (maximize probability directly)
+# hinge      : max(0, margin − [ P_t(target) − max_{u≠target} P_t(u) ])
+loss: nll
+
+# -------------------------
+# Time aggregation
+# -------------------------
+# last     : use P at final step T−1
+# mean     : average P over t
+# max      : elementwise max over t (non-smooth)
+# softmax  : smooth attention over t with temperature `tau`
+time_agg: last
+tau: 0.2
+
+# -------------------------
+# Loss shaping / numerics
+# -------------------------
+label_smoothing: 0.0   # ε in [0,1); NLL target prob becomes (1−ε) + ε/N
+cvar_alpha: 0.1        # tail mass for CVaR (used if loss=cvar_nll)
+margin: 0.0            # hinge margin (used if loss=hinge)
+reduce: mean           # mean | sum  (reduction over batch)
+eps: 1.0e-8            # floor to keep logs finite
+
+# -------------------------
+# Probability handling
+# -------------------------
+normalize_prob: true   # renormalize P to simplex before loss (safety)
+check_simplex: false   # assert probabilities form a simplex (debug)
