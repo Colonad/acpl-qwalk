@@ -1,0 +1,58 @@
+# Experiment manifest: State transfer on a line (degree=2)
+goal: transfer
+task: state_transfer
+graph:
+  family: line
+  train_sizes: [64, 96, 128, 160, 192]
+  val_holdout_sizes: [72, 136, 184]
+  test_ood_sizes: [256]
+horizon:
+  T: [64, 96, 128]
+policy:
+  gnn:
+    kind: GIN
+    layers: 2
+    hidden: 128
+    norm: graphnorm
+    dropout: 0.1
+  controller:
+    kind: GRU
+    hidden: 128
+    dropout: 0.1
+  coin:
+    map: SU2      # degree 2 -> SU(2) ZYZ angles
+features:
+  degree: true
+  pe:
+    method: coord
+    params:
+      axis: x_norm # x/(N-1)
+  extra: []
+optimization:
+  optimizer: adam
+  lr: 2.5e-4
+  weight_decay: 1.0e-5
+  batch_episodes: 32
+  epochs: 120
+  grad_clip: 1.0
+  regularizers:
+    temporal_smoothness: 1.0e-3
+    magnitude: 1.0e-5
+randomness:
+  master_seed: 1234
+  split_routing: size_bands
+  seeds_per_run: 5
+baselines:
+  - fixed_coin: hadamard
+  - global_time_varying_coin: true
+success_criteria:
+  transfer_min: 0.90   # P_T(target) on line (pre-registered threshold)
+compute_budget:
+  device: auto
+  dtype:
+    encoder: float32
+    state: complex128
+  wallclock_hours: 8
+  max_memory_gb: 16
+notes: >
+  Uses SU(2) ZYZ angles for dv=2 coins. Curriculum over T is allowed.

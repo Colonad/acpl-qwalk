@@ -272,10 +272,14 @@ def train_epoch(
 
     optimizer.zero_grad(set_to_none=True)
 
-    iterator = dataloader
-    if getattr(loop_cfg, "progress_bar", True):
-        total = len(dataloader) if hasattr(dataloader, "__len__") else None
-        iterator = tqdm(dataloader, total=total, desc="train", leave=False)
+    total = len(dataloader) if hasattr(dataloader, "__len__") else None
+    iterator = tqdm(
+        dataloader,
+        total=total,
+        desc="train",
+        leave=False,
+        disable=not loop_cfg.progress_bar,  # <- respect LoopConfig.progress_bar
+    )
 
     for bidx, batch in enumerate(iterator, start=1):
         step += 1
@@ -413,10 +417,14 @@ def eval_epoch(
             key = f"{prefix}{k}"
             agg[key] = agg.get(key, 0.0) + float(v)
 
-    iterator = dataloader
-    if getattr(loop_cfg, "progress_bar", True):
-        total = len(dataloader) if hasattr(dataloader, "__len__") else None
-        iterator = tqdm(dataloader, total=total, desc="eval", leave=False)
+    total = len(dataloader) if hasattr(dataloader, "__len__") else None
+    iterator = tqdm(
+        dataloader,
+        total=total,
+        desc="eval",
+        leave=False,
+        disable=not loop_cfg.progress_bar,  # <- respect LoopConfig.progress_bar
+    )
 
     for batch in iterator:
         n_batches += 1

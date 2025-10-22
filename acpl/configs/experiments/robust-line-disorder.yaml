@@ -1,0 +1,62 @@
+# Experiment manifest: Robust transport on 1D line with static edge-phase disorder
+goal: robust
+task: robust_transport
+graph:
+  family: line
+  train_sizes: [64, 96, 128, 160, 192]
+  val_holdout_sizes: [72, 136, 184]
+  test_ood_sizes: [256]
+noise:
+  type: static_edge_phase
+  sigma: [0.05, 0.10, 0.20]
+  draw_per_episode: true
+horizon:
+  T: [64, 96, 128]
+policy:
+  gnn:
+    kind: GIN
+    layers: 2
+    hidden: 128
+    norm: graphnorm
+    dropout: 0.1
+  controller:
+    kind: GRU
+    hidden: 128
+    dropout: 0.1
+  coin:
+    map: SU2
+features:
+  degree: true
+  pe:
+    method: coord
+    params: {axis: x_norm}
+optimization:
+  optimizer: adam
+  lr: 2.5e-4
+  weight_decay: 1.0e-5
+  batch_episodes: 32
+  epochs: 160
+  grad_clip: 1.0
+  regularizers:
+    temporal_smoothness: 2.0e-3
+    magnitude: 1.0e-5
+randomness:
+  master_seed: 1234
+  split_routing: size_bands
+  seeds_per_run: 7
+baselines:
+  - fixed_coin: hadamard
+  - global_time_varying_coin: true
+success_criteria:
+  cvar_alpha: 0.10
+  cvar_improvement_epsilon: 0.03
+  mean_success_improvement_epsilon: 0.03
+compute_budget:
+  device: auto
+  dtype:
+    encoder: float32
+    state: complex128
+  wallclock_hours: 16
+  max_memory_gb: 24
+notes: >
+  Report mean, quantiles, and CVaR_0.1 across M=100 disorder draws per episode.

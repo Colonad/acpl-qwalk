@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from html import parser
 import math
 from pathlib import Path
 import re
@@ -15,6 +17,79 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 import yaml
+
+from acpl.eval.protocol import EvalConfig, run_ci_eval, summarize_results
+
+
+def _pad_epoch(i: int) -> str:
+    return f"{i:08d}"
+
+class EpochAverager:
+    """
+    Collect numeric metrics across an epoch and report means.
+    Usage:
+      avg = EpochAverager(prefix="train/")
+      avg.update({"loss": 0.12, "mix/tv": 0.4})
+      ...
+      means = avg.means()
+    """
+    def __init__(self, prefix: str = "") -> None:
+        self.prefix = prefix
+        self._sum = defaultdict(float)
+        self._cnt = defaultdict(int)
+
+    def update(self, metrics: dict[str, float]) -> None:
+        for k, v in metrics.items():
+            if v is None:
+                continue
+            # normalize keys to have prefix once
+            key = k if not self.prefix or k.startswith(self.prefix) else f"{self.prefix}{k}"
+            self._sum[key] += float(v)
+            self._cnt[key] += 1
+
+    def means(self) -> dict[str, float]:
+        out: dict[str, float] = {}
+        for k, s in self._sum.items():
+            c = max(1, self._cnt[k])
+            out[k] = s / c
+        return out
+
+def _fmt_epoch_summary(epoch_idx: int, means: dict[str, float], lr: float) -> str:
+    eid = _pad_epoch(epoch_idx)
+    # Pull known groups (fall back to None if missing)
+    get = means.get
+    # Core lines
+    lines = []
+    lines.append(f"[{eid}] train/loss: {get('train/loss', float('nan')): .6f}")
+    lines.append(f"[{eid}] train/lr: {lr:.6f}")
+
+    # Mix metrics (group known keys if available)
+    mix_keys = ["train/mix/tv", "train/mix/js", "train/mix/hell", "train/mix/l2", "train/mix/H", "train/mix/kl_pu"]
+    mix_parts = []
+    for k in mix_keys:
+        if k in means:
+            name = k.split("/", 2)[-1]
+            mix_parts.append(f"{name}={means[k]:.6f}")
+    if mix_parts:
+        lines.append(f"[{eid}] train/mix/ " + " ".join(mix_parts))
+
+    # Target metrics
+    tgt_keys = [
+        "train/target/success","train/target/maxp","train/target/gini",
+        "train/target/tv_vsU","train/target/js_vsU","train/target/H",
+        "train/target/KLpU","train/target/cvar_neglogOmega"
+    ]
+    tgt_parts = []
+    for k in tgt_keys:
+        if k in means:
+            name = k.split("/", 2)[-1]
+            tgt_parts.append(f"{name}={means[k]:.6f}")
+    if tgt_parts:
+        lines.append(f"[{eid}] train/target/ " + " ".join(tgt_parts))
+
+    return "\n".join(lines)
+
+
 
 # -------------------------------
 # Optional Phase-B8 utils (robust fallbacks if missing)
@@ -102,7 +177,9 @@ class _CheckpointShim:
     def save_train_state(self, path: Path, **state) -> None:
         # Phase B8 API if present, else plain save
         if self._ok and hasattr(self.ck, "save_checkpoint"):
-            self.ck.save_checkpoint(path=path, **state)  # type: ignore
+            # Some checkpointer impls concatenate with ".meta.json" using string '+'
+            # so ensure 'path' is a str to avoid PosixPath + str TypeError.
+            self.ck.save_checkpoint(str(path), state)  # type: ignore
         else:
             torch.save(state, path)
 
@@ -151,7 +228,7 @@ from acpl.data import graphs as G
 from acpl.policy.policy import ACPLPolicy, ACPLPolicyConfig
 from acpl.sim.portmap import PortMap, build_portmap
 from acpl.sim.shift import ShiftOp, build_shift
-from acpl.train.loops import LoopConfig, RolloutFn, train_epoch
+from acpl.train.loops import LoopConfig, RolloutFn, build_metric_pack, train_epoch
 from acpl.utils.logging import MetricLogger, MetricLoggerConfig
 
 # -------------------------------
@@ -203,11 +280,32 @@ def _coerce_scalar(s: str) -> Any:
 
 
 def apply_overrides(cfg: dict, overrides: list[str]) -> dict:
+    """
+    Accept both Hydra-like 'key=value' and our prior '++key=value'.
+    Includes a small alias map so common keys from older configs work.
+    """
+    alias = {
+        # CLI → config path
+        "logging.dir": "train.run_dir",                 # your smoke test
+        "dataset.num_episodes": "train.episodes_per_epoch",
+        "train.max_steps": "train.episodes_per_epoch",  # best-effort: treat as episode count
+        # optional convenience
+        "dtype": "dtype",
+        "device": "device",
+        "seed": "seed",
+    }
+
     for ov in overrides:
-        if not ov.startswith("++") or "=" not in ov:
+        if "=" not in ov:
             continue
-        key, val = ov[2:].split("=", 1)
+        key, val = ov.split("=", 1)
+        # drop any leading '+' (supports both '++k=v' and 'k=v')
+        key = key.lstrip("+")
+        # normalize & alias
+        key = alias.get(key, key)
         val = _coerce_scalar(val)
+
+        # walk & set
         parts = key.split(".")
         d = cfg
         for p in parts[:-1]:
@@ -216,6 +314,7 @@ def apply_overrides(cfg: dict, overrides: list[str]) -> dict:
             d = d[p]
         d[parts[-1]] = val
     return cfg
+
 
 
 def _to_namespace(d):
@@ -861,8 +960,11 @@ def main():
     parser.add_argument("--lr", type=float, default=None, help="Override learning rate")
     parser.add_argument("--run_dir", type=str, default=None, help="Output directory")
     parser.add_argument(
-        "--resume", type=str, default=None, help="Resume from checkpoint file/dir (B8 atomic)."
+        "--ci_only",
+        action="store_true",
+        help="Skip training; run the CI evaluation only (uses EMA weights if available). Requires --resume.",
     )
+
     args, unknown = parser.parse_known_args()
 
     cfg_path = Path(args.config)
@@ -872,11 +974,31 @@ def main():
     cfg = load_yaml(cfg_path)
     cfg = apply_overrides(cfg, unknown)
 
+    if any(("logging.dir=" in x) or ("dataset.num_episodes=" in x) or ("train.max_steps=" in x) for x in unknown):
+        print("[overrides] applied CLI aliases (logging.dir → train.run_dir, "
+          "dataset.num_episodes/train.max_steps → train.episodes_per_epoch)")
+
+
     # Runtime / deterministic seed (Phase B8)
     seed = int(cfg.get("seed", 42))
     _seed_everything(seed)
     device = select_device(cfg.get("device", "auto"))
     dtype = select_dtype(cfg.get("dtype", "float32"))
+
+    # ---------------- Outputs (create early so logger can write JSONL here) ----------------
+    train_cfg = cfg.get("train", {})
+    run_dir = Path(train_cfg.get("run_dir")) if train_cfg.get("run_dir") else None
+    if run_dir is None:
+        run_dir = (
+            Path(args.run_dir)
+            if args.run_dir
+            else Path("runs") / f"B_{cfg.get('coin', {'family':'su2'}).get('family','su2')}_{cfg.get('data',{}).get('N', cfg.get('data',{}).get('num_nodes', 64))}nodes_{cfg.get('sim',{}).get('steps',64)}steps_seed{seed}"
+        )
+    run_dir.mkdir(parents=True, exist_ok=True)
+    plot_path = run_dir / "pt_target.png"
+    ckpt_last = run_dir / "model_last.pt"
+    ckpt_best = run_dir / "model_best.pt"
+    # ---------------------------------------------------------------------------------------
 
     # Graph/data
     data_cfg = cfg.get("data", {})
@@ -891,22 +1013,37 @@ def main():
         pairs = list(zip(g.edge_index[0].tolist(), g.edge_index[1].tolist(), strict=False))
         pm = build_portmap(pairs, num_nodes=g.N, coalesce=True)
         shift = build_shift(pm)
-
     # Sim horizon / task
-    sim_cfg = cfg.get("sim", {})
+    sim_cfg = cfg.get("sim", {}) or {}
+    if not isinstance(sim_cfg, dict):
+        sim_cfg = {}
     T = int(sim_cfg.get("steps", 64))
     if args.T is not None:
         T = int(args.T)
-    task_cfg = cfg.get("task", {})
+
+    # task may be a string like "transfer" from CLI; we only need defaults here
+    task_cfg = cfg.get("task", {}) or {}
+    if not isinstance(task_cfg, dict):
+        task_cfg = {}
     target_index = int(task_cfg.get("target_index", g.N - 1))
     reduction = task_cfg.get("reduction", "mean")
     renorm = bool(task_cfg.get("renorm", True))
 
-    # Model config
-    model_cfg = cfg.get("model", {})
-    gnn_cfg = model_cfg.get("gnn", {})
-    ctrl_cfg = model_cfg.get("controller", {})
-    head_cfg = model_cfg.get("head", {})
+    # Model config (each subkey may also be a string; coerce to dicts)
+    model_cfg = cfg.get("model", {}) or {}
+    if not isinstance(model_cfg, dict):
+        model_cfg = {}
+    gnn_cfg = model_cfg.get("gnn", {}) or {}
+    if not isinstance(gnn_cfg, dict):
+        # user might pass model.gnn=gcn; we don't use the string anywhere numeric, so ignore
+        gnn_cfg = {}
+    ctrl_cfg = model_cfg.get("controller", {}) or {}
+    if not isinstance(ctrl_cfg, dict):
+        ctrl_cfg = {}
+    head_cfg = model_cfg.get("head", {}) or {}
+    if not isinstance(head_cfg, dict):
+        head_cfg = {}
+
     acpl_cfg = ACPLPolicyConfig(
         in_dim=2,
         gnn_hidden=int(gnn_cfg.get("hidden", 64)),
@@ -967,7 +1104,6 @@ def main():
     amp_enabled = amp_flag != "off"
 
     # Data loaders
-    train_cfg = cfg.get("train", {})
     epochs = int(args.epochs if args.epochs is not None else train_cfg.get("epochs", 1))
     batch_size = int(train_cfg.get("batch_size", 1))
     episodes_per_epoch = max(1, int(train_cfg.get("episodes_per_epoch", 200)))
@@ -1005,7 +1141,7 @@ def main():
         title_suffix = f"{family.upper()} (any degree)"
     loss_builder = make_transfer_loss(reduction=reduction, renorm=renorm)
 
-    # Logging
+    # Logging — write JSONL under run_dir (works with TB/W&B too)
     log_cfg = cfg.get("log", {})
     log_interval = int(log_cfg.get("interval", 50))
     backend_map = {
@@ -1015,14 +1151,13 @@ def main():
         "plain": "plain",
     }
     backend = backend_map.get(str(log_cfg.get("backend", "plain")).lower(), "plain")
-    tb_dir = (log_cfg.get("tensorboard") or {}).get("log_dir", None)
     wb_cfg = log_cfg.get("wandb") or {}
     project = wb_cfg.get("project", log_cfg.get("project"))
     run_name = wb_cfg.get("run_name", log_cfg.get("run_name"))
 
     ml_cfg = MetricLoggerConfig(
         backend=backend,
-        log_dir=tb_dir,
+        log_dir=str(run_dir),   # << ensure metrics.jsonl goes to the run folder
         project=project,
         run_name=run_name,
         step_key="step",
@@ -1032,58 +1167,147 @@ def main():
 
     loop_cfg = LoopConfig(
         device=str(device),
-        log_every=log_interval,
+        log_every=10**9,     # effectively disables per-batch logger prints
         grad_clip=max_norm,
-        cvar_alpha=float(cfg.get("task", {}).get("cvar_alpha", 0.1)),
+        cvar_alpha=float(task_cfg.get("cvar_alpha", 0.1)),
         primary_on_targets=True,
-        progress_bar=True,
+        progress_bar=True,   # <- show a single tqdm bar over the training batches
         amp=amp_enabled,
     )
 
-    # Outputs
-    run_dir = Path(train_cfg.get("run_dir")) if train_cfg.get("run_dir") else None
-    if run_dir is None:
-        run_dir = (
-            Path(args.run_dir)
-            if args.run_dir
-            else Path("runs") / f"B_{family}_{g.N}nodes_{T}steps_seed{seed}"
-        )
-    run_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = run_dir / "pt_target.png"
-    ckpt_last = run_dir / "model_last.pt"
-    ckpt_best = run_dir / "model_best.pt"
+
 
     # Optional resume (B8 atomic-aware)
     start_epoch = 0
     best_metric = None
-    if args.resume:
+    if getattr(args, "resume", None):
         with _time_block("resume_load"):
-            payload = _CK.try_resume(Path(args.resume))
-            if payload:
-                # Accept a few common layouts
-                sd = payload.get("state_dict") or payload.get("model")
+            ckpt_payload = _CK.try_resume(Path(args.resume))
+            if ckpt_payload:
+                sd = ckpt_payload.get("state_dict") or ckpt_payload.get("model")
                 if sd is not None:
                     try:
                         model.load_state_dict(sd, strict=False)
                     except Exception:
-                        # remove 'module.' prefix if present
                         new_sd = {k.replace("module.", "", 1): v for k, v in sd.items()}
                         model.load_state_dict(new_sd, strict=False)
+
                 if adaptor is not None and isinstance(payload.get("adaptor", None), dict):
                     try:
                         adaptor.load_state_dict(payload["adaptor"], strict=False)
                     except Exception:
                         pass
+
                 opt_sd = payload.get("optimizer", None)
                 if isinstance(opt_sd, dict):
                     try:
                         optimizer.load_state_dict(opt_sd)
                     except Exception:
                         pass
-                if "epoch" in payload:
-                    start_epoch = int(payload["epoch"])
-                best_metric = payload.get("best_metric", None)
+
+                if "epoch" in ckpt_payload:
+                    start_epoch = int(ckpt_payload["epoch"])
+                best_metric = ckpt_payload.get("best_metric", None)
+
+                ema_shadow = ckpt_payload.get("ema_shadow", None)
+                if ema is not None and isinstance(ema_shadow, dict) and len(ema_shadow) > 0:
+                    try:
+                        # move to current device
+                        ema.shadow = {k: v.to(next(model.parameters()).device) for k, v in ema_shadow.items()}
+                        print(f"[resume] EMA shadow restored ({len(ema.shadow)} tensors).")
+                    except Exception as e:
+                        print(f"[resume] EMA shadow restore failed: {e}")
+
                 print(f"[resume] Loaded checkpoint from {args.resume} @ epoch {start_epoch}")
+
+
+    # ---------------- CI-ONLY MODE ----------------
+    if args.ci_only:
+        if not args.resume:
+            print("[ci_only] --resume is required to load a checkpoint.", file=sys.stderr)
+            try:
+                logger.close()
+            except Exception:
+                pass
+            sys.exit(2)
+
+        print("[ci_only] Running pooled CI evaluation on checkpointed weights "
+              f"{'(EMA)' if ema is not None and len(getattr(ema, 'shadow', {}))>0 else '(raw)'}")
+
+        # eval config knobs (same defaults as training CI block)
+        ci_n_seeds = int(train_cfg.get("ci_n_seeds", 5))
+        ci_episodes = int(train_cfg.get("ci_episodes", max(1, train_cfg.get("episodes_per_epoch", 200) // 2)))
+        ci_bootstrap = int((cfg.get("log", {}) or {}).get("ci_bootstrap_samples", 1000))
+        ci_alpha = float((cfg.get("log", {}) or {}).get("ci_alpha", 0.05))
+
+        # make a tiny iterable of dict-batches for each seed
+        def _make_eval_iter(seed: int):
+            ds = SingleGraphEpisodeDataset(payload, num_episodes=ci_episodes)
+            return (ds[i] for i in range(len(ds)))
+
+
+        eval_cfg = EvalConfig(
+            seeds=[],
+            n_seeds=ci_n_seeds,
+            device=str(device),
+            progress_bar=True,
+            ci_method="bootstrap",
+            ci_alpha=ci_alpha,
+            bootstrap_samples=ci_bootstrap,
+            keep_per_seed_means=False,
+        )
+
+        # Swap to EMA if we actually have a shadow
+        used_ema = False
+        if ema is not None and isinstance(getattr(ema, "shadow", None), dict) and len(ema.shadow) > 0:
+            ema.store(model)
+            used_ema = True
+        try:
+            results = run_ci_eval(
+                model=model,
+                dataloader_factory=_make_eval_iter,
+                rollout_fn=rollout_fn,
+                loop_cfg=loop_cfg,
+                eval_cfg=eval_cfg,
+                logger=logger,
+                step=0,  # tag as step 0 in ci_only mode
+            )
+        finally:
+            if used_ema:
+                ema.restore(model)
+
+        summary = summarize_results(
+            results,
+            title="CI over pooled episodes (EMA weights)" if used_ema else "CI over pooled episodes",
+            show_per_seed=False,
+            ci_alpha=eval_cfg.ci_alpha,
+        )
+        print("\n" + summary + "\n")
+
+        # save artifacts
+        (run_dir / "eval_ci.txt").write_text(summary + "\n", encoding="utf-8")
+        import json as _json
+        def _ci_to_dict(ci):
+            return {"mean": ci.mean, "lo": ci.lo, "hi": ci.hi, "stderr": ci.stderr, "n": ci.n}
+        json_payload = {k: _ci_to_dict(v["all"]) for k, v in results.items() if "all" in v}
+        (run_dir / "eval_ci.json").write_text(_json.dumps(json_payload, indent=2), encoding="utf-8")
+        print(f"[ci_only] wrote {run_dir/'eval_ci.txt'} and {run_dir/'eval_ci.json'}")
+
+        try:
+            logger.close()
+        except Exception:
+            pass
+        return
+
+
+
+
+
+
+
+
+
+
 
     # Train/Eval
     step = 0 if start_epoch == 0 else start_epoch * steps_per_epoch
@@ -1100,6 +1324,7 @@ def main():
         print(f"[setup] scheduler={scheduler.__class__.__name__}")
     if ema is not None:
         print(f"[setup] EMA enabled: decay={ema.decay}, warmup_steps={ema.warm}, every={ema.every}")
+    print(f"[setup] run_dir={run_dir} (metrics.jsonl, checkpoints, plots)")
 
     pbar_epochs = (
         _tqdm(range(start_epoch + 1, epochs + 1), desc="epochs")
@@ -1107,6 +1332,31 @@ def main():
         else range(start_epoch + 1, epochs + 1)
     )
     for epoch in pbar_epochs:
+        # --- per-epoch collector (no prints during batches) ---
+        avg = EpochAverager(prefix="")   # keys we push already include 'train/...'
+        metric_pack = None
+
+        def _collect_hook(*, P, aux, loss, step, lr, **_):
+            nonlocal metric_pack
+            # lazily build the metric pack (matches loops.py semantics)
+            if metric_pack is None:
+                with_targets = ("targets" in aux) and (aux["targets"] is not None)
+                metric_pack = build_metric_pack(
+                    with_targets=with_targets,
+                    cvar_alpha=float(task_cfg.get("cvar_alpha", 0.1)),
+                )
+            # base scalars
+            m = {
+                "train/loss": float(loss.detach().item()),
+                "train/lr": float(lr),
+            }
+            # metric groups: mix/* and (if targets) target/*
+            for name, fn in metric_pack.items():
+                scalars = fn(P.detach(), **aux)  # returns dict[str, float]
+                for k, v in scalars.items():
+                    m[f"train/{name}/{k}"] = float(v)
+            avg.update(m)
+
         with _time_block(f"epoch_{epoch}_train"):
             step = train_epoch(
                 model=model,
@@ -1122,8 +1372,18 @@ def main():
                     if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
                     else scheduler
                 ),
+                hooks={"after_forward": _collect_hook},  # <- collect, don't print
             )
 
+        # ---- print one training summary line block before eval ----
+        means = avg.means()
+        try:
+            lr_now = optimizer.param_groups[0]["lr"]
+        except Exception:
+            lr_now = float("nan")
+        print(_fmt_epoch_summary(epoch_idx=epoch, means=means, lr=lr_now))
+
+        # --------- Eval ---------
         # Eval (EMA swap if configured for eval-only averaging)
         with torch.no_grad():
             if ema is not None:
@@ -1156,20 +1416,22 @@ def main():
                 )
 
         # Save last every epoch; update best if improved
-        payload = {
+        ckpt_state = {
             "state_dict": model.state_dict(),
             "adaptor": (adaptor.state_dict() if adaptor is not None else None),
             "optimizer": optimizer.state_dict(),
             "epoch": epoch,
             "config": cfg,
             "best_metric": best_metric if best_metric is not None else -1.0,
+            "ema_shadow": (ema.shadow if ema is not None else None),
         }
-        _CK.save_train_state(ckpt_last, **payload)
+
+        _CK.save_train_state(ckpt_last, **ckpt_state)
 
         if (best_metric is None) or (pt_avg > best_metric):
             best_metric = pt_avg
-            payload["best_metric"] = best_metric
-            _CK.atomic_save(payload, ckpt_best)
+            ckpt_state["best_metric"] = best_metric
+            _CK.atomic_save(ckpt_state, ckpt_best)
 
         if _tqdm is not None:
             try:
@@ -1180,6 +1442,82 @@ def main():
 
     print(f"[done] final P_T[target]={pt_curve_y[-1]:.4f}")
     print(f"[artifacts] plot={plot_path}, ckpt_last={ckpt_last}, ckpt_best={ckpt_best}")
+
+
+        # ---------------- CI EVALUATION (pooled across seeds; uses EMA weights if available) ----------------
+    try:
+        # CI knobs (override via train.yaml: train.ci_n_seeds / train.ci_episodes / log.ci_bootstrap_samples)
+        ci_n_seeds = int(train_cfg.get("ci_n_seeds", 5))
+        ci_episodes = int(train_cfg.get("ci_episodes", max(1, episodes_per_epoch // 2)))
+        ci_bootstrap = int((cfg.get("log", {}) or {}).get("ci_bootstrap_samples", 1000))
+        ci_alpha = float((cfg.get("log", {}) or {}).get("ci_alpha", 0.05))
+
+        # Build an iterable of batches for a given seed
+        def _make_eval_iter(seed: int):
+            ds = SingleGraphEpisodeDataset(payload, num_episodes=ci_episodes)
+            return (ds[i] for i in range(len(ds)))
+
+        eval_cfg = EvalConfig(
+            seeds=[],                 # auto-generate [0..n_seeds-1]
+            n_seeds=ci_n_seeds,
+            device=str(device),
+            progress_bar=True,
+            ci_method="bootstrap",
+            ci_alpha=ci_alpha,
+            bootstrap_samples=ci_bootstrap,
+            keep_per_seed_means=False,
+        )
+
+        # --- Run CI on EMA weights if available ---
+        if ema is not None:
+            ema.store(model)
+        try:
+            results = run_ci_eval(
+                model=model,
+                dataloader_factory=_make_eval_iter,
+                rollout_fn=rollout_fn,
+                loop_cfg=loop_cfg,
+                eval_cfg=eval_cfg,
+                logger=logger,   # logs eval_CI/* into metrics.jsonl (and TB/W&B if enabled)
+                step=step,       # tag with the last global step
+            )
+        finally:
+            if ema is not None:
+                ema.restore(model)
+
+        # Pretty print + save artifacts
+        summary = summarize_results(
+            results,
+            title="Final CI over pooled episodes (EMA weights)" if ema is not None
+                  else "Final CI over pooled episodes",
+            show_per_seed=False,
+            ci_alpha=eval_cfg.ci_alpha,
+        )
+        print("\n" + summary + "\n")
+
+        # Save .txt
+        (run_dir / "eval_ci.txt").write_text(summary + "\n", encoding="utf-8")
+
+        # Save .json (mean/lo/hi/stderr/n per key, pooled "all")
+        import json as _json
+        def _ci_to_dict(ci):
+            return {"mean": ci.mean, "lo": ci.lo, "hi": ci.hi, "stderr": ci.stderr, "n": ci.n}
+
+        json_payload = {k: _ci_to_dict(v["all"]) for k, v in results.items() if "all" in v}
+        (run_dir / "eval_ci.json").write_text(_json.dumps(json_payload, indent=2), encoding="utf-8")
+
+        print(f"[eval/ci] wrote {run_dir/'eval_ci.txt'} and {run_dir/'eval_ci.json'}")
+    except Exception as e:
+        print(f"[eval/ci] skipped due to error: {e}")
+
+
+
+
+    # ensure logger flushes JSONL / TB / W&B
+    try:
+        logger.close()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

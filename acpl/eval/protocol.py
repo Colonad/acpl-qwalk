@@ -9,17 +9,14 @@ import random
 import torch
 import torch.nn as nn
 
-from acpl.train.loops import (
-    build_metric_pack,
-)
 from acpl.train.loops import LoopConfig  # only for device & UI knobs
 from acpl.train.loops import RolloutFn  # Callable[[nn.Module, dict], tuple[torch.Tensor, dict]]
+from acpl.train.loops import build_metric_pack
 from acpl.utils.logging import MetricLogger
 
 try:
     from tqdm.auto import tqdm
 except Exception:  # pragma: no cover
-
     def tqdm(x, **kwargs):
         return x
 
@@ -45,15 +42,23 @@ class EvalConfig:
 
     Attributes
     ----------
-    seeds:                list of RNG seeds to evaluate. If empty and n_seeds>0, we
-                          synthesize deterministic seeds [0..n_seeds-1].
-    n_seeds:              used only when `seeds` is empty.
-    device:               torch device string for model & tensors.
-    progress_bar:         show tqdm bars.
-    ci_method:            "student" or "bootstrap".
-    ci_alpha:             1 - confidence level (e.g., 0.05 -> 95% CI).
-    bootstrap_samples:    number of bootstrap resamples if ci_method="bootstrap".
-    keep_per_seed_means:  include per-seed means in the returned dict (for tables).
+    seeds:
+        Explicit RNG seeds to evaluate. If empty and n_seeds>0, we synthesize
+        deterministic seeds [0..n_seeds-1].
+    n_seeds:
+        Used only when `seeds` is empty.
+    device:
+        Torch device string for model & tensors.
+    progress_bar:
+        Whether to show tqdm bars.
+    ci_method:
+        "student" or "bootstrap".
+    ci_alpha:
+        1 - confidence level (e.g., 0.05 -> 95% CI).
+    bootstrap_samples:
+        Number of bootstrap resamples if ci_method="bootstrap".
+    keep_per_seed_means:
+        Include per-seed means in the returned dict (for tables).
     """
 
     seeds: list[int] = field(default_factory=list)
@@ -82,10 +87,13 @@ class CISummary:
     n: int
 
 
-def _student_interval(samples: torch.Tensor, alpha: float) -> tuple[float, float, float, int]:
+def _student_interval(samples: torch.Tensor, alpha: float) -> tuple[float, float, float, float, int]:
     """
     Student-t (or normal for large n) CI on the mean.
-    Returns (mean, lo, hi, stderr, n).
+
+    Returns
+    -------
+    (mean, lo, hi, stderr, n)
     """
     if samples.numel() == 0:
         return float("nan"), float("nan"), float("nan"), float("nan"), 0
@@ -93,19 +101,16 @@ def _student_interval(samples: torch.Tensor, alpha: float) -> tuple[float, float
     x = samples.to(torch.float64)
     n = int(x.numel())
     mean = float(x.mean().item())
+
     # Unbiased sample std; handle n==1
-    if n > 1:
-        s = float(x.std(unbiased=True).item())
-    else:
-        s = 0.0
+    s = float(x.std(unbiased=True).item()) if n > 1 else 0.0
     stderr = s / math.sqrt(max(n, 1))
 
     # For small n, use Student-t; for large n, z is fine.
     # We avoid scipy; use Normal icdf as an approximation to t-quantile when n>30.
-    # For n<=30, we inflate by sqrt((n-1)/(n-3)) heuristically if n>3.
-    # This is conservative and avoids external deps.
+    # For n<=30, inflate by sqrt((n-1)/(n-3)) heuristically if n>3 (conservative).
     z = float(torch.distributions.Normal(0, 1).icdf(torch.tensor(1 - alpha / 2)).item())
-    if n <= 30 and n > 3:
+    if 3 < n <= 30:
         z *= math.sqrt((n - 1) / (n - 3))
 
     half_width = z * stderr
@@ -113,11 +118,16 @@ def _student_interval(samples: torch.Tensor, alpha: float) -> tuple[float, float
 
 
 def _bootstrap_interval(
-    samples: torch.Tensor, alpha: float, B: int
+    samples: torch.Tensor,
+    alpha: float,
+    B: int,
 ) -> tuple[float, float, float, float, int]:
     """
     Percentile bootstrap CI on the mean, with B resamples.
-    Returns (mean, lo, hi, stderr, n).
+
+    Returns
+    -------
+    (mean, lo, hi, stderr, n)
     """
     if samples.numel() == 0:
         return float("nan"), float("nan"), float("nan"), float("nan"), 0
@@ -173,7 +183,10 @@ MetricPack = dict[str, Callable[[torch.Tensor], dict[str, float]]]
 def _seed_everything(seed: int) -> None:
     random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    try:
+        torch.cuda.manual_seed_all(seed)  # no-op on CPU-only
+    except Exception:
+        pass
 
 
 def run_ci_eval(
@@ -240,7 +253,7 @@ def run_ci_eval(
         _seed_everything(int(sd))
         dl = dataloader_factory(int(sd))
 
-        # Will lazily create a metric pack based on the first batch's aux
+        # Lazily create a metric pack based on the first batch's aux
         metric_pack: MetricPack | None = None
 
         # Book-keeping for this seed
@@ -269,7 +282,7 @@ def run_ci_eval(
                     with_targets = ("targets" in aux) and (aux["targets"] is not None)
                     metric_pack = build_metric_pack(with_targets=with_targets, cvar_alpha=0.1)
 
-                # Compute all metric groups and flatten the dicts into one level
+                # Compute all metric groups and flatten dicts into one level
                 scalars: dict[str, float] = {}
                 for name, fn in metric_pack.items():
                     vals = fn(P, **aux)
@@ -309,9 +322,8 @@ def run_ci_eval(
                     bootstrap_samples=eval_cfg.bootstrap_samples,
                 )
 
-    # Optional structured logging
+    # Optional structured logging → also persists to JSONL/TB/W&B via MetricLogger
     if logger is not None and step is not None:
-        # Log the pooled "all" CI and mean for each metric key
         to_log = {}
         for k, d in results.items():
             ci = d["all"]
@@ -354,12 +366,12 @@ def summarize_results(
     for k in sorted(results.keys()):
         all_ci = results[k].get("all")
         if all_ci is not None:
-            lines.append(f"{k}: { _fmt_ci(all_ci, conf) }")
+            lines.append(f"{k}: {_fmt_ci(all_ci, conf)}")
         if show_per_seed:
             # Show per-seed summaries in numeric seed order if present
             seeds = [x for x in results[k].keys() if x.startswith("seed=")]
             seeds.sort(key=lambda s: int(s.split("=")[-1]))
             for tag in seeds:
-                lines.append(f"  {tag}: { _fmt_ci(results[k][tag], conf) }")
+                lines.append(f"  {tag}: {_fmt_ci(results[k][tag], conf)}")
 
     return "\n".join(lines)

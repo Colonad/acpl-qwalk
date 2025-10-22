@@ -1,0 +1,58 @@
+# Experiment manifest: Fast mixing on a 2D lattice
+goal: mixing
+task: fast_mixing
+graph:
+  family: grid
+  train_L: [32, 48, 64, 80]
+  val_holdout_L: [40, 72]
+  test_ood_L: [96]
+horizon:
+  T_candidates: [64, 96, 128]
+  choose_on_val: true
+policy:
+  gnn:
+    kind: GCN
+    layers: 3
+    hidden: 128
+    norm: graphnorm
+    dropout: 0.1
+  controller:
+    kind: GRU
+    hidden: 128
+    dropout: 0.1
+  coin:
+    map: cayley  # dv=4
+    generators: "full"
+features:
+  degree: true
+  pe:
+    method: coords
+    params: {normalize: true}
+optimization:
+  optimizer: adam
+  lr: 2.5e-4
+  weight_decay: 1.0e-5
+  batch_episodes: 32
+  epochs: 120
+  grad_clip: 1.0
+  regularizers:
+    temporal_smoothness: 5.0e-3   # stronger smoothing for mixing
+    magnitude: 1.0e-5
+randomness:
+  master_seed: 1234
+  split_routing: size_bands
+  seeds_per_run: 5
+baselines:
+  - fixed_coin: hadamard
+  - global_time_varying_coin: true
+success_criteria:
+  tv_threshold: 0.05    # TV(ρ_T, uniform) <= 0.05 by T<=128
+compute_budget:
+  device: auto
+  dtype:
+    encoder: float32
+    state: complex128
+  wallclock_hours: 10
+  max_memory_gb: 20
+notes: >
+  Emphasizes temporal smoothness; plots TV vs t will be generated in eval.

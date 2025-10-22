@@ -1,0 +1,65 @@
+# Experiment manifest: Marked-node search on 2D grid
+goal: search
+task: spatial_search
+graph:
+  family: grid
+  train_L: [32, 48, 64, 80]
+  val_holdout_L: [40, 72]
+  test_ood_L: [96]
+  marks_per_episode: 1
+horizon:
+  T_rule: "c*sqrt(|V|)"
+  T_candidates: [96, 128, 160, 192]
+  choose_on_val: true
+policy:
+  gnn:
+    kind: PNA    # degree-aware encoder for mixed roles
+    layers: 3
+    hidden: 128
+    aggregators: [sum, mean, max, std]
+    scalers: [identity, amp, att]
+    norm: graphnorm
+    dropout: 0.1
+  controller:
+    kind: GRU
+    hidden: 128
+    dropout: 0.1
+  coin:
+    map: cayley  # dv=4 -> U(4) via Cayley retraction
+    generators: "full"  # q = d^2
+features:
+  degree: true
+  pe:
+    method: coords
+    params: {normalize: true}   # (x/L, y/L)
+  extra: []
+optimization:
+  optimizer: adam
+  lr: 2.5e-4
+  weight_decay: 1.0e-5
+  batch_episodes: 32
+  epochs: 160
+  grad_clip: 1.0
+  regularizers:
+    temporal_smoothness: 1.0e-3
+    magnitude: 1.0e-5
+randomness:
+  master_seed: 1234
+  split_routing: size_bands
+  seeds_per_run: 5
+baselines:
+  - analytical: AKR   # Ambainis–Kempe–Rivosh on grid
+  - fixed_coin: grover
+  - global_time_varying_coin: true
+success_criteria:
+  improvement_over_best_baseline:
+    epsilon: 0.03     # lower 95% CI of improvement >= epsilon
+compute_budget:
+  device: auto
+  dtype:
+    encoder: float32
+    state: complex128
+  wallclock_hours: 16
+  max_memory_gb: 24
+notes: >
+  Uses degree-4 local coins; Cayley map is numerically stable and fast.
