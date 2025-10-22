@@ -1,0 +1,132 @@
+# ACPL — Task config: ROBUST TRANSPORT under disorder
+# Objective: maximize E_ξ[P_T(j*, ξ)] and/or CVaR_α; supports stochastic disorder in edges/coins.
+
+task:
+  name: robust
+  objective: "maximize robust success at target j*"
+  horizon_T: 128
+  normalized_time_feature: true
+
+data:
+  family: ["line", "grid-2d"]            # robust transport demos often on 1D; include grid for harder settings
+  line:
+    N_min: 128
+    N_max: 512
+    source: "left"                       # left | center | custom_index
+    target: "right"                      # right | custom_index
+  grid:
+    L_min: 48
+    L_max: 96
+    boundary: "open"
+    source: "corner"                     # corner | center | custom_index
+    target: "opposite-corner"
+  features:
+    include_degree: true
+    laplacian_pe:
+      enabled: true
+      k: 8
+      sign_fix: "max-abs-positive"
+    coords:
+      enabled_on_grids: true
+  batching:
+    episodes_per_graph: 1
+    graphs_per_batch: 2
+    shuffle: true
+  seed: 1447
+
+disorder:
+  # Static edge phases φ_uv ~ N(0, σ^2) (wrapped), applied once per episode
+  edge_phase:
+    enabled: true
+    sigma: 0.15                          # strength at train time; sweep in eval
+    wrap: true
+    trials_per_episode: 1                # >1 turns each batch item into small Monte Carlo
+  # Optional coin dephasing: random Z-rot noise on SU(2) head (or diagonal on U(d))
+  coin_dephase:
+    enabled: false
+    sigma: 0.0
+  # Edge dropout (per-step) to simulate faults
+  edge_dropout:
+    enabled: false
+    p: 0.0
+
+loss:
+  kind: "robust_combo"                   # L = -Eξ[P_T(j*, ξ)]  OR CVaR-style if cvar_alpha > 0
+  target_from_batch: true                # expect batch['target_index'] or set by data.* config
+  cvar_alpha: 0.1                        # set to 0 to disable CVaR and use pure expectation
+  monte_carlo:
+    episodes: 2                          # per batch element during training (trade-off compute/variance)
+  reduction: "mean"
+  clamp_min_p: 1.0e-9
+
+regularization:
+  smooth_theta: 2.5e-3
+  l2_theta: 1.0e-4
+  spectral:
+    enabled: true
+    dct_weight: 1.0e-4
+    hf_bins: 0.5
+  grad_clip_norm: 1.5
+
+training:
+  # Robust tasks may need PPO if evaluation uses non-differentiable oracles (e.g., projective hits mid-episode)
+  method: "backprop"                     # switch to "ppo" if using non-diff oracle variants
+  optimizer:
+    name: "adamw"
+    lr: 1.5e-4
+    betas: [0.9, 0.999]
+    weight_decay: 2.0e-4
+  scheduler:
+    enabled: true
+    name: "cosine"
+    warmup_steps: 500
+  epochs: 100
+  steps_per_epoch: 400
+  accum_steps: 1
+  amp: true
+  device: "cuda"
+  log_every: 50
+  log_grad_norm_every: 200
+  ckpt:
+    dir: "checkpoints/robust"
+    keep_last: 6
+    save_every_steps: 2000
+    save_best_metric: "eval/target/success"
+
+ppo:
+  enabled: false                         # set true if task pipeline uses non-diff reward callbacks
+  rollout_length: 128
+  epochs: 4
+  minibatch_size: 2048
+  clip_eps: 0.2
+  vf_coef: 0.5
+  ent_coef: 0.01
+  gamma: 0.995
+  gae_lambda: 0.95
+  max_grad_norm: 1.0
+
+eval:
+  seeds: [551, 552, 553, 651, 652]
+  ci_alpha: 0.1
+  metrics:
+    - "target/success"
+    - "mix/tv"
+    - "mix/H"
+  robustness:
+    enabled: true
+    edge_phase:
+      sigma_grid: [0.0, 0.05, 0.1, 0.15, 0.2]  # sweep for robustness curves
+      trials: 8
+    coin_dephase:
+      sigma_grid: [0.0, 0.05, 0.1]
+      trials: 6
+
+viz:
+  pt_timelines:
+    enabled: true
+    topk_vertices: 8
+  tv_curves:
+    enabled: true
+  spectra:
+    enabled: true
+    dct_show_bins: 24

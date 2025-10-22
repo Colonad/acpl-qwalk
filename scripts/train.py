@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 import math
 from pathlib import Path
+import re
 import sys
-import time
 from types import SimpleNamespace
 from typing import Any
 
@@ -16,27 +16,146 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 import yaml
 
-# Graphs: import module and resolve builders dynamically
-from acpl.data import graphs as G
+# -------------------------------
+# Optional Phase-B8 utils (robust fallbacks if missing)
+# -------------------------------
 
-# Policy & loops
-from acpl.policy.policy import ACPLPolicy, ACPLPolicyConfig
 
-# Sim
-from acpl.sim.portmap import PortMap, build_portmap
-from acpl.sim.shift import ShiftOp, build_shift
-from acpl.train.loops import LoopConfig, RolloutFn, train_epoch
-from acpl.utils.logging import MetricLogger, MetricLoggerConfig
+# Seeding (deterministic + flags)
+def _seed_everything(seed: int) -> None:
+    """
+    Prefer acpl.utils.seeding (Phase B8) and fall back to a minimal implementation.
+    """
+    try:
+        from acpl.utils import seeding as _seeding  # type: ignore
 
-# add this with the other imports at the top
+        # new API (Phase B8): seed_everything handles python/numpy/torch + cudnn flags
+        if hasattr(_seeding, "seed_everything"):
+            _seeding.seed_everything(seed=seed, deterministic=True, warn_only=True)
+            return
+        # older API variants
+        if hasattr(_seeding, "set_deterministic"):
+            _seeding.set_deterministic(seed)  # type: ignore
+            return
+    except Exception:
+        pass
+
+    # Fallback (minimal)
+    import random
+
+    random.seed(seed)
+    torch.manual_seed(seed)
+    try:
+        import numpy as _np  # noqa: WPS433
+
+        _np.random.seed(seed)
+    except Exception:
+        pass
+    try:
+        # conservative flags for determinism
+        torch.backends.cudnn.deterministic = True  # type: ignore[attr-defined]
+        torch.backends.cudnn.benchmark = False  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+
+# Timers
+class _NullTimer:
+    def __enter__(self):  # noqa: D401
+        """No-op timer (fallback)."""
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _time_block(label: str):
+    """
+    Prefer acpl.utils.timers.time_block context manager if available.
+    """
+    try:
+        from acpl.utils.timers import time_block as _tb  # type: ignore
+
+        return _tb(label)
+    except Exception:
+        return _NullTimer()
+
+
+# Checkpointing (atomic save/load; resume)
+class _CheckpointShim:
+    def __init__(self):
+        self._ok = False
+        try:
+            from acpl.utils import checkpoint as _ck  # type: ignore
+
+            self.ck = _ck
+            self._ok = True
+        except Exception:
+            self.ck = None
+
+    def atomic_save(self, obj: dict, path: Path) -> None:
+        if self._ok and hasattr(self.ck, "atomic_save"):
+            self.ck.atomic_save(obj, path)  # type: ignore
+        else:
+            torch.save(obj, path)
+
+    def save_train_state(self, path: Path, **state) -> None:
+        # Phase B8 API if present, else plain save
+        if self._ok and hasattr(self.ck, "save_checkpoint"):
+            self.ck.save_checkpoint(path=path, **state)  # type: ignore
+        else:
+            torch.save(state, path)
+
+    def try_resume(self, path: Path) -> dict | None:
+        """
+        Return loaded dict if found, else None. Accepts either a file or a directory.
+        """
+        # Prefer Phase B8 'load_checkpoint_resume'
+        if self._ok and hasattr(self.ck, "load_checkpoint_resume"):
+            try:
+                ok, payload = self.ck.load_checkpoint_resume(path)  # type: ignore
+                return payload if ok else None
+            except Exception:
+                return None
+
+        # Fallback: accept directories with 'model_last.pt'
+        if path.is_dir():
+            for name in ("model_last.pt", "last.pt", "checkpoint.pt"):
+                cand = path / name
+                if cand.exists():
+                    path = cand
+                    break
+
+        if path.exists():
+            try:
+                return torch.load(path, map_location="cpu")
+            except Exception:
+                return None
+        return None
+
+
+_CK = _CheckpointShim()
+
+# -------------------------------
+# Progress
+# -------------------------------
 try:
     from tqdm.auto import tqdm as _tqdm
 except Exception:
     _tqdm = None
 
+# -------------------------------
+# Graphs / Policy / Sim / Train
+# -------------------------------
+from acpl.data import graphs as G
+from acpl.policy.policy import ACPLPolicy, ACPLPolicyConfig
+from acpl.sim.portmap import PortMap, build_portmap
+from acpl.sim.shift import ShiftOp, build_shift
+from acpl.train.loops import LoopConfig, RolloutFn, train_epoch
+from acpl.utils.logging import MetricLogger, MetricLoggerConfig
 
 # -------------------------------
-# Utilities: device / dtype / seeding
+# Utilities: device / dtype
 # -------------------------------
 
 
@@ -51,16 +170,6 @@ def select_dtype(dtype_flag: str):
     if dtype_flag not in mapping:
         raise ValueError(f"Unsupported dtype '{dtype_flag}'. Choose from {list(mapping)}.")
     return mapping[dtype_flag]
-
-
-def set_seed(seed: int):
-    torch.manual_seed(seed)
-    try:
-        import numpy as np
-
-        np.random.seed(seed)
-    except Exception:
-        pass
 
 
 # -------------------------------
@@ -170,10 +279,6 @@ class GraphData:
 
 
 def _resolve_builder(names: list[str]) -> Callable:
-    """
-    Return the first callable present in acpl.data.graphs whose name matches one of `names`.
-    Raise a clear error if none found.
-    """
     for n in names:
         fn = getattr(G, n, None)
         if callable(fn):
@@ -203,7 +308,6 @@ def graph_from_config(data_cfg: dict, *, device, dtype) -> GraphData:
         ei, deg, coords, arc = fn(Lx, Ly)
         N = Lx * Ly
     elif family == "cube":
-        # Optional: treat gracefully if not present
         try:
             fn = _resolve_builder(["cube_graph"])
         except ImportError:
@@ -222,7 +326,6 @@ def graph_from_config(data_cfg: dict, *, device, dtype) -> GraphData:
             ["d_regular_random_graph", "d_regular_graph", "regular_graph", "regular_d_graph"]
         )
         ei, deg, coords, arc = fn(N, d, seed=seed)
-
     elif family == "er":
         r = data_cfg.get("er", {})
         N = int(r.get("N", data_cfg.get("N", 64)))
@@ -241,7 +344,6 @@ def graph_from_config(data_cfg: dict, *, device, dtype) -> GraphData:
         except TypeError:
             ei, deg, coords, arc = fn(Lx, Ly, kx, ky, beta, seed=seed)
         N = Lx * Ly
-
     else:
         raise ValueError(f"Unknown graph family '{family}'")
 
@@ -270,10 +372,12 @@ class ThetaToHermitianAdaptor(nn.Module):
 
     @staticmethod
     def _port_features(d: int, Kfreq: int, device=None, dtype=torch.float32) -> torch.Tensor:
+        import math as _m
+
         j = torch.arange(d, device=device, dtype=dtype).unsqueeze(1)
         cols = [torch.ones(d, 1, device=device, dtype=dtype)]
         for k in range(1, Kfreq + 1):
-            ang = 2.0 * math.pi * k * j / max(d, 1)
+            ang = 2.0 * _m.pi * k * j / max(d, 1)
             cols.append(torch.sin(ang))
             cols.append(torch.cos(ang))
         return torch.cat(cols, dim=1)  # (d, 2K+1)
@@ -291,12 +395,11 @@ class ThetaToHermitianAdaptor(nn.Module):
         w = self.proj(theta_vt.reshape(-1, 3)).view(*batch, self.B)  # (...,B)
         M = self._basis_matrices(d, device=theta_vt.device, dtype=theta_vt.dtype)  # (B,d,d)
         H = torch.tensordot(w, M, dims=([-1], [0]))
-        H = 0.5 * (H + H.transpose(-1, -2))  # <-- add this line
+        H = 0.5 * (H + H.transpose(-1, -2))
         return H
 
 
 def unitary_exp_iH(H: torch.Tensor, cdtype=torch.complex64) -> torch.Tensor:
-    # Enforce exact symmetry, promote to float64, add tiny jitter on the diag
     n = H.size(-1)
     Hs = 0.5 * (H + H.transpose(-1, -2))
     H64 = Hs.to(torch.float64)
@@ -304,22 +407,19 @@ def unitary_exp_iH(H: torch.Tensor, cdtype=torch.complex64) -> torch.Tensor:
     H64 = H64 + torch.eye(n, dtype=H64.dtype, device=H64.device) * eps
     try:
         evals, evecs = torch.linalg.eigh(H64)
-        # Clamp spectrum (not strictly necessary, but avoids extreme angles)
         evals = torch.clamp(evals, min=-1e6, max=1e6)
         D = torch.diag_embed(torch.complex(torch.cos(evals), torch.sin(evals)).to(cdtype))
         Q = evecs.to(cdtype)
         return Q @ D @ Q.transpose(-1, -2).conj()
     except RuntimeError:
-        # Fallback: stable matrix exponential
         return torch.matrix_exp(1j * Hs.to(cdtype))
 
 
 def unitary_cayley(H: torch.Tensor, cdtype=torch.complex64) -> torch.Tensor:
     n = H.size(-1)
-    Hs = 0.5 * (H + H.transpose(-1, -2))  # enforce symmetry
+    Hs = 0.5 * (H + H.transpose(-1, -2))
     I = torch.eye(n, dtype=cdtype, device=H.device)
     iH = 1j * Hs.to(cdtype)
-    # Damping to avoid near-singularity of (I - iH)
     eps = 1e-8
     A = I - iH + eps * I
     B = I + iH
@@ -357,7 +457,6 @@ def make_rollout_su2_dv2(pm: PortMap, shift: ShiftOp, *, cdtype) -> RolloutFn:
     from acpl.sim.utils import partial_trace_coin
 
     def rollout(model: nn.Module, batch: dict):
-        # Squeeze away a possible leading batch dimension added by DataLoader
         X: torch.Tensor = _maybe_squeeze_leading(batch["X"])
         edge_index: torch.Tensor = _maybe_squeeze_leading(batch["edge_index"])
         T: int = int(
@@ -397,7 +496,6 @@ def make_rollout_anydeg_exp_or_cayley(
     end = pm.node_ptr[1:]
 
     def rollout(model: nn.Module, batch: dict):
-        # Squeeze away a possible leading batch dimension added by DataLoader
         X: torch.Tensor = _maybe_squeeze_leading(batch["X"])
         edge_index: torch.Tensor = _maybe_squeeze_leading(batch["edge_index"])
         T: int = int(
@@ -452,15 +550,286 @@ def make_transfer_loss(reduction: str = "mean", renorm: bool = True):
     return loss_builder
 
 
+# -------------------------------
+# Optimizer: param groups, EMA, schedulers
+# -------------------------------
+
+
+def _named_params_with_prefix(
+    mod: nn.Module, prefix: str = ""
+) -> Iterable[tuple[str, nn.Parameter]]:
+    for n, p in mod.named_parameters():
+        yield (f"{prefix}{n}", p)
+
+
+def build_param_groups(
+    base_lr: float,
+    base_wd: float,
+    named_params: list[tuple[str, nn.Parameter]],
+    cfg: dict | None,
+):
+    """Apply regex rules to create param groups with lr multipliers and no-decay."""
+    if not cfg or not cfg.get("enabled", True):
+        # single group
+        return [{"params": [p for _, p in named_params], "lr": base_lr, "weight_decay": base_wd}]
+
+    rules = cfg.get("rules", [])
+    groups: list[dict] = []
+
+    def _match_any(name: str):
+        for r in rules:
+            pat = r.get("pattern", None)
+            if not pat:
+                continue
+            if re.fullmatch(pat, name):
+                return r
+        return None
+
+    for name, p in named_params:
+        rule = _match_any(name)
+        lr = base_lr
+        wd = base_wd
+        if rule is not None:
+            if "lr_mult" in rule and rule["lr_mult"] is not None:
+                lr = base_lr * float(rule["lr_mult"])
+            if "weight_decay" in rule and rule["weight_decay"] is not None:
+                wd = float(rule["weight_decay"])
+        groups.append({"params": [p], "lr": lr, "weight_decay": wd})
+
+    return groups
+
+
+class EMAHelper:
+    def __init__(
+        self,
+        model: nn.Module,
+        decay: float,
+        warmup_steps: int = 0,
+        update_every: int = 1,
+        pin_to_device: bool = True,
+    ):
+        self.decay = float(decay)
+        self.warm = int(max(0, warmup_steps))
+        self.every = int(max(1, update_every))
+        self.step = 0
+        self.shadow = {}
+        self.pin = bool(pin_to_device)
+        for n, p in model.named_parameters():
+            if p.requires_grad:
+                self.shadow[n] = p.detach().clone()
+        self.device = next(model.parameters()).device
+
+    def _decay_t(self) -> float:
+        if self.step < self.warm:
+            return float(self.step / max(1, self.warm)) * self.decay
+        return self.decay
+
+    @torch.no_grad()
+    def update(self, model: nn.Module):
+        self.step += 1
+        if (self.step % self.every) != 0:
+            return
+        d = self._decay_t()
+        for n, p in model.named_parameters():
+            if not p.requires_grad:
+                continue
+            buf = self.shadow.get(n, None)
+            if buf is None:
+                buf = p.detach().clone()
+                self.shadow[n] = buf
+            buf.mul_(d).add_(p.detach(), alpha=(1.0 - d))
+        if self.pin:
+            for k in list(self.shadow.keys()):
+                self.shadow[k] = self.shadow[k].to(self.device)
+
+    @torch.no_grad()
+    def store(self, model: nn.Module):
+        """Swap model weights -> EMA (save current to _tmp)."""
+        self._tmp = {}
+        for n, p in model.named_parameters():
+            if p.requires_grad:
+                self._tmp[n] = p.detach().clone()
+                p.data.copy_(self.shadow[n].data)
+
+    @torch.no_grad()
+    def restore(self, model: nn.Module):
+        if not hasattr(self, "_tmp"):
+            return
+        for n, p in model.named_parameters():
+            if p.requires_grad and n in self._tmp:
+                p.data.copy_(self._tmp[n].data)
+        del self._tmp
+
+
+def build_optimizer_and_ema(model: nn.Module, adaptor: nn.Module | None, optim_cfg: dict):
+    name = str(optim_cfg.get("name", "adam")).lower()
+    base_lr = float(optim_cfg.get("lr", 3e-3))
+    base_wd = float(optim_cfg.get("weight_decay", 0.0))
+    betas = tuple(optim_cfg.get("betas", [0.9, 0.999]))
+    eps = float(optim_cfg.get("eps", 1e-8))
+    momentum = float(optim_cfg.get("momentum", 0.9))
+    nesterov = bool(optim_cfg.get("nesterov", True))
+
+    named_params: list[tuple[str, nn.Parameter]] = list(_named_params_with_prefix(model))
+    if adaptor is not None:
+        named_params += list(_named_params_with_prefix(adaptor, prefix="adaptor."))
+
+    pg_cfg = optim_cfg.get("param_groups", {})
+    groups = build_param_groups(base_lr, base_wd, named_params, pg_cfg)
+
+    if name in ("adamw", "adamw_fused"):
+        Optim = torch.optim.AdamW
+        kw = {"betas": betas, "eps": eps}
+    elif name == "adam":
+        Optim = torch.optim.Adam
+        kw = {"betas": betas, "eps": eps}
+    elif name == "sgd":
+        Optim = torch.optim.SGD
+        kw = {"momentum": momentum, "nesterov": nesterov}
+    else:
+        raise ValueError(f"Unknown optimizer '{name}'")
+
+    optimizer = Optim(groups, lr=base_lr, weight_decay=base_wd, **kw)
+
+    ema_cfg = optim_cfg.get("ema", {})
+    ema_enabled = bool(ema_cfg.get("enabled", False))
+    ema = None
+    if ema_enabled:
+        ema = EMAHelper(
+            model,
+            decay=float(ema_cfg.get("decay", 0.999)),
+            warmup_steps=int(ema_cfg.get("warmup_steps", 100)),
+            update_every=int(ema_cfg.get("update_every", 1)),
+            pin_to_device=bool(ema_cfg.get("pin_to_device", True)),
+        )
+        orig_step = optimizer.step
+
+        def step_with_ema(*args, **kwargs):
+            out = orig_step(*args, **kwargs)
+            ema.update(model)
+            return out
+
+        optimizer.step = step_with_ema  # type: ignore[assignment]
+
+    return optimizer, ema
+
+
+def build_scheduler(
+    optimizer: torch.optim.Optimizer,
+    sched_cfg: dict,
+    *,
+    steps_per_epoch: int | None,
+    total_epochs: int | None,
+):
+    kind = str(sched_cfg.get("kind", "none")).lower()
+
+    total_steps = None
+    if steps_per_epoch is not None and total_epochs is not None:
+        total_steps = max(1, steps_per_epoch * total_epochs)
+
+    if kind == "none":
+        return None
+
+    if kind == "cosine":
+        c = sched_cfg.get("cosine", {})
+        return torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=int(c.get("t_max", 1000)),
+            eta_min=float(c.get("eta_min", 1e-5)),
+        )
+
+    if kind == "cosine_warmup":
+        c = sched_cfg.get("cosine_warmup", {})
+        warm = int(c.get("warmup_steps", 100))
+        tmax = int(c.get("t_max", 1000))
+        from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
+
+        warmup = LinearLR(optimizer, start_factor=0.0, end_factor=1.0, total_iters=warm)
+        cosine = CosineAnnealingLR(optimizer, T_max=tmax, eta_min=float(c.get("eta_min", 1e-5)))
+        return SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[warm])
+
+    if kind == "cosine_restart":
+        c = sched_cfg.get("cosine_restart", {})
+        return torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            optimizer,
+            T_0=int(c.get("first_cycle_steps", 200)),
+            T_mult=float(c.get("cycle_mult", 2.0)),
+            eta_min=float(c.get("eta_min", 1e-5)),
+        )
+
+    if kind == "step":
+        s = sched_cfg.get("step", {})
+        return torch.optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=int(s.get("step_size", 200)),
+            gamma=float(s.get("gamma", 0.5)),
+        )
+
+    if kind == "plateau":
+        p = sched_cfg.get("plateau", {})
+        return torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode=str(p.get("mode", "min")),
+            factor=float(p.get("factor", 0.5)),
+            patience=int(p.get("patience", 10)),
+            threshold=float(p.get("threshold", 1e-3)),
+            threshold_mode=str(p.get("threshold_mode", "rel")),
+            cooldown=int(p.get("cooldown", 0)),
+            min_lr=float(p.get("min_lr", 1e-6)),
+        )
+
+    if kind == "onecycle":
+        o = sched_cfg.get("onecycle", {})
+        if total_steps is None:
+            raise ValueError(
+                "onecycle scheduler requires total_steps; cannot infer from dataloader."
+            )
+        max_lr_mult = float(o.get("max_lr_mult", 1.0))
+        max_lr = [pg["lr"] * max_lr_mult for pg in optimizer.param_groups]
+        return torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=max_lr,
+            total_steps=total_steps,
+            pct_start=float(o.get("pct_start", 0.1)),
+            anneal_strategy=str(o.get("anneal_strategy", "cos")),
+            div_factor=float(o.get("div_factor", 25.0)),
+            final_div_factor=float(o.get("final_div_factor", 10000.0)),
+        )
+
+    if kind == "linear_warmup_decay":
+        l = sched_cfg.get("linear_warmup_decay", {})
+        warm = int(l.get("warmup_steps", 100))
+        tot = int(l.get("total_steps", total_steps or 1000))
+        from torch.optim.lr_scheduler import LambdaLR, LinearLR, SequentialLR
+
+        warmup = LinearLR(optimizer, start_factor=0.0, end_factor=1.0, total_iters=warm)
+
+        def decay_lambda(step):
+            rem = max(1, tot - warm)
+            t = max(0, step - warm)
+            frac = max(0.0, 1.0 - t / rem)
+            return frac
+
+        decay = LambdaLR(optimizer, lr_lambda=decay_lambda)
+        return SequentialLR(optimizer, [warmup, decay], milestones=[warm])
+
+    raise ValueError(f"Unknown scheduler kind '{kind}'")
+
+
+# -------------------------------
+# Plot helper
+# -------------------------------
+
+
 def plot_series(xs: list[int], ys: list[float], *, out_png: Path, title: str):
     try:
+        import matplotlib
         import matplotlib.pyplot as plt
+
+        matplotlib.use("Agg")
     except Exception as e:
         print(f"[plot] matplotlib not available: {e}")
         return
-    import matplotlib
-
-    matplotlib.use("Agg")
     plt.figure()
     plt.plot(xs, ys, marker="o")
     plt.xlabel("Epoch")
@@ -479,7 +848,7 @@ def plot_series(xs: list[int], ys: list[float], *, out_png: Path, title: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="ACPL Training — Phase A (SU2) + Phase B (exp/Cayley)"
+        description="ACPL Training — Phases A/B with advanced optim + B8 utils"
     )
     parser.add_argument(
         "--config", type=str, default="acpl/configs/train.yaml", help="Top-level train config YAML"
@@ -491,6 +860,9 @@ def main():
     parser.add_argument("--T", type=int, default=None, help="Override horizon (steps)")
     parser.add_argument("--lr", type=float, default=None, help="Override learning rate")
     parser.add_argument("--run_dir", type=str, default=None, help="Output directory")
+    parser.add_argument(
+        "--resume", type=str, default=None, help="Resume from checkpoint file/dir (B8 atomic)."
+    )
     args, unknown = parser.parse_known_args()
 
     cfg_path = Path(args.config)
@@ -500,9 +872,9 @@ def main():
     cfg = load_yaml(cfg_path)
     cfg = apply_overrides(cfg, unknown)
 
-    # Runtime
+    # Runtime / deterministic seed (Phase B8)
     seed = int(cfg.get("seed", 42))
-    set_seed(seed)
+    _seed_everything(seed)
     device = select_device(cfg.get("device", "auto"))
     dtype = select_dtype(cfg.get("dtype", "float32"))
 
@@ -511,12 +883,14 @@ def main():
     if args.N is not None:
         data_cfg["N"] = int(args.N)
         data_cfg["num_nodes"] = int(args.N)
-    g = graph_from_config(data_cfg, device=device, dtype=dtype)
+    with _time_block("build_graph"):
+        g = graph_from_config(data_cfg, device=device, dtype=dtype)
 
     # Port map / shift
-    pairs = list(zip(g.edge_index[0].tolist(), g.edge_index[1].tolist(), strict=False))
-    pm = build_portmap(pairs, num_nodes=g.N, coalesce=True)
-    shift = build_shift(pm)
+    with _time_block("build_shift"):
+        pairs = list(zip(g.edge_index[0].tolist(), g.edge_index[1].tolist(), strict=False))
+        pm = build_portmap(pairs, num_nodes=g.N, coalesce=True)
+        shift = build_shift(pm)
 
     # Sim horizon / task
     sim_cfg = cfg.get("sim", {})
@@ -555,7 +929,8 @@ def main():
         head_layernorm=True,
         head_dropout=float(head_cfg.get("dropout", 0.0)),
     )
-    model = ACPLPolicy(acpl_cfg).to(device=device)
+    with _time_block("build_model"):
+        model = ACPLPolicy(acpl_cfg).to(device=device)
 
     # Simple node features (degree + coord)
     N = g.N
@@ -567,44 +942,31 @@ def main():
     coin_cfg = cfg.get("coin", {"family": "su2"})
     family = str(coin_cfg.get("family", "su2")).lower().strip()
 
-    # Optim
+    # Optim (advanced)
     optim_cfg = cfg.get("optim", {})
-    lr = float(args.lr if args.lr is not None else optim_cfg.get("lr", 3e-3))
-    weight_decay = float(optim_cfg.get("weight_decay", 0.0))
-    betas = tuple(optim_cfg.get("betas", [0.9, 0.999]))
+    if args.lr is not None:
+        optim_cfg["lr"] = float(args.lr)
 
-    params = list(model.parameters())
     adaptor = None
     if family in ("exp", "cayley"):
         adaptor = ThetaToHermitianAdaptor(Kfreq=2).to(device)
-        params += list(adaptor.parameters())
 
-    optimizer = torch.optim.Adam(params, lr=lr, betas=betas, weight_decay=weight_decay)
-    grad_clip = optim_cfg.get("grad_clip", 1.0)
-    if isinstance(grad_clip, (int, float)) and grad_clip <= 0:
-        grad_clip = None
+    optimizer, ema = build_optimizer_and_ema(model, adaptor, optim_cfg)
 
-    # Scheduler
-    scheduler_cfg = optim_cfg.get("scheduler", {"name": "none"})
-    name = scheduler_cfg.get("name", "none")
-    if name == "cosine":
-        cosine = scheduler_cfg.get("cosine", {"t_max": 1000, "eta_min": 1e-5})
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=int(cosine.get("t_max", 1000)),
-            eta_min=float(cosine.get("eta_min", 1e-5)),
-        )
-    elif name == "step":
-        step_sched = scheduler_cfg.get("step", {"step_size": 200, "gamma": 0.5})
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer,
-            step_size=int(step_sched.get("step_size", 200)),
-            gamma=float(step_sched.get("gamma", 0.5)),
-        )
+    # Grad clip & AMP mapping
+    grad_clip_cfg = optim_cfg.get("grad_clip", optim_cfg.get("grad_clip", None))
+    if isinstance(grad_clip_cfg, (int, float)) or grad_clip_cfg is None:
+        max_norm = None if (not grad_clip_cfg or grad_clip_cfg <= 0) else float(grad_clip_cfg)
     else:
-        scheduler = None
+        max_norm = None
+        if grad_clip_cfg.get("enabled", True) and grad_clip_cfg.get("mode", "norm") == "norm":
+            max_norm = float(grad_clip_cfg.get("max_norm", 1.0))
 
-    # Loaders
+    precision_cfg = optim_cfg.get("precision", {})
+    amp_flag = str(precision_cfg.get("amp", "auto")).lower()
+    amp_enabled = amp_flag != "off"
+
+    # Data loaders
     train_cfg = cfg.get("train", {})
     epochs = int(args.epochs if args.epochs is not None else train_cfg.get("epochs", 1))
     batch_size = int(train_cfg.get("batch_size", 1))
@@ -626,6 +988,12 @@ def main():
         eval_ds, batch_size=batch_size, shuffle=False, collate_fn=lambda xs: xs[0]
     )
 
+    steps_per_epoch = math.ceil(len(train_ds) / max(1, batch_size))
+    scheduler_cfg = optim_cfg.get("scheduler", {"kind": "none"})
+    scheduler = build_scheduler(
+        optimizer, scheduler_cfg, steps_per_epoch=steps_per_epoch, total_epochs=epochs
+    )
+
     # Rollout + loss
     if family == "su2":
         rollout_fn = make_rollout_su2_dv2(pm, shift, cdtype=torch.complex64)
@@ -637,11 +1005,9 @@ def main():
         title_suffix = f"{family.upper()} (any degree)"
     loss_builder = make_transfer_loss(reduction=reduction, renorm=renorm)
 
-    # Logging (backward-compatible)
+    # Logging
     log_cfg = cfg.get("log", {})
     log_interval = int(log_cfg.get("interval", 50))
-
-    # Map our YAML names to the logger's expectation
     backend_map = {
         "console": "plain",
         "tensorboard": "tensorboard",
@@ -649,10 +1015,9 @@ def main():
         "plain": "plain",
     }
     backend = backend_map.get(str(log_cfg.get("backend", "plain")).lower(), "plain")
-
     tb_dir = (log_cfg.get("tensorboard") or {}).get("log_dir", None)
     wb_cfg = log_cfg.get("wandb") or {}
-    project = wb_cfg.get("project", log_cfg.get("project"))  # allow top-level fallback
+    project = wb_cfg.get("project", log_cfg.get("project"))
     run_name = wb_cfg.get("run_name", log_cfg.get("run_name"))
 
     ml_cfg = MetricLoggerConfig(
@@ -668,10 +1033,11 @@ def main():
     loop_cfg = LoopConfig(
         device=str(device),
         log_every=log_interval,
-        grad_clip=grad_clip,
+        grad_clip=max_norm,
         cvar_alpha=float(cfg.get("task", {}).get("cvar_alpha", 0.1)),
         primary_on_targets=True,
-        progress_bar=True,  # or False to disable
+        progress_bar=True,
+        amp=amp_enabled,
     )
 
     # Outputs
@@ -684,89 +1050,136 @@ def main():
         )
     run_dir.mkdir(parents=True, exist_ok=True)
     plot_path = run_dir / "pt_target.png"
-    ckpt_path = run_dir / "model_last.pt"
+    ckpt_last = run_dir / "model_last.pt"
+    ckpt_best = run_dir / "model_best.pt"
+
+    # Optional resume (B8 atomic-aware)
+    start_epoch = 0
+    best_metric = None
+    if args.resume:
+        with _time_block("resume_load"):
+            payload = _CK.try_resume(Path(args.resume))
+            if payload:
+                # Accept a few common layouts
+                sd = payload.get("state_dict") or payload.get("model")
+                if sd is not None:
+                    try:
+                        model.load_state_dict(sd, strict=False)
+                    except Exception:
+                        # remove 'module.' prefix if present
+                        new_sd = {k.replace("module.", "", 1): v for k, v in sd.items()}
+                        model.load_state_dict(new_sd, strict=False)
+                if adaptor is not None and isinstance(payload.get("adaptor", None), dict):
+                    try:
+                        adaptor.load_state_dict(payload["adaptor"], strict=False)
+                    except Exception:
+                        pass
+                opt_sd = payload.get("optimizer", None)
+                if isinstance(opt_sd, dict):
+                    try:
+                        optimizer.load_state_dict(opt_sd)
+                    except Exception:
+                        pass
+                if "epoch" in payload:
+                    start_epoch = int(payload["epoch"])
+                best_metric = payload.get("best_metric", None)
+                print(f"[resume] Loaded checkpoint from {args.resume} @ epoch {start_epoch}")
 
     # Train/Eval
-    step = 0
+    step = 0 if start_epoch == 0 else start_epoch * steps_per_epoch
     pt_curve_x: list[int] = []
     pt_curve_y: list[float] = []
-    epoch_times: list[float] = []
-    t_epoch_start = time.perf_counter()
 
     print(
         f"[setup] device={device}, N={g.N}, T={T}, target={target_index}, family={family}, epochs={epochs}"
     )
-    print(f"[setup] optimizer=Adam(lr={lr}), grad_clip={grad_clip}")
+    print(
+        f"[setup] optimizer={optimizer.__class__.__name__}, groups={len(optimizer.param_groups)}; grad_clip={max_norm}"
+    )
+    if scheduler is not None:
+        print(f"[setup] scheduler={scheduler.__class__.__name__}")
+    if ema is not None:
+        print(f"[setup] EMA enabled: decay={ema.decay}, warmup_steps={ema.warm}, every={ema.every}")
 
     pbar_epochs = (
-        _tqdm(range(1, epochs + 1), desc="epochs") if _tqdm is not None else range(1, epochs + 1)
+        _tqdm(range(start_epoch + 1, epochs + 1), desc="epochs")
+        if _tqdm is not None
+        else range(start_epoch + 1, epochs + 1)
     )
     for epoch in pbar_epochs:
-        step = train_epoch(
-            model=model,
-            dataloader=train_loader,
-            optimizer=optimizer,
-            logger=logger,
-            loop_cfg=loop_cfg,
-            rollout_fn=rollout_fn,
-            loss_builder=loss_builder,
-            step_start=step,
-        )
-        if scheduler is not None:
-            scheduler.step()
+        with _time_block(f"epoch_{epoch}_train"):
+            step = train_epoch(
+                model=model,
+                dataloader=train_loader,
+                optimizer=optimizer,
+                logger=logger,
+                loop_cfg=loop_cfg,
+                rollout_fn=rollout_fn,
+                loss_builder=loss_builder,
+                step_start=step,
+                scheduler=(
+                    None
+                    if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
+                    else scheduler
+                ),
+            )
 
-        # Eval P_T[target]
+        # Eval (EMA swap if configured for eval-only averaging)
         with torch.no_grad():
-            vals = []
-            for batch in eval_loader:
-                P, aux = rollout_fn(model, batch)
-                P = P / (P.sum(dim=-1, keepdim=True).clamp_min(1e-12))
-                pt = P.index_select(dim=-1, index=aux["targets"]).sum(dim=-1)
-                vals.extend(pt.cpu().tolist())
-            pt_avg = float(sum(vals) / max(1, len(vals)))
-            pt_curve_x.append(epoch)
-            pt_curve_y.append(pt_avg)
+            if ema is not None:
+                ema.store(model)
+            with _time_block(f"epoch_{epoch}_eval"):
+                vals = []
+                for batch in eval_loader:
+                    P, aux = rollout_fn(model, batch)
+                    P = P / (P.sum(dim=-1, keepdim=True).clamp_min(1e-12))
+                    pt = P.index_select(dim=-1, index=aux["targets"]).sum(dim=-1)
+                    vals.extend(pt.cpu().tolist())
+                pt_avg = float(sum(vals) / max(1, len(vals)))
+                pt_curve_x.append(epoch)
+                pt_curve_y.append(pt_avg)
+            if ema is not None:
+                ema.restore(model)
 
+        # Plateau step if used
+        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            mode = scheduler_cfg.get("plateau", {}).get("mode", "min")
+            metric = pt_avg if mode == "max" else -pt_avg
+            scheduler.step(metric)
+
+        # Print + plot + save (atomic)
         if epoch % 10 == 0 or epoch == 1 or epoch == epochs:
             print(f"[epoch {epoch:04d}] P_T[target]={pt_avg:.4f}")
-            plot_series(
-                pt_curve_x, pt_curve_y, out_png=plot_path, title=f"P_T[target] — {title_suffix}"
-            )
-            torch.save(
-                {
-                    "model": model.state_dict(),
-                    "adaptor": (adaptor.state_dict() if adaptor is not None else None),
-                    "epoch": epoch,
-                },
-                ckpt_path,
-            )
+            with _time_block("plot_update"):
+                plot_series(
+                    pt_curve_x, pt_curve_y, out_png=plot_path, title=f"P_T[target] — {title_suffix}"
+                )
 
-            # right after pt_avg is computed
+        # Save last every epoch; update best if improved
+        payload = {
+            "state_dict": model.state_dict(),
+            "adaptor": (adaptor.state_dict() if adaptor is not None else None),
+            "optimizer": optimizer.state_dict(),
+            "epoch": epoch,
+            "config": cfg,
+            "best_metric": best_metric if best_metric is not None else -1.0,
+        }
+        _CK.save_train_state(ckpt_last, **payload)
+
+        if (best_metric is None) or (pt_avg > best_metric):
+            best_metric = pt_avg
+            payload["best_metric"] = best_metric
+            _CK.atomic_save(payload, ckpt_best)
+
         if _tqdm is not None:
             try:
-                # show latest metric(s) and lr on the epoch bar
                 lr_now = optimizer.param_groups[0]["lr"]
                 pbar_epochs.set_postfix({"P_T[target]": f"{pt_avg:.3f}", "lr": f"{lr_now:.2e}"})
             except Exception:
                 pass
 
     print(f"[done] final P_T[target]={pt_curve_y[-1]:.4f}")
-    print(f"[artifacts] plot={plot_path}, ckpt={ckpt_path}")
-
-    # --- timing / ETA ---
-    t_now = time.perf_counter()
-    epoch_time = t_now - t_epoch_start
-    epoch_times.append(epoch_time)
-    avg = sum(epoch_times[-5:]) / min(len(epoch_times), 5)  # rolling avg of last 5 epochs
-    remaining = max(0, epochs - epoch) * avg
-
-    def _fmt(sec):
-        m, s = divmod(int(sec), 60)
-        h, m = divmod(m, 60)
-        return f"{h:02d}:{m:02d}:{s:02d}"
-
-    print(f"[time] last_epoch={_fmt(epoch_time)}  avg={_fmt(avg)}  ETA={_fmt(remaining)}")
-    t_epoch_start = time.perf_counter()
+    print(f"[artifacts] plot={plot_path}, ckpt_last={ckpt_last}, ckpt_best={ckpt_best}")
 
 
 if __name__ == "__main__":

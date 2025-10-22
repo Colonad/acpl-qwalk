@@ -2,10 +2,10 @@
 import pytest
 import torch
 
+from acpl.sim.coins import CoinsSpecSU2, coins_su2_from_theta
 from acpl.sim.portmap import build_portmap
 from acpl.sim.shift import build_shift
 from acpl.sim.step import step
-from acpl.sim.coins import coins_su2_from_theta, CoinsSpecSU2
 from acpl.sim.utils import position_probabilities, renorm_state_
 
 

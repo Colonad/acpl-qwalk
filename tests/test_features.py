@@ -1,17 +1,16 @@
 # tests/test_features.py
 import torch
-import pytest
 
-from acpl.data.graphs import line_graph, grid_graph
 from acpl.data.features import (
     FeatureSpec,
-    node_features_line,
+    build_arc_features,
     build_node_features,
     laplacian_positional_encoding,
-    random_walk_structural_encoding,
-    build_arc_features,
+    node_features_line,
     normalize_degree,
+    random_walk_structural_encoding,
 )
+from acpl.data.graphs import grid_graph, line_graph
 
 
 def _ortho_check(M: torch.Tensor, atol=1e-5):
@@ -81,7 +80,9 @@ def test_arc_features_geometry_and_shapes_2d():
     # Grid with 2D coords → arc features contain direction(2) + distance(1) + angle sin/cos(2) = 5 dims
     edge_index, degrees, coords, arc_slices = grid_graph(3, 3, seed=0)
     A = edge_index.shape[1]
-    F = build_arc_features(edge_index, coords, use_direction=True, use_distance=True, use_angle2d=True)
+    F = build_arc_features(
+        edge_index, coords, use_direction=True, use_distance=True, use_angle2d=True
+    )
     assert F.shape == (A, 5)
 
     # Direction rows should be unit norm wherever distance > 0
@@ -102,11 +103,18 @@ def test_build_node_features_block_indexing_and_shapes():
     # Combine multiple blocks and verify index ranges are consistent
     edge_index, degrees, coords, arc_slices = grid_graph(3, 3, seed=0)
     spec = FeatureSpec(
-        use_degree=True, degree_norm="inv_sqrt", degree_onehot_K=3,
+        use_degree=True,
+        degree_norm="inv_sqrt",
+        degree_onehot_K=3,
         use_coords=True,
-        use_sinusoidal_coords=True, sinusoidal_dims=4,
-        use_lap_pe=True, lap_pe_k=3, lap_pe_norm="sym", lap_pe_random_sign=False,
-        use_rwse=True, rwse_K=3,
+        use_sinusoidal_coords=True,
+        sinusoidal_dims=4,
+        use_lap_pe=True,
+        lap_pe_k=3,
+        lap_pe_norm="sym",
+        lap_pe_random_sign=False,
+        use_rwse=True,
+        rwse_K=3,
         seed=999,
     )
     X, idx = build_node_features(edge_index, degrees, coords, spec=spec)
@@ -124,7 +132,7 @@ def test_build_node_features_block_indexing_and_shapes():
 
     # Ensure blocks do not overlap and cover exactly the used width
     start_end_sorted = sorted(start_end, key=lambda t: t[0])
-    for (s1, e1), (s2, e2) in zip(start_end_sorted, start_end_sorted[1:]):
+    for (s1, e1), (s2, e2) in zip(start_end_sorted, start_end_sorted[1:], strict=False):
         assert e1 == s2  # contiguous packing
 
     # Sanity: degree norm column equals normalize_degree(...)

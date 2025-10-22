@@ -1,0 +1,124 @@
+# ACPL — Task config: STATE/SET SEARCH (maximize success at marked set Ω)
+# Compatible with:
+#   - acpl/train/loops.py (train/eval epochs, richer logging)
+#   - acpl/train/backprop.py (regularizers, spectral penalties, grad clipping)
+#   - acpl/train/ppo.py (fallback for non-differentiable oracles)
+#   - acpl/eval/{protocol,ablations,plots}.py (CI-style eval & viz)
+#   - scripts/{train.py,eval.py,export_coins.py,viz_coins.py}
+
+task:
+  name: search
+  objective: "maximize P_Omega(T)"      # Sum of terminal probabilities over marks Ω
+  horizon_T: 128                         # default; can be overridden via CLI
+  normalized_time_feature: true          # τ_t = t / T
+
+data:
+  # Graph families & target marking
+  family: ["grid-2d", "hypercube"]       # use one or both; can supply multiple loaders in scripts/eval.py
+  grid:
+    L_min: 32
+    L_max: 96
+    boundary: "open"                     # open | periodic
+    mark_scheme: "single"                # single | k-random | cross | ring
+    k: 1
+  hypercube:
+    n_min: 6                             # Q_n degree = n
+    n_max: 9
+    mark_scheme: "single"
+  features:
+    include_degree: true
+    laplacian_pe:
+      enabled: true
+      k: 16
+      sign_fix: "max-abs-positive"
+    coords:
+      enabled_on_grids: true             # (x/L, y/L)
+    cube_bits:
+      enabled_on_hypercube: true
+      include_weight: true               # Hamming weight
+  batching:
+    episodes_per_graph: 1
+    graphs_per_batch: 4                  # for small graphs; use 1 for large
+    shuffle: true
+  seed: 1337
+
+loss:
+  kind: "neg_success"                    # L = - sum_{m in Ω} P_T(m)
+  clamp_min_p: 1.0e-9                    # numerical floor used by some risk metrics
+  reduction: "mean"
+
+regularization:
+  # Angle-level regularizers (Phase B5: temporal smoothness & magnitude)
+  smooth_theta: 1.0e-3                   # λ_t * sum ||θ_t - θ_{t-1}||^2
+  l2_theta: 5.0e-5                       # λ_m * sum ||θ_t||^2
+  # Spectral penalties on angle time-series (low-pass bias)
+  spectral:
+    enabled: true
+    dct_weight: 5.0e-5                  # penalize high-frequency DCT bins
+    hf_bins: 0.25                        # penalize top 25% of frequencies
+  # Gradient clipping (applied in loops/backprop)
+  grad_clip_norm: 1.0
+
+training:
+  method: "backprop"                     # "backprop" | "ppo"
+  optimizer:
+    name: "adamw"
+    lr: 2.0e-4
+    betas: [0.9, 0.999]
+    weight_decay: 1.0e-4
+  scheduler:
+    enabled: true
+    name: "cosine"
+    warmup_steps: 500
+  epochs: 60
+  steps_per_epoch: 500                   # for sampler-based loaders
+  accum_steps: 1
+  amp: true                              # mixed precision on CUDA
+  device: "cuda"
+  log_every: 50
+  log_grad_norm_every: 200
+  ckpt:
+    dir: "checkpoints/search"
+    keep_last: 5
+    save_every_steps: 2000
+    save_best_metric: "eval/target/success"  # from loops/eval logging pack
+  # PPO fallback config (if switching method: "ppo" or for mixed regimes)
+  ppo:
+    enabled: false
+    rollout_length: 128
+    epochs: 4
+    minibatch_size: 2048
+    clip_eps: 0.2
+    vf_coef: 0.5
+    ent_coef: 0.01
+    gamma: 0.995
+    gae_lambda: 0.95
+    max_grad_norm: 1.0
+
+eval:
+  seeds: [101, 102, 103, 201, 202]
+  ci_alpha: 0.1                          # for CI-style aggregates
+  metrics:
+    - "target/success"
+    - "target/maxp"
+    - "mix/tv"
+    - "mix/js"
+    - "mix/H"
+    - "mix/kl_pu"
+  # Robustness (optional for search)
+  robustness:
+    enabled: false
+    edge_phase:
+      sigma: 0.0
+      trials: 0
+
+viz:
+  # Used by acpl/eval/plots.py and scripts/viz_coins.py
+  pt_timelines:
+    enabled: true
+    topk_vertices: 10
+  tv_curves:
+    enabled: true
+  spectra:
+    enabled: true
+    dct_show_bins: 16

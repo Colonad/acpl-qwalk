@@ -1,20 +1,17 @@
 # acpl/utils/logging.py
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
-
 
 __all__ = ["MetricLogger", "MetricLoggerConfig"]
 
 
 @dataclass
 class MetricLoggerConfig:
-    backend: str = "plain"       # "plain" | "tensorboard" | "wandb"
-    log_dir: Optional[str] = None
-    project: Optional[str] = None   # for wandb
-    run_name: Optional[str] = None  # for wandb
+    backend: str = "plain"  # "plain" | "tensorboard" | "wandb"
+    log_dir: str | None = None
+    project: str | None = None  # for wandb
+    run_name: str | None = None  # for wandb
     step_key: str = "step"
     enable: bool = True
 
@@ -26,6 +23,7 @@ class MetricLogger:
       - tb:      logs to TensorBoard (scalars only)
       - wandb:   logs scalar dicts
     """
+
     def __init__(self, cfg: MetricLoggerConfig):
         self.cfg = cfg
         self.backend = (cfg.backend or "plain").lower()
@@ -80,7 +78,7 @@ class MetricLogger:
             self._wb.log({name: value, self.cfg.step_key: step})
             return
 
-    def log_dict(self, prefix: str, scalars: Dict[str, float], step: int):
+    def log_dict(self, prefix: str, scalars: dict[str, float], step: int):
         if self.backend == "off":
             return
         if self.backend == "plain":

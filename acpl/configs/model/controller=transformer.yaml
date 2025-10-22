@@ -1,0 +1,112 @@
+# ACPL • Model config • Transformer controller (Phase B7)
+# Compatible with the training/eval scripts and B3 PE wrapper.
+
+model:
+  name: ACPLPolicy
+
+  # ---------------- Encoder (GNN) ----------------
+  # You can swap this block with {gat|gin|pna} configs. GCN is a solid default.
+  encoder:
+    type: gcn                        # {gcn, gat, gin, pna}
+    in_dim: ${data.in_dim}
+    hidden_dim: 128
+    out_dim: 128
+    num_layers: 3
+    dropout: 0.05
+    act: gelu                        # {relu, gelu, prelu}
+    norm: layernorm                  # {batchnorm, layernorm, none}
+    residual: true
+    use_edge_attr: false
+    edge_dim: 0
+
+  # ------------- Positional Encodings (Phase B3 wrapper) -------------
+  pe:
+    # Graph PEs (concatenated to raw features then mixed by a small MLP)
+    use_coords: false                # expect dataset coords if true
+    use_lappe: true                  # Laplacian eigenfeatures
+    use_roles: false                 # structural role encodings
+
+    ablations:
+      drop_time_pe: false            # removes time PE injected to controller
+      drop_graph_pe: false           # strips graph PEs from node features
+      drop_degree_feat: false        # if the feature builder emits degree channels, drop them
+
+    lappe:
+      k: 16
+      sign_flip: true
+      norm: none                     # {none, l2, batchnorm, layernorm}
+      project_to: 32                 # 0 = no projection (concat raw)
+
+    roles:
+      kind: "kcore-bucket"           # {kcore-bucket, pagerank-quant, ecc-bin}
+      num_buckets: 8
+      one_hot: true
+      project_to: 16
+
+    coords:
+      expect_dim: 3
+      project_to: 16
+      center_and_scale: true
+
+    mix:                              # lightweight mixer after [X || PE_*]
+      enabled: true
+      hidden: 64
+      dropout: 0.0
+      norm: layernorm
+
+  # ---------------- Temporal controller (Transformer) ----------------
+  controller:
+    type: transformer                 # <- key change versus GRU configs
+    hidden: 128                       # kept for interface parity
+    layers: 1                         # (unused by transformer; see below)
+    dropout: 0.0
+
+    transformer:
+      dim: 128                        # model width D
+      heads: 4                        # multi-head self-attention
+      layers: 3                       # # of Transformer blocks (depth)
+      dropout: 0.0
+      attn_dropout: 0.0
+      mlp_ratio: 4.0                  # FFN hidden = mlp_ratio * dim
+      causal: true                    # enforce temporal causality
+      alibi: true                     # ALiBi slopes for long horizons
+      final_norm: layernorm           # {layernorm, rmsnorm, none}
+      pre_norm: true                  # pre-norm residual layout
+      # Implementation notes:
+      # - The project includes a custom MultiheadSelfAttention using PyTorch SDPA,
+      #   with bool/float masks and optional ALiBi addition.
+      # - Controller accepts input (T, N, Dz) after node encoder.
+
+  # ---------------- Time positional encoding ----------------
+  time_pe:
+    kind: fourier                     # TimeFourierPE (Phase B3)
+    dim: 48                           # richer spectrum for transformer
+    base: 10000.0
+    learned_scale: true
+    normalize: false
+    dropout: 0.0
+    learned_phase: false
+    learned_freqs: false
+
+  # ---------------- Policy head (SU(2) coins) ----------------
+  head:
+    type: su2_zyz                     # 3 Euler angles per (t,v)
+    hidden: 0                         # optional MLP on top of controller (0 = identity)
+    angle_range: "unbounded"          # angles are wrapped in the SU(2) lift
+
+  # ---------------- Regularization (Backprop loop reads these) ----------------
+  regularizers:
+    smooth_theta: 5e-5                # temporal smoothness (θ_t − θ_{t−1})^2
+    l2_theta: 0.0
+
+  # ---------------- Training niceties ----------------
+  train:
+    grad_clip_norm: 1.0               # safe default for transformer stability
+    amp: true                         # enable mixed precision if CUDA
+
+# Tips:
+# • For small graphs/horizons, consider heads=2, layers=2 to reduce memory.
+# • If you disable time_pe.aliased by ablations.drop_time_pe=true, ALiBi helps retain
+#   temporal biasing. Keeping both generally yields best results in our report.
+# • Swap the encoder block with the previously provided GAT/GIN/PNA files while
+#   keeping this controller section unchanged to compare controllers apples-to-apples.

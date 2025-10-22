@@ -1,0 +1,25 @@
+# acpl/configs/model/gnn=graphsage.yaml
+# Phase B3 preset for GraphSAGE (mean)
+# This is a *module-level* config for the GNN encoder that feeds the policy.
+
+name: graphsage
+
+# You *must* pass in_dim/out_dim from your runtime (feature size and embed size).
+# Many trainers merge this file into a higher-level model config where these get
+# filled in by the pipeline. Example:
+#   in_dim: ${features.dim}     # (resolve from feature builder)
+#   out_dim: ${model.embed_dim} # (resolve from policy)
+
+hidden_dim: 128
+num_layers: 2
+
+# If you have edge features (e.g., orientation/phase), set this to their size
+# and provide edge_attr=[E, edge_dim] at runtime. Otherwise leave as null.
+edge_dim: null
+
+# Stabilizers
+norm: layer          # one of: ["layer", "graph", "none"]
+dropout: 0.1
+act: gelu            # one of: ["relu", "gelu", "prelu"]
+residual: true
+add_self_loops: true

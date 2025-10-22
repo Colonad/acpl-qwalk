@@ -12,7 +12,7 @@ import torch.nn as nn
 from acpl.sim.coins import CoinsSpecSU2
 
 from .controller.gru import GRUController, GRUControllerConfig
-from .controller.tiny_transformer import TinyTimeTransformer, TinyTimeTransformerConfig
+from .controller.transformer import TemporalTransformer, TemporalTransformerConfig
 from .gnn.gcn import GCN
 from .head import CoinHeadConfig, CoinHeadSU2
 from .pe import TimeFourierPE, TimeFourierPEConfig
@@ -113,16 +113,26 @@ class ACPLPolicy(nn.Module):
             ctrl_out_dim = cfg.ctrl_hidden * (2 if cfg.ctrl_bidirectional else 1)
 
         elif cfg.controller == "transformer":
-            self.controller = TinyTimeTransformer(
-                TinyTimeTransformerConfig(
+            # Temporal Transformer controller (Phase B3)
+            self.controller = TemporalTransformer(
+                TemporalTransformerConfig(
                     in_dim=ctrl_in,
                     model_dim=cfg.ctrl_hidden,
+                    out_dim=cfg.ctrl_hidden,  # keep controller hidden size constant
                     num_layers=cfg.ctrl_layers,
-                    num_heads=max(1, min(8, cfg.ctrl_hidden // 32)),
-                    mlp_ratio=2.0,
+                    num_heads=max(1, min(8, max(1, cfg.ctrl_hidden // 32))),
+                    mlp_ratio=4.0,
                     dropout=cfg.ctrl_dropout,
-                    layernorm=cfg.ctrl_layernorm,
-                    residual=False,
+                    attn_dropout=0.0,
+                    droppath=0.0,
+                    norm_first=True,
+                    residual_gating=False,
+                    use_internal_time=False,  # we already pass external time PE
+                    concat_external_tpe=True,
+                    project_in=True,
+                    final_norm=True,
+                    causal=True,
+                    use_alibi=True,
                 )
             )
             ctrl_out_dim = cfg.ctrl_hidden
@@ -190,12 +200,12 @@ class ACPLPolicy(nn.Module):
         -------
         theta : (T, N, 3)    Euler angles per (time,node)
         (theta, h_next)      if return_state=True (h_next may be None if controller
-                             does not expose it).
+                            does not expose it).
 
         Notes
         -----
         * Backward compatibility: callers that pass only (X, edge_index, T=...)
-          get the same behavior as before.
+        get the same behavior as before.
         * If both T and t_coords are provided, t_coords length is used.
         """
         self._check_minimal(X, edge_index)
@@ -208,19 +218,13 @@ class ACPLPolicy(nn.Module):
         tpe = self._make_time_pe(T=T, t_coords=t_coords, device=device)  # (T, Pt)
 
         # 3) Temporal controller
-        # Our controllers currently return only the time trajectory H. If/when they
-        # support returning h_next, we will detect it. For GRUController we pass h_prev
-        # through (it already accepts it).
         h_next: torch.Tensor | None = None
         try:
-            # Try calling with all bells & whistles; controllers ignore extras they don't support.
+            # Controllers ignore extras they don't support; TemporalTransformer has no h0/mask.
             H = self.controller(z, tpe, h0=h_prev, mask=mask)  # (T, N, Dh)
         except TypeError:
-            # Fall back to the minimal signature
             H = self.controller(z, tpe)  # (T, N, Dh)
 
-        # If the controller exposes a terminal state via attribute (future-proof),
-        # capture it. (Current GRUController does not, so this remains None.)
         if hasattr(self.controller, "_last_hN"):
             h_next = self.controller._last_hN
 

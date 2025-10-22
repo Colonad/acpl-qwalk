@@ -2,15 +2,15 @@
 import pytest
 import torch
 
-from acpl.data.graphs import line_graph, grid_graph
 from acpl.data.features import (
     FeatureSpec,
-    build_node_features,
-    node_features_line,
     build_arc_features,
+    build_node_features,
     laplacian_positional_encoding,
+    node_features_line,
     random_walk_structural_encoding,
 )
+from acpl.data.graphs import grid_graph, line_graph
 
 
 def test_node_features_line_rejects_wrong_coord_shape():
@@ -28,7 +28,7 @@ def test_build_node_features_odd_sinusoidal_dims_raises():
         degree_norm="inv_sqrt",
         use_coords=True,
         use_sinusoidal_coords=True,
-        sinusoidal_dims=3,   # <-- must be even; should raise
+        sinusoidal_dims=3,  # <-- must be even; should raise
         use_lap_pe=False,
         use_rwse=False,
     )

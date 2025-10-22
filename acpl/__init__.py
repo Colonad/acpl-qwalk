@@ -4,7 +4,7 @@ ACPL-QWalk: GNN-based Adaptive Coin Policy for Discrete-Time Quantum Walks.
 
 from importlib.metadata import PackageNotFoundError, version
 
-__all__ = ["__version__"]
+__all__ = []
 
 try:
     __version__ = version("acpl-qwalk")

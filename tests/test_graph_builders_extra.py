@@ -1,12 +1,10 @@
 # tests/test_graph_builders_extra.py
-import math
 import pytest
 import torch
 
 from acpl.data.graphs import (
-    watts_strogatz_grid_graph,
     random_geometric_graph,
-    build_arc_index,
+    watts_strogatz_grid_graph,
 )
 
 
@@ -35,10 +33,12 @@ def _check_arc_csr(edge_index: torch.Tensor, arc_slices: torch.Tensor, num_nodes
         # all src equal u, dst non-decreasing (determinism)
         assert (src[s:e] == u).all()
         if e - s > 1:
-            assert torch.all(dst[s:e - 1] <= dst[s + 1:e])
+            assert torch.all(dst[s : e - 1] <= dst[s + 1 : e])
 
 
-def _check_degree_consistency(edge_index: torch.Tensor, degrees: torch.Tensor, arc_slices: torch.Tensor):
+def _check_degree_consistency(
+    edge_index: torch.Tensor, degrees: torch.Tensor, arc_slices: torch.Tensor
+):
     # degrees[u] must equal number of outgoing arcs from u in undirected-to-arcs convention
     # because for every undirected edge (u,v) we added arcs u->v and v->u.
     src = edge_index[0]
@@ -56,11 +56,15 @@ def _check_degree_consistency(edge_index: torch.Tensor, degrees: torch.Tensor, a
 # Watts–Strogatz on a 2D lattice with fixed coordinates
 # ------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("Lx,Ly,kx,ky,beta", [
-    (6, 5, 1, 1, 0.0),   # pure lattice
-    (6, 5, 1, 1, 0.3),   # some rewiring
-    (8, 8, 2, 1, 0.5),   # asymmetric neighborhoods
-])
+
+@pytest.mark.parametrize(
+    "Lx,Ly,kx,ky,beta",
+    [
+        (6, 5, 1, 1, 0.0),  # pure lattice
+        (6, 5, 1, 1, 0.3),  # some rewiring
+        (8, 8, 2, 1, 0.5),  # asymmetric neighborhoods
+    ],
+)
 def test_ws_grid_shapes_and_invariants(Lx, Ly, kx, ky, beta):
     edge_index, degrees, coords, arc_slices = watts_strogatz_grid_graph(
         Lx=Lx, Ly=Ly, kx=kx, ky=ky, beta=beta, seed=123
@@ -80,10 +84,10 @@ def test_ws_grid_shapes_and_invariants(Lx, Ly, kx, ky, beta):
     # --- Lattice baseline (no rewiring) degrees per node ---
     def base_deg_xy(x: int, y: int) -> int:
         # neighbors up to kx on each x side and ky on each y side, clipped by borders
-        left  = min(kx, x)
+        left = min(kx, x)
         right = min(kx, Lx - 1 - x)
-        down  = min(ky, y)
-        up    = min(ky, Ly - 1 - y)
+        down = min(ky, y)
+        up = min(ky, Ly - 1 - y)
         return left + right + down + up
 
     base_degs = torch.zeros(N, dtype=torch.long)
@@ -112,7 +116,6 @@ def test_ws_grid_shapes_and_invariants(Lx, Ly, kx, ky, beta):
     assert (degrees <= hi).all()
 
 
-
 def test_ws_grid_deterministic_with_seed():
     args = dict(Lx=5, Ly=4, kx=1, ky=1, beta=0.35)
     e1, d1, c1, s1 = watts_strogatz_grid_graph(**args, seed=999)
@@ -127,12 +130,16 @@ def test_ws_grid_deterministic_with_seed():
 # Random geometric graphs (RGG)
 # ------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("N,dim,torus", [
-    (1, 2, False),
-    (10, 2, False),
-    (10, 2, True),
-    (12, 3, False),
-])
+
+@pytest.mark.parametrize(
+    "N,dim,torus",
+    [
+        (1, 2, False),
+        (10, 2, False),
+        (10, 2, True),
+        (12, 3, False),
+    ],
+)
 def test_rgg_shapes_and_basic_invariants(N, dim, torus):
     edge_index, degrees, coords, arc_slices = random_geometric_graph(
         N=N, radius=0.5, dim=dim, torus=torus, seed=777

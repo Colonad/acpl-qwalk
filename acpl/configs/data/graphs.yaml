@@ -1,80 +1,160 @@
 # acpl/configs/data/graphs.yaml
 # -----------------------------------------------------------------------------
 # Graph generation config (Hydra-friendly).
-# This selects the graph *family* and the parameters used by
-# acpl/data/graphs.py to build an undirected simple graph and its CSR/arc view.
+# Selects the graph *family* and the parameters used by acpl/data/graphs.py
+# to build an undirected simple graph (plus optional coordinates & PE).
 #
-# Minimal usage (requested):
+# Minimal usage:
 #   family: line
 #   N: 64
 #   seed: 1234
 #
-# You can override any field from the CLI, e.g.:
+# CLI overrides examples:
 #   python scripts/train.py +data=@data/graphs.yaml data.family=grid data.grid.Lx=10 data.grid.Ly=8
+#   python scripts/eval.py  +data=@data/graphs.yaml data.family=ws   data.ws.beta=0.35 data.ws.torus=true
+#   python scripts/eval.py  +data=@data/graphs.yaml data.posenc.kind=laplacian data.posenc.k=16
 # -----------------------------------------------------------------------------
 
-# Master switch
-family: line        # line | cycle | grid | cube | regular | er | ws
+# ------------------------------- Master switches ------------------------------
 
-# Global options
-seed: 1234          # RNG seed for generators that use randomness (ER/WS/regular ties)
-coalesce: true      # merge duplicate undirected edges & remove self-loops
+# Pick one: line | cycle | grid | cube | regular | er | ws
+family: line
 
-# --- Shared scalar size knobs -------------------------------------------------
-# Used by families that specify a single size:
-N: 64               # line/cycle/regular/er default number of nodes
+# Reproducibility seed for generators that use randomness (ER/WS/regular ties)
+seed: 1234
 
-# --- Family-specific parameter blocks ----------------------------------------
+# Sanity & cleaning
+coalesce: true         # merge duplicate undirected edges & remove self-loops
+directed: false        # keep false for standard DTQW experiments
+self_loops: false      # do NOT add self-loops in the graph (coins already mix locally)
+
+# ------------------------------ Shared size knobs -----------------------------
+
+# Used by single-size families (line/cycle/regular/er default number of nodes)
+N: 64
+
+# -------------------------- Family-specific parameter blocks ------------------
 
 line:
   # Path graph on {0,…,N-1}
-  N: ${..N}         # inherit from top-level N
+  N: ${..N}
 
 cycle:
   # Cycle graph on {0,…,N-1}
   N: ${..N}
 
 grid:
-  # Rectangular grid (no wrap unless ws.torus=true). Total nodes Lx*Ly.
+  # Rectangular grid (no wrap unless ws.torus=true). Total nodes: Lx * Ly.
   Lx: 8
   Ly: 8
+  # Optional helper for coords; leave true for easy visualization
+  make_coords: true    # produce integer (x,y) and normalized (x/Lx, y/Ly)
 
 cube:
-  # Hypercube Q_d (N = 2^d). If you set d, N is ignored for this family.
-  d: 6              # 6 → N = 64
+  # Hypercube Q_d with N = 2^d nodes. If 'd' is set, top-level N is ignored.
+  d: 6                 # d=6 -> N=64
+  emit_bitstrings: true  # include binary coordinates for features/viz
 
 regular:
-  # d-regular simple graph on N nodes.
-  # Generator retries until success (degree feasibility required: 0 <= d < N)
+  # d-regular simple graph on N nodes. Retries until success.
   N: ${..N}
   d: 3
   max_retries: 50
 
 er:
-  # Erdős–Rényi G(N, p) with coalesced undirected edges, no self-loops.
+  # Erdős–Rényi G(N, p). Edges coalesced, no self-loops.
   N: ${..N}
-  p: 0.05           # edge probability in [0,1]
+  p: 0.05              # edge probability in [0,1]
+  keep_connected: false  # if true, resample until connected (costly for small p)
 
 ws:
-  # Watts–Strogatz small-world on a 2D grid lattice with local neighborhoods.
-  # We start with axis-aligned neighbors (kx in +x, ky in +y) then rewire each
-  # lattice edge (u,v) to (u,w) with probability beta. If torus=true, the base
-  # lattice is periodic on both axes.
+  # Watts–Strogatz on a 2D grid lattice with local neighborhoods, then rewire.
+  # Start from axis-aligned neighbors (kx in +x, ky in +y).
   Lx: 10
   Ly: 10
-  kx: 1             # neighborhood radius in +x
-  ky: 1             # neighborhood radius in +y
-  beta: 0.2         # rewiring probability in [0,1]
-  torus: false      # wrap-around grid
+  kx: 1                # neighborhood radius in +x
+  ky: 1                # neighborhood radius in +y
+  beta: 0.2            # rewiring probability in [0,1]
+  torus: false         # periodic boundary on both axes if true
+  # (Optional) ensure simple graph after rewiring (drop multi-edges/loops)
+  sanitize: true
 
-# --- Validation guards (checked by your runner, optional) ---------------------
+# ------------------------- Positional encodings (PE) --------------------------
+# These settings control optional position/spectral features creation. Your
+# model can ignore them safely; they are provided for convenience/consistency.
+
+posenc:
+  # none | laplacian | coords | hybrid
+  # - none:   no extra PE (degree-only features are still allowed by your features builder)
+  # - laplacian: top-k Laplacian eigenvectors with deterministic sign fix
+  # - coords: grid/hypercube coordinates only (if available)
+  # - hybrid: concatenate coords (if available) with LapPE
+  kind: laplacian
+
+  # Laplacian specifics (used if kind in {laplacian, hybrid})
+  k: 16                 # number of eigenvectors (small nontrivial)
+  norm: "sym"           # "sym" (I - D^{-1/2} A D^{-1/2}) or "comb" (D - A)
+  sign_fix: "max"       # "max" -> flip each eigvec so argmax|phi| is positive
+  standardize: true     # zero-mean/unit-std per PE channel
+
+  # Coordinate specifics (used if kind in {coords, hybrid} and coords exist)
+  coords_norm: true     # normalize coordinates to [0,1] range
+
+# ------------------------------- Robustness knobs -----------------------------
+# These are read by robustness tasks/evals; harmless to leave at defaults.
+
+robustness:
+  # Static edge phases (disorder). When enabled at eval, downstream pipeline draws
+  # phases φ~Uniform[-phi_max,phi_max] (radians) and folds them into the shift/coins.
+  static_edge_phases:
+    enabled: false
+    phi_max: 0.0       # e.g., 0.3 ~ moderate disorder
+
+  # Coin dephasing noise (per step). If enabled, downstream code may apply a small
+  # diagonal phase jitter to local coins during rollout for robustness sweeps.
+  coin_dephasing:
+    enabled: false
+    sigma: 0.0         # stddev in radians
+
+  # Missing-edge rate for drop-edge stress tests at eval time
+  drop_edge:
+    enabled: false
+    p_drop: 0.0        # fraction of edges removed uniformly at random
+
+# ------------------------------ Features & coords -----------------------------
+# Controls for the convenience outputs from the generator. If the runner ignores
+# them, nothing breaks.
+
+features:
+  degree: true         # include normalized degree in X
+  # For grids/cubes, emit coordinates/bitstrings if available
+  include_coords: true
+  include_bitstrings: true
+
+coords:
+  # If true and family supports it, return both integer coords and normalized coords
+  export: true
+
+# ------------------------------- Validation guards ----------------------------
+# Checked by your runner/util if desired (no-op if unused).
+
 validate:
   allow_isolated: false   # assert min degree >= 1 after construction if false
   max_degree: null        # e.g., 16 -> assert deg(u) <= 16 for all u
+  must_be_connected: null # null | true | false (null = do not check)
 
-# --- Notes --------------------------------------------------------------------
+# --------------------------------- Caching ------------------------------------
+# Optional cache hints for expensive PE on repeated sizes/topologies.
+cache:
+  enable: true
+  # Cache key suggestion: (family, params, N/Lx/Ly/d, seed-independent topology key)
+  dir: ".acpl_cache/graphs"   # runner may use this to persist LapPE/coords per (family,size)
+
+# --------------------------------- Notes --------------------------------------
 # • graphs.py returns: edge_index (2,E), degrees (N,), coords (N,2 or None),
 #   and arc_slices (N+1,) to index per-node arc ranges.
-# • For line/cycle/grid/cube we also emit normalized [0,1] coordinates; ER/regular/WS
+# • For line/cycle/grid/cube we also emit normalized coordinates; ER/regular/WS
 #   fall back to simple 1D coords (i/(N-1), 0) unless your features builder overrides.
 # • coalesce=true guarantees a simple undirected graph view, matching the DTQW simulator.
+# • All extra blocks (posenc/robustness/features/coords/cache) are strictly optional,
+#   designed to be safely ignored by older runners.

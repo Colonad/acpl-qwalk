@@ -1,0 +1,94 @@
+# ACPL • Model config • PNA encoder (Powerful Graph Networks with aggregators/scalers)
+model:
+  name: ACPLPolicy
+
+  encoder:
+    type: pna
+    in_dim: ${data.in_dim}
+    hidden_dim: 128
+    out_dim: 128
+    num_layers: 4
+    dropout: 0.05
+    act: gelu
+    norm: layernorm
+
+    pna:
+      aggregators: ["mean", "min", "max", "std"]   # can include "sum"
+      scalers: ["identity", "amplification", "attenuation"]
+      towers: 4                                    # split channels across towers
+      pretrans_layers: 1                           # #MLP layers before aggregate
+      posttrans_layers: 1                          # #MLP layers after aggregate
+      residual: true
+      deg_buckets: [0, 1, 2, 4, 8, 16, 32]        # histogram used by PNA scalers
+
+    use_edge_attr: true
+    edge_dim: ${data.edge_dim:-0}                  # if not available, set 0 or remove
+
+  pe:
+    use_coords: true
+    use_lappe: true
+    use_roles: false
+    ablations:
+      drop_time_pe: false
+      drop_graph_pe: false
+      drop_degree_feat: false
+
+    lappe:
+      k: 16
+      sign_flip: true
+      norm: none
+      project_to: 32
+
+    roles:
+      kind: "kcore-bucket"
+      num_buckets: 8
+      one_hot: true
+      project_to: 16
+
+    coords:
+      expect_dim: 3
+      project_to: 32
+      center_and_scale: true
+
+    mix:
+      enabled: true
+      hidden: 96
+      dropout: 0.05
+      norm: layernorm
+
+  controller:
+    type: transformer                   # PNA pairs well with a light transformer
+    hidden: 128                         # (kept for GRU compat; not used by transformer)
+    layers: 1
+    dropout: 0.0
+
+    transformer:
+      dim: 128
+      heads: 4
+      layers: 2
+      dropout: 0.0
+      alibi: true
+      causal: true
+
+  time_pe:
+    kind: fourier
+    dim: 48
+    base: 10000.0
+    learned_scale: true
+    normalize: false
+    dropout: 0.0
+    learned_phase: false
+    learned_freqs: false
+
+  head:
+    type: su2_zyz
+    hidden: 0
+    angle_range: "unbounded"
+
+  regularizers:
+    smooth_theta: 5e-5
+    l2_theta: 0.0
+
+  train:
+    grad_clip_norm: 1.0
+    amp: true

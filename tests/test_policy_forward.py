@@ -1,18 +1,21 @@
 # tests/test_policy_forward.py
-import torch
 import pytest
+import torch
 
-from acpl.policy.policy import ACPLPolicy, ACPLPolicyConfig
-from acpl.data.graphs import grid_graph
 from acpl.data.features import FeatureSpec, build_node_features
+from acpl.data.graphs import grid_graph
+from acpl.policy.policy import ACPLPolicy, ACPLPolicyConfig
 
 
 def _make_graph_and_features(Lx=4, Ly=4, seed=0, use_lap_pe=True):
     edge_index, degrees, coords, _ = grid_graph(Lx, Ly, seed=seed)
     spec = FeatureSpec(
-        use_degree=True, degree_norm="inv_sqrt",
+        use_degree=True,
+        degree_norm="inv_sqrt",
         use_coords=True,
-        use_lap_pe=use_lap_pe, lap_pe_k=min(4, degrees.numel() - 1), lap_pe_norm="sym",
+        use_lap_pe=use_lap_pe,
+        lap_pe_k=min(4, degrees.numel() - 1),
+        lap_pe_norm="sym",
         use_rwse=False,
     )
     X, _ = build_node_features(edge_index, degrees, coords, spec=spec)
@@ -28,14 +31,18 @@ def test_policy_forward_shapes(controller):
 
     cfg = ACPLPolicyConfig(
         in_dim=X.size(1),
-        gnn_hidden=64, gnn_out=64,
-        controller=controller, ctrl_hidden=64, ctrl_layers=1, ctrl_dropout=0.0,
+        gnn_hidden=64,
+        gnn_out=64,
+        controller=controller,
+        ctrl_hidden=64,
+        ctrl_layers=1,
+        ctrl_dropout=0.0,
         time_pe_dim=32,
         head_hidden=0,
     )
     policy = ACPLPolicy(cfg)
 
-    theta = policy(X, edge_index, T=T)         # (T, N, 3)
+    theta = policy(X, edge_index, T=T)  # (T, N, 3)
     coins = policy.coins_su2(X, edge_index, T=T)
 
     assert theta.shape == (T, N, 3)
@@ -47,7 +54,7 @@ def test_policy_forward_shapes(controller):
 def _blocks_unitary_and_det1(U: torch.Tensor, atol=1e-5):
     """
     U: (..., 2, 2) complex
-    Check U^\dagger U ≈ I and |det(U)| ≈ 1 blockwise.
+    Check U^\\dagger U ≈ I and |det(U)| ≈ 1 blockwise.
     """
     assert U.shape[-2:] == (2, 2)
     UhU = torch.matmul(U.conj().transpose(-1, -2), U)
@@ -67,8 +74,11 @@ def test_policy_coins_are_unitary_su2():
     T = 4
     cfg = ACPLPolicyConfig(
         in_dim=X.size(1),
-        gnn_hidden=48, gnn_out=48,
-        controller="gru", ctrl_hidden=48, ctrl_layers=1,
+        gnn_hidden=48,
+        gnn_out=48,
+        controller="gru",
+        ctrl_hidden=48,
+        ctrl_layers=1,
         time_pe_dim=16,
         head_hidden=0,
     )
@@ -85,24 +95,34 @@ def test_policy_determinism_same_seed():
     T = 3
 
     torch.manual_seed(999)
-    pol1 = ACPLPolicy(ACPLPolicyConfig(
-        in_dim=X.size(1),
-        gnn_hidden=32, gnn_out=32,
-        controller="gru", ctrl_hidden=32, ctrl_layers=1,
-        time_pe_dim=16,
-        head_hidden=0,
-    ))
+    pol1 = ACPLPolicy(
+        ACPLPolicyConfig(
+            in_dim=X.size(1),
+            gnn_hidden=32,
+            gnn_out=32,
+            controller="gru",
+            ctrl_hidden=32,
+            ctrl_layers=1,
+            time_pe_dim=16,
+            head_hidden=0,
+        )
+    )
     out1 = pol1(X, edge_index, T=T)
     coins1 = pol1.coins_su2(X, edge_index, T=T)
 
     torch.manual_seed(999)
-    pol2 = ACPLPolicy(ACPLPolicyConfig(
-        in_dim=X.size(1),
-        gnn_hidden=32, gnn_out=32,
-        controller="gru", ctrl_hidden=32, ctrl_layers=1,
-        time_pe_dim=16,
-        head_hidden=0,
-    ))
+    pol2 = ACPLPolicy(
+        ACPLPolicyConfig(
+            in_dim=X.size(1),
+            gnn_hidden=32,
+            gnn_out=32,
+            controller="gru",
+            ctrl_hidden=32,
+            ctrl_layers=1,
+            time_pe_dim=16,
+            head_hidden=0,
+        )
+    )
     out2 = pol2(X, edge_index, T=T)
     coins2 = pol2.coins_su2(X, edge_index, T=T)
 
@@ -118,8 +138,11 @@ def test_policy_backward_path_exists():
 
     cfg = ACPLPolicyConfig(
         in_dim=X.size(1),
-        gnn_hidden=32, gnn_out=32,
-        controller="transformer", ctrl_hidden=32, ctrl_layers=1,
+        gnn_hidden=32,
+        gnn_out=32,
+        controller="transformer",
+        ctrl_hidden=32,
+        ctrl_layers=1,
         time_pe_dim=16,
         head_hidden=0,
     )
@@ -127,7 +150,7 @@ def test_policy_backward_path_exists():
 
     # Simple scalar loss: sum of squared magnitudes of coin entries at all (t,n)
     coins = policy.coins_su2(X, edge_index, T=T)  # complex
-    loss = (coins.real ** 2 + coins.imag ** 2).sum()
+    loss = (coins.real**2 + coins.imag**2).sum()
     loss.backward()
 
     # Some parameter must have non-zero grad (e.g., head or encoder)

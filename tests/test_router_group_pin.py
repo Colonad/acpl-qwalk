@@ -1,22 +1,16 @@
 # tests/test_router_group_pin.py
-import math
-import numpy as np
-import pytest
 
 from acpl.data.splits import (
-    SplitSpec,
-    holdout_split_indices,
-    group_holdout_split_indices,
-    stratified_group_holdout_split_indices,
-    kfold_indices,
-    group_kfold_indices,
     EpisodeRouter,
+    SplitSpec,
 )
+
 
 def test_router_holdout_group_pin_keeps_groups_intact():
     # Group-pinned streaming: all episodes of a group map to the same split
-    spec = SplitSpec(method="holdout", group=True, group_pin=True,
-                     ratios=(0.6, 0.2, 0.2), seed=2025)
+    spec = SplitSpec(
+        method="holdout", group=True, group_pin=True, ratios=(0.6, 0.2, 0.2), seed=2025
+    )
     router = EpisodeRouter(spec)
 
     G = 60
@@ -50,19 +44,20 @@ def test_router_holdout_group_pin_keeps_groups_intact():
         counts_groups[sp] += 1
 
     frac_train_g = counts_groups["train"] / G
-    frac_val_g   = counts_groups["val"] / G
-    frac_test_g  = counts_groups["test"] / G
+    frac_val_g = counts_groups["val"] / G
+    frac_test_g = counts_groups["test"] / G
 
     # Allow larger variance on groups than episodes
     assert abs(frac_train_g - 0.6) < 0.15
-    assert abs(frac_val_g   - 0.2) < 0.12
-    assert abs(frac_test_g  - 0.2) < 0.12
+    assert abs(frac_val_g - 0.2) < 0.12
+    assert abs(frac_test_g - 0.2) < 0.12
 
 
 def test_router_holdout_episode_mix_ratios_remain_tight():
     # Episode-mixed (default): ratios measured over EPISODES should be tighter
-    spec = SplitSpec(method="holdout", group=True, group_pin=False,
-                     ratios=(0.6, 0.2, 0.2), seed=2025)
+    spec = SplitSpec(
+        method="holdout", group=True, group_pin=False, ratios=(0.6, 0.2, 0.2), seed=2025
+    )
     router = EpisodeRouter(spec)
 
     n_eps = 2000
@@ -81,10 +76,10 @@ def test_router_holdout_episode_mix_ratios_remain_tight():
         assert split == split2 and ep_seed == ep_seed2
 
     p_train = assigned["train"] / n_eps
-    p_val   = assigned["val"]   / n_eps
-    p_test  = assigned["test"]  / n_eps
+    p_val = assigned["val"] / n_eps
+    p_test = assigned["test"] / n_eps
 
     # Tighter tolerances at episode level
     assert abs(p_train - 0.6) < 0.04
-    assert abs(p_val   - 0.2) < 0.03
-    assert abs(p_test  - 0.2) < 0.03
+    assert abs(p_val - 0.2) < 0.03
+    assert abs(p_test - 0.2) < 0.03

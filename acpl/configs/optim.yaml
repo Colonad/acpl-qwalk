@@ -1,92 +1,274 @@
 # acpl/configs/optim.yaml
 # -----------------------------------------------------------------------------
-# Optimizer & (optional) LR scheduler configuration, Hydra-friendly.
+# Optimizer & LR scheduler configuration (Hydra-friendly).
 # Matches contracts expected by scripts/train.py and acpl/train/loops.py.
 #
 # Notes
-# - `name` controls which torch optimizer to construct.
-# - `scheduler.kind` may be `none`, `cosine`, or `step` (kept simple for Phase A).
-# - Some runners also read `grad_clip` here for convenience, but the loop-level
-#   switch that actually clips is `loop.grad_clip` (see train.yaml). Keeping both
-#   lets you override from either place without breaking older code.
+# - scripts/train.py should:
+#     * construct the optimizer "name" with hyperparams below
+#     * apply "param_groups" (e.g., no-decay on LayerNorm/bias) if enabled
+#     * optionally enable EMA tracking if ema.enabled
+#     * build a scheduler according to scheduler.kind
+# - acpl/train/loops.py uses loop-level clip (loop.grad_clip), but we also
+#   include "grad_clip" here for convenience (runners may mirror it).
+# - All numeric values are sensible defaults for Phase B; tune per task/graph.
 # -----------------------------------------------------------------------------
 
 # -------------------------
-# Optimizer
+# Optimizer (base)
 # -------------------------
-name: adam                 # adam | adamw | sgd
-lr: 3.0e-3                # base learning rate
-weight_decay: 0.0         # L2 (AdamW decouples this term if selected)
-betas: [0.9, 0.999]       # Adam/AdamW momentum coefficients
-eps: 1.0e-8               # numerical epsilon for Adam-family
+name: adam                 # adam | adamw | sgd | adamw_fused (if available)
+lr: 3.0e-3                 # base learning rate
+weight_decay: 0.0          # AdamW: decoupled; Adam/SGD: L2 regularization
+betas: [0.9, 0.999]        # Adam/AdamW moments
+eps: 1.0e-8                # Adam/AdamW epsilon
 
-# Optional: momentum/Nesterov (used iff name=sgd)
+# SGD-only extras (ignored otherwise)
 momentum: 0.9
 nesterov: true
 
-# Backward-compat / convenience (actual clipping applied by loop.grad_clip)
-grad_clip: 1.0            # L2 max-norm; set null/0 to disable (loop must enable)
+# Optional: gradient centralization for Adam/SGD (if your runner supports it)
+grad_centralization: false # true | false (applied to weight matrices only)
+
+# Optional fused/backends hints (honored only if your environment supports them)
+use_fused: false           # try fused AdamW if available (Apex/Torch compile)
+use_kahan: false           # kahan summation in optimizer (if implemented)
+
+# -------------------------
+# Parameter Groups
+# -------------------------
+# Enable sane defaults:
+#   - "no_decay": disable weight decay for bias and norm parameters
+#   - per-module LR multipliers (e.g., head faster than encoder)
+param_groups:
+  enabled: true
+
+  # Regex patterns matched against parameter names; first match wins.
+  rules:
+    # 1) No weight decay on biases and norm scales
+    - name: no_decay_bias
+      pattern: ".*\\.bias$"
+      weight_decay: 0.0
+
+    - name: no_decay_norm
+      # Covers LayerNorm, GroupNorm, BatchNorm, GraphNorm, etc.
+      pattern: ".*(norm|Norm).*(weight|bias)$"
+      weight_decay: 0.0
+
+    # 2) (Optional) Faster LR for the policy head (coin angles), helps convergence
+    - name: head_fast
+      pattern: ".*(head|coin_head|policy_head)\\.(weight|bias)$"
+      lr_mult: 2.0
+
+    # 3) (Optional) Slightly slower LR for the GNN encoder (stability)
+    - name: encoder_slow
+      pattern: ".*(gnn|encoder)\\."
+      lr_mult: 0.5
+
+    # 4) Default catch-all (implicit): no overrides
+
+# -------------------------
+# Gradient Clipping (convenience mirror)
+# -------------------------
+# Real clipping is applied by the training loop; this is provided for runners
+# that prefer reading it here and wiring to loop.grad_clip.
+grad_clip:
+  enabled: true
+  mode: norm             # norm | value
+  max_norm: 1.0          # used if mode=norm
+  clip_value: null       # used if mode=value
+
+# -------------------------
+# Exponential Moving Average (EMA) of weights (optional)
+# -------------------------
+ema:
+  enabled: false
+  decay: 0.999           # higher = slower, more stable shadow
+  warmup_steps: 100      # ramp EMA decay from 0 -> decay over warmup
+  update_every: 1        # update cadence in optimizer steps
+  pin_to_device: true    # keep EMA weights on device to reduce transfers
 
 # -------------------------
 # Scheduler
 # -------------------------
 scheduler:
-  kind: none              # none | cosine | step | cosine_warmup
-  # Cosine annealing without restarts
+  kind: none             # none | cosine | cosine_warmup | cosine_restart | step | plateau | onecycle | linear_warmup_decay
+
+  # Cosine annealing without restarts (torch.optim.lr_scheduler.CosineAnnealingLR)
   cosine:
-    t_max: 1000           # number of optimizer steps for a full cosine period
-    eta_min: 1.0e-5       # final LR
-  # Step decay
-  step:
-    step_size: 200        # drop every N optimizer steps
-    gamma: 0.5            # multiplicative decay
-  # Cosine with linear warmup (common stable default)
+    t_max: 1000          # steps for a full cosine period
+    eta_min: 1.0e-5      # final LR
+
+  # Cosine with linear warmup, then cosine decay (common stable default)
   cosine_warmup:
-    warmup_steps: 100     # linear ramp from 0 → lr over this many steps
-    t_max: 1000           # cosine horizon after warmup
+    warmup_steps: 100    # linear ramp from 0 → base lr
+    t_max: 1000          # cosine horizon after warmup
     eta_min: 1.0e-5
 
-# -----------------------------------------------------------------------------
-# Presets (copy/merge one of these blocks above via CLI or experiment config)
-# -----------------------------------------------------------------------------
+  # Cosine with restarts (CosineAnnealingWarmRestarts); period grows by T_mult
+  cosine_restart:
+    first_cycle_steps: 200
+    cycle_mult: 2.0
+    eta_min: 1.0e-5
+
+  # Step decay (StepLR)
+  step:
+    step_size: 200       # drop every N optimizer steps
+    gamma: 0.5           # multiplicative decay
+
+  # ReduceLROnPlateau (monitor "eval/loss" or task metric; runner must pass metric)
+  plateau:
+    mode: min            # min | max
+    factor: 0.5          # LR *= factor on plateau
+    patience: 10         # checks with no improvement
+    threshold: 1.0e-3
+    threshold_mode: rel  # rel | abs
+    cooldown: 0
+    min_lr: 1.0e-6
+
+  # OneCycleLR (needs total_steps from runner; use pct_start for warmup)
+  onecycle:
+    max_lr_mult: 1.0     # multiplier * base lr becomes max_lr
+    pct_start: 0.1       # warmup fraction of total steps
+    anneal_strategy: cos # cos | linear
+    div_factor: 25.0     # initial lr = max_lr / div_factor
+    final_div_factor: 10000.0
+
+  # Linear warmup → linear decay to eta_min over total_steps
+  linear_warmup_decay:
+    warmup_steps: 100
+    total_steps: 1000
+    eta_min: 1.0e-5
+
+# -------------------------
+# AMP / Precision Hints (read by runner; actual AMP is in loop config)
+# -------------------------
+precision:
+  amp: auto              # auto | fp16 | bf16 | off  (runner maps to torch.amp dtype)
+  grad_scaler: auto      # auto | off
+
+# -------------------------
+# Presets (copy/merge one of these blocks above via CLI)
+#   Example: +optim=@optim.yaml +optim.presets.fast_sweep
+# -------------------------
 presets:
 
+  # Aggressive exploration; quick sweeps; warmup + cosine
   fast_sweep:
     name: adam
     lr: 5.0e-3
     weight_decay: 0.0
     betas: [0.9, 0.999]
     eps: 1.0e-8
-    grad_clip: 1.0
+    grad_clip:
+      enabled: true
+      mode: norm
+      max_norm: 1.0
     scheduler:
       kind: cosine_warmup
       cosine_warmup:
         warmup_steps: 50
-        t_max: 1000
+        t_max: 1500
         eta_min: 3.0e-5
 
+  # Safer training; mild WD; step decay
   conservative:
     name: adamw
     lr: 2.0e-3
     weight_decay: 1.0e-4
     betas: [0.9, 0.999]
     eps: 1.0e-8
-    grad_clip: 0.8
+    grad_clip:
+      enabled: true
+      mode: norm
+      max_norm: 0.8
     scheduler:
       kind: step
       step:
         step_size: 400
         gamma: 0.5
 
+  # Strong WD + restarts; useful on larger models or noisy tasks
+  adamw_restarts:
+    name: adamw
+    lr: 3.0e-3
+    weight_decay: 5.0e-4
+    betas: [0.9, 0.999]
+    eps: 1.0e-8
+    grad_clip:
+      enabled: true
+      mode: norm
+      max_norm: 1.0
+    scheduler:
+      kind: cosine_restart
+      cosine_restart:
+        first_cycle_steps: 200
+        cycle_mult: 2.0
+        eta_min: 1.0e-5
+
+  # SGD baseline; cosine (no warmup)
   sgd_baseline:
     name: sgd
     lr: 1.0e-2
     momentum: 0.9
     nesterov: true
     weight_decay: 0.0
-    grad_clip: 1.0
+    grad_clip:
+      enabled: true
+      mode: norm
+      max_norm: 1.0
     scheduler:
       kind: cosine
       cosine:
         t_max: 1500
         eta_min: 1.0e-4
+
+  # PPO / RL-style long runs: OneCycle for fast ramp + long tail
+  rl_onecycle:
+    name: adam
+    lr: 3.0e-4
+    weight_decay: 0.0
+    betas: [0.9, 0.999]
+    eps: 1.0e-8
+    grad_clip:
+      enabled: true
+      mode: norm
+      max_norm: 0.5
+    scheduler:
+      kind: onecycle
+      onecycle:
+        max_lr_mult: 1.0
+        pct_start: 0.1
+        anneal_strategy: cos
+        div_factor: 25.0
+        final_div_factor: 10000.0
+    ema:
+      enabled: true
+      decay: 0.999
+      warmup_steps: 200
+      update_every: 1
+      pin_to_device: true
+
+  # Robust long-horizon BPTT: linear warmup → linear decay
+  long_curriculum:
+    name: adamw
+    lr: 2.5e-3
+    weight_decay: 2.0e-4
+    betas: [0.9, 0.999]
+    eps: 1.0e-8
+    grad_clip:
+      enabled: true
+      mode: norm
+      max_norm: 0.9
+    scheduler:
+      kind: linear_warmup_decay
+      linear_warmup_decay:
+        warmup_steps: 200
+        total_steps: 5000
+        eta_min: 1.0e-5
+    ema:
+      enabled: true
+      decay: 0.9995
+      warmup_steps: 400
+      update_every: 1
+      pin_to_device: true

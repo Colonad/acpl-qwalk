@@ -1,0 +1,91 @@
+# ACPL • Model config • GIN encoder
+model:
+  name: ACPLPolicy
+
+  encoder:
+    type: gin
+    in_dim: ${data.in_dim}
+    hidden_dim: 256
+    out_dim: 128
+    num_layers: 5
+    dropout: 0.1
+    act: relu
+    norm: batchnorm
+
+    gin:
+      eps_learnable: true             # ε in GIN update is learnable
+      mlp_layers: 2                   # per-layer MLP depth inside each GIN block
+      mlp_hidden_scale: 1.0           # hidden = scale * hidden_dim
+      residual: true
+
+    use_edge_attr: false
+    edge_dim: 0
+
+  pe:
+    use_coords: false
+    use_lappe: true
+    use_roles: true
+    ablations:
+      drop_time_pe: false
+      drop_graph_pe: false
+      drop_degree_feat: false
+
+    lappe:
+      k: 32
+      sign_flip: true
+      norm: layernorm
+      project_to: 64
+
+    roles:
+      kind: "pagerank-quant"
+      num_buckets: 16
+      one_hot: true
+      project_to: 32
+
+    coords:
+      expect_dim: 2
+      project_to: 16
+      center_and_scale: true
+
+    mix:
+      enabled: true
+      hidden: 128
+      dropout: 0.1
+      norm: layernorm
+
+  controller:
+    type: gru
+    hidden: 128
+    layers: 2
+    dropout: 0.0
+
+    transformer:
+      dim: 128
+      heads: 4
+      layers: 2
+      dropout: 0.0
+      alibi: true
+      causal: true
+
+  time_pe:
+    kind: fourier
+    dim: 32
+    base: 10000.0
+    learned_scale: true
+    normalize: false
+    dropout: 0.0
+    learned_phase: false
+    learned_freqs: false
+
+  head:
+    type: su2_zyz
+    hidden: 64                       # light MLP on top of controller
+    angle_range: "unbounded"
+
+  regularizers:
+    smooth_theta: 1e-4
+    l2_theta: 0.0
+
+  train:
+    grad_clip_norm: 1.0
+    amp: true

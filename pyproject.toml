@@ -48,9 +48,16 @@ dev = [
   "pyright>=1.1.380",
 ]
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["acpl*"]
+
+# Ensure typed package marker is included in the wheel/sdist
+[tool.setuptools.package-data]
+"acpl" = ["py.typed"]
 
 ###############################################
 # Code style / lint / type-check configuration
@@ -69,8 +76,6 @@ combine_as_imports = true
 known_first_party = ["acpl"]
 src_paths = ["acpl", "scripts"]
 
-
-
 [tool.ruff]
 line-length = 100
 target-version = "py311"
@@ -83,21 +88,51 @@ quote-style = "preserve"
 select = ["E", "F", "B", "UP", "N", "ANN"]
 ignore = []
 
-
 [tool.ruff.lint.per-file-ignores]
 # In tests, allow long lines, non-lowercase vars, and skip annotation rules
 "tests/*" = ["E501", "N806", "ANN"]
 # In the training script, we intentionally use short uppercase math symbols (X, T, P, H...)
 "scripts/train.py" = ["N806"]
 
+# =========================
+# Typing (mypy / pyright)
+# =========================
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
+no_implicit_optional = true
+strict_equality = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+disallow_subclassing_any = true
+check_untyped_defs = true
+mypy_path = "stubs"
+
+# 3rd-party modules we use with thin or no stubs
+[[tool.mypy.overrides]]
+module = [
+  "tqdm.*",
+]
+ignore_missing_imports = true
 
 [tool.pyright]
 pythonVersion = "3.11"
-typeCheckingMode = "basic"
-reportMissingTypeStubs = false
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "warning"
 reportPrivateImportUsage = false
+reportUnknownMemberType = "warning"
 venvPath = "."
 venv = ".venv"
+include = ["acpl", "scripts"]
+exclude = ["**/__pycache__"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

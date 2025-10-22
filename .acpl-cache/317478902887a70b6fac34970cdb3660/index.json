@@ -1,0 +1,20 @@
+{
+  "created_unix": 1760842806,
+  "manifest_hex": "317478902887a70b6fac34970cdb3660",
+  "rules": "phase_b2_default_v1",
+  "schema_version": 1,
+  "splits": {
+    "test": {
+      "blake2b_256": "6c27207d641fb7509a790f2150f6c5ff08cb4a45ce27dd89d1c14858d722c0ce",
+      "count": 128,
+      "file": "test.jsonl",
+      "sha256": "f0ca03a53bc5b0814678f1d3799e7873c00ef707b020b8b32b5a01c2c2617370"
+    },
+    "val": {
+      "blake2b_256": "7ddf6a6e63d6c9c1b8ec49f692635af51c55776087d37922c8b0bb31c6251668",
+      "count": 64,
+      "file": "val.jsonl",
+      "sha256": "32736d389216d95b7ab0591a351bea6c1673422be3d0dd4b668bd9a5c0e79473"
+    }
+  }
+}

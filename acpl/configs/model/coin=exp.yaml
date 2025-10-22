@@ -1,0 +1,105 @@
+# ACPL • Model config • Coin parameterization via matrix exponential (Phase B7)
+
+model:
+  name: ACPLPolicy
+
+  # ---------------- Encoder (GNN) ----------------
+  encoder:
+    type: gcn
+    in_dim: ${data.in_dim}
+    hidden_dim: 128
+    out_dim: 128
+    num_layers: 3
+    dropout: 0.05
+    act: gelu
+    norm: layernorm
+    residual: true
+    use_edge_attr: false
+    edge_dim: 0
+
+  # ------------- Positional Encodings (Phase B3) -------------
+  pe:
+    use_coords: false
+    use_lappe: true
+    use_roles: false
+    ablations:
+      drop_time_pe: false
+      drop_graph_pe: false
+      drop_degree_feat: false
+    lappe:
+      k: 16
+      sign_flip: true
+      norm: none
+      project_to: 32
+    roles:
+      kind: "kcore-bucket"
+      num_buckets: 8
+      one_hot: true
+      project_to: 16
+    coords:
+      expect_dim: 3
+      project_to: 16
+      center_and_scale: true
+    mix:
+      enabled: true
+      hidden: 64
+      dropout: 0.0
+      norm: layernorm
+
+  # ---------------- Temporal controller (Transformer) ----------------
+  controller:
+    type: transformer
+    hidden: 128               # for interface parity
+    layers: 1
+    dropout: 0.0
+    transformer:
+      dim: 128
+      heads: 4
+      layers: 3
+      dropout: 0.0
+      attn_dropout: 0.0
+      mlp_ratio: 4.0
+      causal: true
+      alibi: true
+      final_norm: layernorm
+      pre_norm: true
+
+  # ---------------- Time positional encoding ----------------
+  time_pe:
+    kind: fourier
+    dim: 48
+    base: 10000.0
+    learned_scale: true
+    normalize: false
+    dropout: 0.0
+    learned_phase: false
+    learned_freqs: false
+
+  # ---------------- Policy head (coins via EXP of skew-Hermitian) ----------------
+  head:
+    type: su2_exp                 # implementation: U = exp(K), K† = -K (2×2)
+    hidden: 0                     # optional MLP on top of controller; 0 = identity
+    init:
+      scheme: zero                # {zero, small-normal, small-uniform}
+      scale: 1e-3                 # std/range if not 'zero'
+    generator:
+      basis: pauli                # {pauli, learned}
+      antihermitian: true         # ensure K is in su(2)
+    spectral:
+      max_norm: 6.0               # soft clip on ||K||_F to avoid huge exps
+      penalty: 0.0                # weight for ||K||_F^2 (if you want extra control)
+
+  # ---------------- Regularization (read by backprop loop) ----------------
+  regularizers:
+    smooth_theta: 5e-5            # temporal smoothness on controller outputs
+    l2_theta: 0.0
+
+  # ---------------- Training niceties ----------------
+  train:
+    grad_clip_norm: 1.0
+    amp: true
+
+notes:
+  - "This config uses an exponential map to obtain SU(2) coins. It is smooth and
+     well-behaved for policy optimization, and works well with angle-free heads."
+  - "Use this when you want generator-level regularization or spectral control."

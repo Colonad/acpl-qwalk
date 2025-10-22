@@ -16,6 +16,8 @@ __all__ = [
     "normalize_degree",
     "degree_one_hot",
     "sinusoidal_coords",
+    "role_encodings",
+    "hypercube_bit_features",
     "build_arc_features",
 ]
 
@@ -31,12 +33,14 @@ class FeatureSpec:
     Configuration of node- and arc-level features.
 
     Node features (stacked in this order when enabled):
-      1) degree statistics (raw, normalized)
+      1) degree statistics (raw-normalized scalar)
       2) degree one-hot up to K (optional)
       3) geometry coords (as provided by graphs)
       4) sinusoidal coords (periodic embeddings of coords)
-      5) Laplacian Positional Encodings (LapPE, top-k eigenvectors)
+      5) Laplacian Positional Encodings (LapPE, top-k eigenvectors; deterministic sign)
       6) Random-Walk Structural Encoding (RWSE) up to K steps
+      7) Role encodings (leaf/hub/binning; grid-boundary flags if coords resemble a grid)
+      8) Hypercube bitstrings (and Hamming weight), when graph is Q_n or coords are {0,1}^n
 
     Arc features (optional):
       - direction vector (dst - src), L2 normalized (+ distance)
@@ -44,11 +48,11 @@ class FeatureSpec:
 
     Notes
     -----
-    - All tensors are returned as float32 by default except where noted.
-    - LapPE is sign-deterministic via 'random_sign=False' or seeded generator.
+    - All tensors are float32 by default.
+    - LapPE is sign-deterministic by default (see lap_pe_random_sign=False).
     """
 
-    # Node
+    # Node: degrees & coords
     use_degree: bool = True
     degree_norm: Literal["none", "max", "log", "inv_sqrt"] = "inv_sqrt"
     degree_onehot_K: int = 0  # 0 disables one-hot
@@ -56,13 +60,32 @@ class FeatureSpec:
     use_sinusoidal_coords: bool = False
     sinusoidal_dims: int = 0  # if >0 and use_sinusoidal_coords=True
     sinusoidal_base: float = 10000.0
+
+    # Laplacian PE
     use_lap_pe: bool = False
     lap_pe_k: int = 0  # number of eigenvectors
     lap_pe_norm: Literal["sym", "rw"] = "sym"
-    lap_pe_random_sign: bool = True
+    lap_pe_random_sign: bool = False  # Phase B2: deterministic sign is the default
+    # RWSE
     use_rwse: bool = False
     rwse_K: int = 0  # steps for P^k
     rwse_aggregation: Literal["row"] = "row"  # reserved for future
+
+    # Role encodings
+    use_role_encodings: bool = False
+    role_degree_bins_K: int = 0  # degree bin one-hot (0 disables)
+    role_include_leaf: bool = True
+    role_include_hub: bool = True
+    role_hub_percentile: float = 0.90  # degree >= this percentile -> hub flag
+    role_include_grid_boundary: bool = True  # if coords look grid-like, add edge/corner flags
+
+    # Hypercube bitstrings
+    use_bitstrings: bool = (
+        False  # when True, attempt to consume coords as {0,1}^n (or a provided bit tensor)
+    )
+    bitstrings_center: Literal["none", "pm1"] = "none"  # if "pm1", map {0,1} -> {-1,+1}
+    bitstrings_append_hamming: bool = True  # append Hamming weight / n (scalar)
+
     # Arc
     build_arcs: bool = False
     arc_use_direction: bool = True
@@ -71,7 +94,7 @@ class FeatureSpec:
 
     # Misc
     eps: float = 1e-12
-    seed: int | None = None  # for deterministic LapPE sign jitter, etc.
+    seed: int | None = None  # for optional randomized behaviors
 
 
 # --------------------------------------------------------------------------------------
@@ -122,7 +145,7 @@ def sinusoidal_coords(coords: torch.Tensor, dims: int, base: float = 10000.0) ->
     """
     Sinusoidal positional encoding (Vaswani-style) for each coordinate dimension.
     coords : (N, C) in [0,1] or reasonable scale
-    dims   : number of features per coordinate dimension (must be even, we use sin/cos pairs)
+    dims   : number of features *per coordinate* (must be even, we use sin/cos pairs)
     returns: (N, C*dims)
     """
     if dims <= 0:
@@ -131,7 +154,6 @@ def sinusoidal_coords(coords: torch.Tensor, dims: int, base: float = 10000.0) ->
         raise ValueError("sinusoidal_dims must be even (sin/cos pairs).")
     N, C = coords.shape
     pe_list = []
-    # frequencies
     half = dims // 2
     div = torch.exp(
         torch.arange(0, half, dtype=torch.float32, device=coords.device)
@@ -146,14 +168,14 @@ def sinusoidal_coords(coords: torch.Tensor, dims: int, base: float = 10000.0) ->
 
 
 # --------------------------------------------------------------------------------------
-# Laplacian PE (robust, sparse-friendly)
+# Laplacian PE (robust, sparse-friendly) with deterministic sign
 # --------------------------------------------------------------------------------------
 
 
 def _build_undirected_adj(edge_index: torch.Tensor, num_nodes: int) -> torch.Tensor:
     """
     Build a symmetric sparse adjacency (float32) from oriented arcs edge_index (2,A).
-    Self-loops removed.
+    Self-loops removed. Coalesces duplicates.
     """
     if edge_index.ndim != 2 or edge_index.shape[0] != 2:
         raise ValueError("edge_index must be (2, A)")
@@ -161,18 +183,16 @@ def _build_undirected_adj(edge_index: torch.Tensor, num_nodes: int) -> torch.Ten
     mask = src != dst
     src = src[mask]
     dst = dst[mask]
-    # Take only one direction for undirected (min,max) coalescing
+    # coalesce undirected edges via sorted endpoints
     a = torch.minimum(src, dst)
     b = torch.maximum(src, dst)
-    undirected = torch.stack([a, b], dim=0)
-    # sort/unique
     key = a * num_nodes + b
-    uniq, idx = torch.unique(key, sorted=True, return_inverse=False, return_counts=False), None
-    # recover pairs from uniq keys
+    uniq = torch.unique(key, sorted=True)
+
     uu = (uniq // num_nodes).to(torch.long)
     vv = (uniq % num_nodes).to(torch.long)
 
-    # Now build symmetric COO
+    # symmetric COO
     ii = torch.cat([uu, vv], dim=0)
     jj = torch.cat([vv, uu], dim=0)
     vv_data = torch.ones_like(ii, dtype=torch.float32)
@@ -192,12 +212,10 @@ def _laplacian_from_adj(A: torch.Tensor, mode: str = "sym", eps: float = 1e-12) 
     I_idx = torch.arange(N, device=A.device)
     if mode == "sym":
         dinv_sqrt = (deg + eps).pow(-0.5)
-        # scale values of A by D^{-1/2} row and col
         idx = A.indices()
         val = A.values()
         v = dinv_sqrt[idx[0]] * val * dinv_sqrt[idx[1]]
         S = torch.sparse_coo_tensor(idx, v, A.shape).coalesce()
-        # L = I - S
         I = torch.sparse_coo_tensor(
             torch.stack([I_idx, I_idx]), torch.ones(N, device=A.device), A.shape
         )
@@ -218,6 +236,21 @@ def _laplacian_from_adj(A: torch.Tensor, mode: str = "sym", eps: float = 1e-12) 
         raise ValueError("mode must be 'sym' or 'rw'.")
 
 
+def _sign_fix_columns(M: torch.Tensor) -> torch.Tensor:
+    """
+    Deterministic sign fix for eigenvectors M (N, k):
+      For each column, find index of max |entry| and flip the column so that entry is >= 0.
+      If the max is numerically 0, leave as-is.
+    """
+    if M.numel() == 0:
+        return M
+    # idx of argmax |·| per column
+    idx = torch.argmax(torch.abs(M), dim=0)  # (k,)
+    signs = torch.sign(M.gather(0, idx.view(1, -1)).squeeze(0))
+    signs[signs == 0] = 1.0
+    return M * signs  # broadcast over rows
+
+
 @torch.no_grad()
 def laplacian_positional_encoding(
     edge_index: torch.Tensor,
@@ -225,39 +258,45 @@ def laplacian_positional_encoding(
     k: int,
     *,
     mode: Literal["sym", "rw"] = "sym",
-    random_sign: bool = True,
+    random_sign: bool = False,
     seed: int | None = None,
     eps: float = 1e-12,
 ) -> torch.Tensor:
     """
     Compute top-k (smallest) Laplacian eigenvectors as positional encodings.
 
-    - Works with disconnected graphs: we compute per-component eigenvectors implicitly
-      via full sparse->dense fallback (small graphs) or dense on small N;
-      for typical N (<= few thousands), dense eig is acceptable here.
+    - Works with disconnected graphs (zero eigenvalues allowed).
     - Returns (N, k) float32. If k==0 → shape (N,0).
-    - random_sign: multiply each eigenvector by ±1 consistently (fixes sign ambiguity).
+    - Sign handling:
+        * By default (random_sign=False) we apply a deterministic sign fix per eigenvector
+          by making the entry with largest magnitude nonnegative.
+        * If random_sign=True, we multiply each eigenvector by an independent ±1 (seedable)
+          for experimentation/ablations.
     """
     if k <= 0:
         return torch.zeros(num_nodes, 0, dtype=torch.float32, device=edge_index.device)
+    k_eff = int(min(k, num_nodes))
+    if k_eff <= 0:
+        return torch.zeros(num_nodes, 0, dtype=torch.float32, device=edge_index.device)
+
     A = _build_undirected_adj(edge_index, num_nodes)
     L = _laplacian_from_adj(A, mode=mode, eps=eps)
 
-    # Dense fallback
+    # Dense eigendecomposition (moderate N); for larger N, swap to Lanczos if needed.
     Ld = L.to_dense()
-    # eigh for symmetric (real)
     evals, evecs = torch.linalg.eigh(Ld)  # ascending
-    # take the smallest k (skip exact zeros if needed? keep as-is; zeros capture components)
-    evecs_k = evecs[:, :k].to(torch.float32)
+    evecs_k = evecs[:, :k_eff].to(torch.float32)
 
     if random_sign:
         gen = torch.Generator(device=evecs_k.device)
         if seed is not None:
             gen.manual_seed(seed)
         signs = torch.where(
-            torch.rand(1, k, generator=gen, device=evecs_k.device) > 0.5, 1.0, -1.0
+            torch.rand(1, k_eff, generator=gen, device=evecs_k.device) > 0.5, 1.0, -1.0
         ).to(evecs_k.dtype)
-        evecs_k = evecs_k * signs  # broadcast across rows
+        evecs_k = evecs_k * signs
+    else:
+        evecs_k = _sign_fix_columns(evecs_k)
 
     return evecs_k
 
@@ -277,11 +316,7 @@ def random_walk_structural_encoding(
 ) -> torch.Tensor:
     """
     RWSE up to K steps using the row-stochastic transition matrix P = D^{-1}A.
-    Returns (N, K) with columns corresponding to diag entries of P^k (or row-sums over powers).
-
-    We build P in sparse COO, then multiply dense vectors iteratively.
-    For simplicity and stability, we compute 'landing probability at the same node'
-    across k steps: diag(P^k). Realistically, you can also use row-sums of P^k (which are 1).
+    Returns (N, K) with columns corresponding to diag(P^k).
     """
     if K <= 0:
         return torch.zeros(num_nodes, 0, dtype=torch.float32, device=edge_index.device)
@@ -295,19 +330,187 @@ def random_walk_structural_encoding(
     v = dinv[idx[0]] * val
     P = torch.sparse_coo_tensor(idx, v, (num_nodes, num_nodes)).coalesce()
 
-    # Efficient multiplication by P using sparse @ dense
+    # Track diag(P^k) iteratively with dense matmuls on an identity basis.
     feats = torch.zeros(num_nodes, K, dtype=torch.float32, device=edge_index.device)
-    # Start with basis vectors e_i one-by-one via diagonal extraction trick:
-    # We track diag(P^k) without storing P^k: diag(P^k) = sum_j P^{k-1}_{i,j} * P_{j,i}
-    # Implement iterative forward over columns of P and gather diagonal.
-    # We'll use dense matmul for P@X with X dense (N,d).
     X = torch.eye(num_nodes, dtype=torch.float32, device=edge_index.device)  # (N,N)
-    # To keep memory in check for moderate N; for larger N you can chunk X.
     for k in range(1, K + 1):
-        X = torch.sparse.mm(P, X)  # (N,N)
-        # extract diagonal
+        X = torch.sparse.mm(P, X)
         feats[:, k - 1] = torch.diag(X)
     return feats
+
+
+# --------------------------------------------------------------------------------------
+# Role encodings (leaf/hub/binning + optional grid boundary flags)
+# --------------------------------------------------------------------------------------
+
+
+@torch.no_grad()
+def role_encodings(
+    degrees: torch.Tensor,
+    coords: torch.Tensor | None = None,
+    *,
+    degree_bins_K: int = 0,
+    include_leaf: bool = True,
+    include_hub: bool = True,
+    hub_percentile: float = 0.90,
+    include_grid_boundary: bool = True,
+) -> torch.Tensor:
+    """
+    Build compact, task-agnostic structural/role encodings:
+      - degree bin one-hot (0..K; K=0 disables)
+      - leaf flag (deg==1)
+      - hub flag (deg >= percentile threshold)
+      - grid boundary flags if coords look like a regular 1D/2D integer grid or normalized [0,1] grid:
+            corner, edge, interior (one-hot)
+
+    Returns (N, R) float32, possibly (N,0) if everything is disabled or undetected.
+    """
+    device = degrees.device
+    N = degrees.numel()
+    blocks: list[torch.Tensor] = []
+
+    # Degree binning
+    if degree_bins_K > 0:
+        blocks.append(degree_one_hot(degrees, degree_bins_K))
+
+    # Leaf/hub flags
+    if include_leaf:
+        leaf = (degrees == 1).to(torch.float32).view(N, 1)
+        blocks.append(leaf)
+    if include_hub:
+        th = torch.quantile(degrees.to(torch.float32), torch.tensor(hub_percentile, device=device))
+        hub = (degrees.to(torch.float32) >= th).to(torch.float32).view(N, 1)
+        blocks.append(hub)
+
+    # Grid boundary flags (only if coords provided and grid-like)
+    if include_grid_boundary and coords is not None and coords.numel() > 0:
+        grid_flags = _grid_boundary_flags(coords)
+        if grid_flags.numel() > 0:
+            blocks.append(grid_flags)
+
+    if len(blocks) == 0:
+        return torch.zeros(N, 0, dtype=torch.float32, device=device)
+    return torch.cat(blocks, dim=1).to(torch.float32)
+
+
+def _grid_boundary_flags(coords: torch.Tensor) -> torch.Tensor:
+    """
+    Heuristically detect 1D/2D grid coordinates and return boundary one-hots:
+      - 1D: end vs interior (one-hot 2)
+      - 2D: corner / edge / interior (one-hot 3)
+    Works if coords are integer-like (0..L-1) or normalized approx in [0,1].
+    Returns (N, C) or (N,0) if not detected.
+    """
+    device = coords.device
+    N, C = coords.shape
+    if C not in (1, 2):
+        return torch.zeros(N, 0, dtype=torch.float32, device=device)
+
+    x = coords[:, 0]
+
+    def is_close(a: torch.Tensor, b: float, tol: float = 1e-6) -> torch.Tensor:
+        return (a - b).abs() <= tol
+
+    # Normalize detection: try integer grid (0..L-1) or normalized [0,1]
+    def norm_axis(ax: torch.Tensor) -> torch.Tensor:
+        ax_min = ax.min()
+        ax_max = ax.max()
+        if ax_max - ax_min < 1e-9:
+            return ax - ax_min  # constant axis; treat as degenerate
+        axn = (ax - ax_min) / (ax_max - ax_min)
+        return axn
+
+    if C == 1:
+        xn = norm_axis(x)
+        at_min = is_close(xn, 0.0, 1e-6)
+        at_max = is_close(xn, 1.0, 1e-6)
+        end = (at_min | at_max).to(torch.float32).view(N, 1)
+        interior = (~(at_min | at_max)).to(torch.float32).view(N, 1)
+        return torch.cat([end, interior], dim=1)
+
+    # C == 2
+    y = coords[:, 1]
+    xn = norm_axis(x)
+    yn = norm_axis(y)
+    at_l = is_close(xn, 0.0, 1e-6)
+    at_r = is_close(xn, 1.0, 1e-6)
+    at_b = is_close(yn, 0.0, 1e-6)
+    at_t = is_close(yn, 1.0, 1e-6)
+
+    on_edge = at_l | at_r | at_b | at_t
+    on_corner = (at_l & at_b) | (at_l & at_t) | (at_r & at_b) | (at_r & at_t)
+
+    corner = on_corner.to(torch.float32).view(N, 1)
+    edge = (on_edge & (~on_corner)).to(torch.float32).view(N, 1)
+    interior = (~on_edge).to(torch.float32).view(N, 1)
+    return torch.cat([corner, edge, interior], dim=1)
+
+
+# --------------------------------------------------------------------------------------
+# Hypercube bitstring features
+# --------------------------------------------------------------------------------------
+
+
+@torch.no_grad()
+def hypercube_bit_features(
+    bits: torch.Tensor,
+    *,
+    center: Literal["none", "pm1"] = "none",
+    append_hamming: bool = True,
+) -> torch.Tensor:
+    """
+    Turn per-node bitstrings into features.
+
+    bits: (N, n) with entries approximately in {0,1}. Non-binary values are rounded to nearest {0,1}.
+    center:
+      - "none": keep {0,1}
+      - "pm1" : map {0,1} -> {-1,+1}
+    append_hamming:
+      - if True, append a single column with normalized Hamming weight (sum(bits)/n)
+
+    Returns: (N, n [+ 1]) float32
+    """
+    if bits.numel() == 0:
+        return torch.zeros(bits.shape[0], 0, dtype=torch.float32, device=bits.device)
+
+    X = (bits >= 0.5).to(torch.float32)  # robust rounding
+    if center == "pm1":
+        X = 2.0 * X - 1.0
+    blocks = [X]
+    if append_hamming and X.shape[1] > 0:
+        if center == "pm1":
+            # For {-1,+1}, Hamming weight = (x+1)/2 summed; normalize by n
+            w = ((X + 1.0) * 0.5).mean(dim=1, keepdim=True)
+        else:
+            w = X.mean(dim=1, keepdim=True)
+        blocks.append(w)
+    return torch.cat(blocks, dim=1).to(torch.float32)
+
+
+def _maybe_bits_from_coords(coords: torch.Tensor) -> torch.Tensor:
+    """
+    If coords look like {0,1}^n (n>=1), return them as bitstrings; else return empty.
+    """
+    if coords is None or coords.numel() == 0:
+        return torch.zeros(0, 0, device=coords.device if coords is not None else "cpu")
+    N, C = coords.shape
+    if C == 0:
+        return torch.zeros(N, 0, dtype=torch.float32, device=coords.device)
+    # Heuristic: values are within small tolerance of 0 or 1 across all dims
+    vals0 = (coords - 0.0).abs().max().item()
+    vals1 = (coords - 1.0).abs().max().item()
+    # But that check alone is too strict; instead, check each element is close to 0 or 1
+    close0 = (coords - 0.0).abs() <= 1e-6
+    close1 = (coords - 1.0).abs() <= 1e-6
+    mask_binary = (close0 | close1).all().item()
+    if mask_binary:
+        return coords.to(torch.float32)
+    # Fallback: if coords are integers 0/1 (exact cast)
+    if torch.equal(coords, coords.round()):
+        uniq = torch.unique(coords)
+        if uniq.numel() <= 2 and torch.all((uniq == 0) | (uniq == 1)):
+            return coords.to(torch.float32)
+    return torch.zeros(N, 0, dtype=torch.float32, device=coords.device)
 
 
 # --------------------------------------------------------------------------------------
@@ -340,12 +543,12 @@ def build_node_features(
     *,
     spec: FeatureSpec | None = None,
     device: torch.device | None = None,
-) -> tuple(torch.Tensor, dict[str, tuple[int, int]]):
+) -> tuple[torch.Tensor, dict[str, tuple[int, int]]]:
     """
     Assemble node features per FeatureSpec.
     Returns:
       X  : (N, F) float32
-      idx: dict mapping feature-block name -> (start, end) column indices
+      idx: dict mapping feature-block name -> (start, end) column indices (end is exclusive)
     """
     if spec is None:
         spec = FeatureSpec()
@@ -353,9 +556,22 @@ def build_node_features(
         device = degrees.device
 
     N = degrees.numel()
-    blocks = []
+    blocks: list[torch.Tensor] = []
     index: dict[str, tuple[int, int]] = {}
     col = 0
+
+    # 0) Hypercube bitstrings (if requested and available)
+    if spec.use_bitstrings:
+        bits = _maybe_bits_from_coords(coords.to(device))
+        if bits.numel() > 0:
+            bf = hypercube_bit_features(
+                bits,
+                center=spec.bitstrings_center,
+                append_hamming=spec.bitstrings_append_hamming,
+            ).to(device)
+            blocks.append(bf)
+            index["bitstrings"] = (col, col + bf.shape[1])
+            col += bf.shape[1]
 
     # 1) degree stats
     if spec.use_degree:
@@ -411,6 +627,22 @@ def build_node_features(
         blocks.append(rw)
         index["rwse"] = (col, col + rw.shape[1])
         col += rw.shape[1]
+
+    # 5) Role encodings
+    if spec.use_role_encodings:
+        roles = role_encodings(
+            degrees.to(device),
+            coords.to(device) if coords is not None else None,
+            degree_bins_K=spec.role_degree_bins_K,
+            include_leaf=spec.role_include_leaf,
+            include_hub=spec.role_include_hub,
+            hub_percentile=spec.role_hub_percentile,
+            include_grid_boundary=spec.role_include_grid_boundary,
+        )
+        if roles.numel() > 0:
+            blocks.append(roles)
+            index["roles"] = (col, col + roles.shape[1])
+            col += roles.shape[1]
 
     if len(blocks) == 0:
         X = torch.zeros(N, 0, dtype=torch.float32, device=device)

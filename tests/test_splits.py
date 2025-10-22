@@ -1,16 +1,14 @@
 # tests/test_splits.py
-import math
 import numpy as np
-import pytest
 
 from acpl.data.splits import (
-    SplitSpec,
-    holdout_split_indices,
-    group_holdout_split_indices,
-    stratified_group_holdout_split_indices,
-    kfold_indices,
-    group_kfold_indices,
     EpisodeRouter,
+    SplitSpec,
+    group_holdout_split_indices,
+    group_kfold_indices,
+    holdout_split_indices,
+    kfold_indices,
+    stratified_group_holdout_split_indices,
 )
 
 
@@ -52,7 +50,7 @@ def test_group_holdout_keeps_groups_intact():
     sizes[-1] = max(1, 200 - sizes[:-1].sum())
     items = []
     groups = []
-    for g, s in zip(group_ids, sizes):
+    for g, s in zip(group_ids, sizes, strict=False):
         start = len(items)
         items.extend(range(start, start + s))
         groups.extend([int(g)] * s)
@@ -89,7 +87,9 @@ def test_stratified_group_holdout_balances_labels():
             labels.append(lbl)
             groups.append(g)
 
-    splits = stratified_group_holdout_split_indices(labels, groups, ratios=(0.7, 0.15, 0.15), seed=5)
+    splits = stratified_group_holdout_split_indices(
+        labels, groups, ratios=(0.7, 0.15, 0.15), seed=5
+    )
     _assert_disjoint_and_cover(splits.train, splits.val, splits.test, G * items_per_group)
 
     # Check label proportions are close to global proportions (within tolerance)
@@ -226,6 +226,3 @@ def test_router_kfold_distribution_and_determinism():
     frac_val = counts["val"] / G
     # Allow some variance due to hashing, but should be close to 1/k = 0.25
     assert abs(frac_val - 0.25) < 0.1
-
-
-

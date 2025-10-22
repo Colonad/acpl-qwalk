@@ -1,10 +1,10 @@
 # acpl/data/splits.py
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import hashlib
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 
@@ -20,6 +20,9 @@ __all__ = [
     "kfold_indices",
     "group_kfold_indices",
     "EpisodeRouter",
+    # New: Phase B2 triplet router
+    "default_phase_b2_rules",
+    "route_triplet",
 ]
 
 
@@ -558,3 +561,130 @@ def _check_disjoint_and_cover(splits: SplitIndices, n_items: int) -> None:
         raise AssertionError(
             f"Splits must cover all items exactly once. Missing={len(missing)}, dups={len(dup)}."
         )
+
+
+# ======================================================================================
+# Phase B2: triplet router (family / size_kv / task) → split, seed  (NEW)
+# ======================================================================================
+
+
+def default_phase_b2_rules() -> dict[str, Any]:
+    """
+    Default routing rules for Phase B2.
+
+    Structure (kept intentionally simple & stable):
+      {
+        "ratios": (train, val, test),                # global default
+        "overrides": {
+            "task": { "search": (0.75, 0.15, 0.10) } # optional task-specific ratios
+            # You can add family-specific or size-bin overrides in future if needed:
+            # "family": {"grid": (0.8, 0.1, 0.1)},
+        }
+      }
+    """
+    return {
+        "ratios": (0.80, 0.10, 0.10),
+        "overrides": {
+            "task": {
+                # Slightly more validation for search to stabilize hyperparam sweeps
+                "search": (0.75, 0.15, 0.10),
+            }
+        },
+    }
+
+
+def _select_ratios(
+    family: str, task: str, size_kv: Mapping[str, int], rules: Mapping[str, Any]
+) -> tuple[float, float, float]:
+    # Start with global ratios
+    tr, va, te = rules.get("ratios", (0.8, 0.1, 0.1))
+    ov = rules.get("overrides", {})
+    # Task override (if any)
+    task_tbl = ov.get("task", {})
+    if isinstance(task_tbl, Mapping) and task in task_tbl:
+        tr, va, te = task_tbl[task]
+    # Future hooks: family/size-bin specific overrides can be added here.
+    s = tr + va + te
+    if s <= 0:
+        raise ValueError("Routing ratios must sum to a positive value.")
+    return float(tr), float(va), float(te)
+
+
+def _hash_to_unit_interval(*parts: Any) -> float:
+    """
+    Mix arbitrary parts into a uniform float in [0,1).
+    """
+    # Normalize size_kv / dicts to a sorted tuple of pairs for deterministic hashing
+    norm_parts: list[Any] = []
+    for p in parts:
+        if isinstance(p, dict):
+            norm_parts.append(tuple(sorted((str(k), int(v)) for k, v in p.items())))
+        else:
+            norm_parts.append(p)
+    h = stable_hash64(tuple(norm_parts))
+    # Extra multiplicative mixing (Knuth constant used elsewhere for consistency)
+    h = (h * 0x9E3779B97F4A7C15) & ((1 << 64) - 1)
+    return h / float(1 << 64)
+
+
+def route_triplet(
+    *,
+    family: str,
+    size_kv: Mapping[str, int],
+    task: str,
+    base_seed: int,
+    episode_id: int,
+    rules: Mapping[str, Any] | None = None,
+    master_seed: int = 0,
+) -> tuple[str, int]:
+    """
+    Deterministically assign split and per-episode seed from (family, size_kv, task) + seeds.
+
+    Inputs
+    ------
+    family : canonical graph family name (e.g., "grid", "line", "hypercube", "er")
+    size_kv: minimal size descriptor (e.g., {"L": 64} or {"N": 128} or {"n": 7})
+    task   : task name ("transfer", "search", "mixing", "robust", ...)
+    base_seed  : canonical stream seed for this global index (from generator)
+    episode_id : global episode index (non-negative)
+    rules  : routing rules (see default_phase_b2_rules())
+    master_seed: master knob (lets a config switch all routing deterministically)
+
+    Returns
+    -------
+    split : "train" | "val" | "test"
+    ep_seed : 64-bit per-episode seed derived from all routing context
+    """
+    fam = str(family).lower()
+    tname = str(task).lower()
+    skv = {str(k): int(v) for k, v in size_kv.items()} if size_kv else {}
+
+    rr = rules or default_phase_b2_rules()
+    tr, va, te = _select_ratios(fam, tname, skv, rr)
+    s = tr + va + te
+    c1 = tr / s
+    c2 = (tr + va) / s
+
+    # Hash to [0,1)
+    u = _hash_to_unit_interval(
+        "triplet_router_v1", int(master_seed), int(base_seed), fam, skv, tname, int(episode_id)
+    )
+
+    if u < c1:
+        split = "train"
+    elif u < c2:
+        split = "val"
+    else:
+        split = "test"
+
+    # Episode seed: include everything that defines the episode identity from the router’s POV
+    ep_seed = derive_seed64(
+        "router_ep_seed_v1",
+        int(master_seed),
+        int(base_seed),
+        fam,
+        tuple(sorted(skv.items())),
+        tname,
+        int(episode_id),
+    )
+    return split, int(ep_seed)

@@ -1,0 +1,104 @@
+# ACPL — Task config: FAST MIXING to uniform (minimize TV(P_T, U))
+# Works on grids/irregular graphs. Encourages flatter distributions at terminal time.
+
+task:
+  name: mixing
+  objective: "minimize TV(P_T, Uniform)"
+  horizon_T: 96
+  normalized_time_feature: true
+
+data:
+  family: ["grid-2d", "irregular"]       # irregular: ER/WS/d-regular mixes from your dataset loader
+  grid:
+    L_min: 32
+    L_max: 96
+    boundary: "periodic"
+  irregular:
+    kind: ["er", "d-regular", "ws"]      # choose subsets in loader
+    n_min: 256
+    n_max: 1024
+    p_or_k:
+      er_p: [0.01, 0.05]
+      dreg_d: [3, 6]
+      ws_k: [4, 8]
+      ws_beta: [0.1, 0.2]
+  features:
+    include_degree: true
+    laplacian_pe:
+      enabled: true
+      k: 16
+      sign_fix: "max-abs-positive"
+    coords:
+      enabled_on_grids: true
+  batching:
+    episodes_per_graph: 1
+    graphs_per_batch: 2                  # bigger graphs → smaller batch
+    shuffle: true
+  seed: 1338
+
+loss:
+  kind: "tv_to_uniform"                  # L = TV(P_T, U) = 0.5 * ||P_T - 1/N||_1
+  uniform_target: "per-graph"            # uniform over active vertices per-graph
+  reduction: "mean"
+
+regularization:
+  smooth_theta: 2.0e-3
+  l2_theta: 1.0e-4
+  spectral:
+    enabled: true
+    dct_weight: 1.0e-4
+    hf_bins: 0.5                         # stronger HF damping for smooth mixing schedules
+  grad_clip_norm: 1.0
+
+training:
+  method: "backprop"
+  optimizer:
+    name: "adamw"
+    lr: 1.5e-4
+    betas: [0.9, 0.999]
+    weight_decay: 2.0e-4
+  scheduler:
+    enabled: true
+    name: "cosine"
+    warmup_steps: 1000
+  epochs: 80
+  steps_per_epoch: 400
+  accum_steps: 1
+  amp: true
+  device: "cuda"
+  log_every: 50
+  log_grad_norm_every: 200
+  ckpt:
+    dir: "checkpoints/mixing"
+    keep_last: 5
+    save_every_steps: 2000
+    save_best_metric: "eval/mix/tv"      # lower is better
+
+ppo:
+  enabled: false                         # mixing objective is differentiable (keep false)
+
+eval:
+  seeds: [301, 302, 303, 401, 402]
+  ci_alpha: 0.1
+  metrics:
+    - "mix/tv"
+    - "mix/js"
+    - "mix/hell"
+    - "mix/l2"
+    - "mix/H"
+    - "mix/kl_pu"
+  robustness:
+    enabled: true
+    edge_phase:
+      sigma: 0.0                         # off by default; set >0 in robustness sweeps
+      trials: 0
+
+viz:
+  pt_timelines:
+    enabled: true
+    sample_vertices: 12                  # randomly chosen for timeline plots
+  tv_curves:
+    enabled: true
+  spectra:
+    enabled: true
+    dct_show_bins: 24

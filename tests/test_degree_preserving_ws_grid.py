@@ -1,12 +1,12 @@
 # tests/test_degree_preserving_ws_grid.py
-import torch
 import pytest
+import torch
 
 from acpl.data.graphs import (
-    watts_strogatz_grid_graph_degree_preserving,
     watts_strogatz_grid_graph,
-    build_arc_index,
+    watts_strogatz_grid_graph_degree_preserving,
 )
+
 
 def _baseline_degrees(Lx, Ly, kx, ky):
     # Compute baseline lattice degrees per node (clipped by borders)
@@ -14,19 +14,23 @@ def _baseline_degrees(Lx, Ly, kx, ky):
     idx = 0
     for y in range(Ly):
         for x in range(Lx):
-            left  = min(kx, x)
+            left = min(kx, x)
             right = min(kx, Lx - 1 - x)
-            down  = min(ky, y)
-            up    = min(ky, Ly - 1 - y)
+            down = min(ky, y)
+            up = min(ky, Ly - 1 - y)
             deg[idx] = left + right + down + up
             idx += 1
     return deg
 
-@pytest.mark.parametrize("Lx,Ly,kx,ky,beta", [
-    (6, 5, 1, 1, 0.0),
-    (6, 5, 1, 1, 0.3),
-    (8, 8, 2, 1, 0.5),
-])
+
+@pytest.mark.parametrize(
+    "Lx,Ly,kx,ky,beta",
+    [
+        (6, 5, 1, 1, 0.0),
+        (6, 5, 1, 1, 0.3),
+        (8, 8, 2, 1, 0.5),
+    ],
+)
 def test_degree_preserving_ws_grid_preserves_degrees(Lx, Ly, kx, ky, beta):
     e, d, c, s = watts_strogatz_grid_graph_degree_preserving(
         Lx=Lx, Ly=Ly, kx=kx, ky=ky, beta=beta, seed=123
@@ -44,6 +48,7 @@ def test_degree_preserving_ws_grid_preserves_degrees(Lx, Ly, kx, ky, beta):
     # consistency: slice lengths = degrees
     slice_lens = s[1:] - s[:-1]
     assert torch.equal(slice_lens, d)
+
 
 def test_degree_preserving_ws_grid_is_simple_and_deterministic():
     Lx, Ly, kx, ky, beta = 7, 6, 1, 1, 0.4
@@ -63,10 +68,11 @@ def test_degree_preserving_ws_grid_is_simple_and_deterministic():
     assert (src != dst).all()
     # Rebuild undirected set and ensure uniqueness
     undirected = set()
-    for u, v in zip(src.tolist(), dst.tolist()):
+    for u, v in zip(src.tolist(), dst.tolist(), strict=False):
         a, b = (u, v) if u < v else (v, u)
         undirected.add((a, b))
     assert len(undirected) * 2 == e1.shape[1]  # arcs are doubled
+
 
 def test_degree_preserving_ws_grid_matches_lattice_when_beta_zero():
     Lx, Ly, kx, ky = 6, 6, 1, 2
@@ -74,7 +80,6 @@ def test_degree_preserving_ws_grid_matches_lattice_when_beta_zero():
         Lx=Lx, Ly=Ly, kx=kx, ky=ky, beta=0.0, seed=1
     )
     # Compare to base lattice made by the non-degree-preserving builder with beta=0.0
-    from acpl.data.graphs import watts_strogatz_grid_graph
     e0, d0, c0, s0 = watts_strogatz_grid_graph(Lx=Lx, Ly=Ly, kx=kx, ky=ky, beta=0.0, seed=999)
 
     assert torch.equal(d_dp, d0)

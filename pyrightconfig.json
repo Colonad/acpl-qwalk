@@ -1,0 +1,8 @@
+{
+  "include": ["acpl", "scripts"],
+  "exclude": ["**/__pycache__"],
+  "typeCheckingMode": "strict",
+  "reportMissingTypeStubs": "warning",
+  "reportUnknownMemberType": "warning",
+  "pythonVersion": "3.10"
+}

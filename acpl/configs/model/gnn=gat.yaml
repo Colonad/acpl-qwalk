@@ -1,0 +1,113 @@
+# ACPL • Model config • GAT encoder
+# Schema is intentionally flat & explicit; all fields have sensible defaults.
+model:
+  name: ACPLPolicy
+
+  # ---------------- Encoder (GNN) ----------------
+  encoder:
+    type: gat                         # {gat, gin, pna}
+    in_dim: ${data.in_dim}            # filled by datamodule/episode builder
+    hidden_dim: 128
+    out_dim: 128
+    num_layers: 3
+    dropout: 0.1
+    act: gelu                         # {relu, gelu, prelu}
+    norm: layernorm                   # {batchnorm, layernorm, none}
+
+    gat:
+      heads: [4, 4, 4]                # per-layer attention heads (len = num_layers)
+      concat: true                    # classic GAT concatenation within a layer
+      attn_dropout: 0.0
+      residual: true
+      stagger_heads: false            # novelty: vary heads across layers to reduce aliasing
+      share_qkv: false                # separate projections by default
+
+    # Optional edge information (if dataset provides)
+    use_edge_attr: false
+    edge_dim: 0
+
+  # ------------- Positional Encodings (Phase B3 wrapper) -------------
+  pe:
+    # Switch among {none, coords, lappe, roles}; can stack by enabling multiple.
+    # If multiple true, they are concatenated in [X | PE] then projected to in_dim via a learned MLP.
+    use_coords: false                 # geometric coords if provided in dataset
+    use_lappe: true                   # Laplacian eigenfeatures
+    use_roles: false                  # role encodings (e.g., betweenness/k-core bins)
+    ablations:
+      drop_time_pe: false             # disables TimeFourierPE injection to controller
+      drop_graph_pe: false            # removes graph PEs (LapPE/coords/roles) from node features
+      drop_degree_feat: false         # strips degree channels (if the feature builder added them)
+
+    # LapPE parameters (if enabled)
+    lappe:
+      k: 16                           # number of eigenvectors to use
+      sign_flip: true                 # randomized sign flip at train-time for invariance
+      norm: none                      # {none, l2, batchnorm, layernorm}
+      project_to: 32                  # project LapPE to this dim before concat (0=skip)
+
+    # Role encodings (if enabled)
+    roles:
+      kind: "kcore-bucket"            # {kcore-bucket, pagerank-quant, ecc-bin}
+      num_buckets: 8
+      one_hot: true
+      project_to: 16
+
+    # Coordinate encodings (if enabled)
+    coords:
+      expect_dim: 3                   # 2 or 3; ignored if dataset provides different
+      project_to: 16
+      center_and_scale: true
+
+    # After concatenating [raw X || PE_*] we can mix with a small MLP
+    mix:
+      enabled: true
+      hidden: 64
+      dropout: 0.0
+      norm: layernorm
+
+  # ---------------- Temporal controller ----------------
+  controller:
+    type: gru                         # {gru, transformer}
+    hidden: 128
+    layers: 1
+    dropout: 0.0
+
+    # Transformer options if you flip type=transformer
+    transformer:
+      dim: 128
+      heads: 4
+      layers: 2
+      dropout: 0.0
+      alibi: true                     # slope bias on attention
+      causal: true
+
+  # ---------------- Time positional encoding ----------------
+  time_pe:
+    kind: fourier                     # currently TimeFourierPE
+    dim: 32
+    base: 10000.0
+    learned_scale: true
+    normalize: false
+    dropout: 0.0
+    learned_phase: false
+    learned_freqs: false
+
+  # ---------------- Policy head (SU(2) coins) ----------------
+  head:
+    type: su2_zyz                     # maps to 3 angles per node/time
+    hidden: 0                         # optional MLP after controller (0 = identity)
+    angle_range: "unbounded"          # internal wrap happens inside coin lift
+
+  # ---------------- Regularization (used by backprop loop) ----------------
+  regularizers:
+    smooth_theta: 0.0                 # lambda for temporal smoothness of angles
+    l2_theta: 0.0                     # lambda for magnitude penalty
+
+  # ---------------- Training niceties (read by loops/backprop) ----------------
+  train:
+    grad_clip_norm: null              # e.g., 1.0
+    amp: true
+
+# Notes:
+# - If you run PPO, the same structural config applies; only the trainer changes.
+# - PE ablations mirror Phase-B3 switches and are consumed by the feature builder / policy wrapper.

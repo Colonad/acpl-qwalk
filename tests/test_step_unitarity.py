@@ -1,12 +1,13 @@
 # tests/test_step_unitarity.py
-import torch
 import pytest
+import torch
 
+from acpl.sim.coins import CoinsSpecSU2, coins_su2_from_theta
 from acpl.sim.portmap import build_portmap
 from acpl.sim.shift import build_shift
 from acpl.sim.step import step
-from acpl.sim.coins import coins_su2_from_theta, CoinsSpecSU2
-from acpl.sim.utils import state_norm2, renorm_state_
+from acpl.sim.utils import renorm_state_, state_norm2
+
 
 @pytest.mark.parametrize("n_cycle", [3, 4, 5, 8])
 def test_step_preserves_global_norm(n_cycle):
