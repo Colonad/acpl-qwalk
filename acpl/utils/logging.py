@@ -2,19 +2,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 import json
-import os
 from pathlib import Path
 import sys
-import time
-from typing import Optional
 
 __all__ = ["MetricLogger", "MetricLoggerConfig"]
 
 
 def _utc_iso8601() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _to_builtin(obj):
@@ -44,21 +41,21 @@ def _to_builtin(obj):
 @dataclass
 class MetricLoggerConfig:
     # core backend selection
-    backend: str = "plain"        # "plain" | "tensorboard" | "wandb"
+    backend: str = "plain"  # "plain" | "tensorboard" | "wandb"
     enable: bool = True
 
     # locations & naming
-    log_dir: Optional[str] = None  # directory for TB/W&B artifacts AND metrics.jsonl (if enabled)
+    log_dir: str | None = None  # directory for TB/W&B artifacts AND metrics.jsonl (if enabled)
     jsonl_name: str = "metrics.jsonl"
-    write_jsonl: bool = True       # write a JSONL stream alongside other backends
+    write_jsonl: bool = True  # write a JSONL stream alongside other backends
 
     # wandb specifics
-    project: Optional[str] = None
-    run_name: Optional[str] = None
+    project: str | None = None
+    run_name: str | None = None
 
     # key names / misc
     step_key: str = "step"
-    echo_plain: bool = True        # print to stdout even if TB/W&B are used
+    echo_plain: bool = True  # print to stdout even if TB/W&B are used
 
 
 class MetricLogger:
@@ -88,7 +85,7 @@ class MetricLogger:
             return
 
         # Ensure log_dir exists if provided / needed
-        log_dir_path: Optional[Path] = None
+        log_dir_path: Path | None = None
         if cfg.log_dir:
             log_dir_path = Path(cfg.log_dir)
             log_dir_path.mkdir(parents=True, exist_ok=True)
@@ -97,10 +94,14 @@ class MetricLogger:
         if self.backend in ("tensorboard", "tb"):
             try:
                 from torch.utils.tensorboard import SummaryWriter  # type: ignore
+
                 self._tb = SummaryWriter(log_dir=str(log_dir_path) if log_dir_path else None)
                 self.backend = "tensorboard"
             except Exception as e:  # pragma: no cover
-                print(f"[MetricLogger] TensorBoard not available ({e}); falling back to plain.", file=sys.stderr)
+                print(
+                    f"[MetricLogger] TensorBoard not available ({e}); falling back to plain.",
+                    file=sys.stderr,
+                )
                 self.backend = "plain"
 
         if self.backend == "wandb":
@@ -119,7 +120,10 @@ class MetricLogger:
                 wandb.init(**wandb_kwargs)
                 self._wb = wandb
             except Exception as e:  # pragma: no cover
-                print(f"[MetricLogger] wandb not available ({e}); falling back to plain.", file=sys.stderr)
+                print(
+                    f"[MetricLogger] wandb not available ({e}); falling back to plain.",
+                    file=sys.stderr,
+                )
                 self.backend = "plain"
 
         # JSONL stream (optional, independent of backend)
@@ -134,7 +138,7 @@ class MetricLogger:
 
     # --- context manager -----------------------------------------------------
 
-    def __enter__(self) -> "MetricLogger":
+    def __enter__(self) -> MetricLogger:
         return self
 
     def __exit__(self, exc_type, exc, tb):
@@ -190,13 +194,15 @@ class MetricLogger:
         """
         if self.backend == "off":
             # still write JSONL if enabled (acts as a minimal audit trail)
-            self._emit_jsonl({
-                "type": "scalar",
-                "time": _utc_iso8601(),
-                self.cfg.step_key: int(step),
-                "name": name,
-                "value": _to_builtin(value),
-            })
+            self._emit_jsonl(
+                {
+                    "type": "scalar",
+                    "time": _utc_iso8601(),
+                    self.cfg.step_key: int(step),
+                    "name": name,
+                    "value": _to_builtin(value),
+                }
+            )
             return
 
         # echo to stdout if requested (even when using TB/W&B)
@@ -210,13 +216,15 @@ class MetricLogger:
             self._wb.log({name: _to_builtin(value), self.cfg.step_key: int(step)})
 
         # JSONL record
-        self._emit_jsonl({
-            "type": "scalar",
-            "time": _utc_iso8601(),
-            self.cfg.step_key: int(step),
-            "name": name,
-            "value": _to_builtin(value),
-        })
+        self._emit_jsonl(
+            {
+                "type": "scalar",
+                "time": _utc_iso8601(),
+                self.cfg.step_key: int(step),
+                "name": name,
+                "value": _to_builtin(value),
+            }
+        )
 
     def log_dict(self, prefix: str, scalars: dict[str, float], step: int):
         """
@@ -232,7 +240,9 @@ class MetricLogger:
 
         if self.backend != "off" and (self.cfg.echo_plain or self.backend == "plain"):
             msg = " ".join([f"{k}={_to_builtin(v):.6f}" for k, v in flat.items()])
-            self._emit_plain(f"[{step:08d}] {msg}" if prefix == "" else f"[{step:08d}] {prefix} {msg}")
+            self._emit_plain(
+                f"[{step:08d}] {msg}" if prefix == "" else f"[{step:08d}] {prefix} {msg}"
+            )
 
         # backend-specific
         if self.backend == "tensorboard" and self._tb is not None:
@@ -244,10 +254,12 @@ class MetricLogger:
             self._wb.log(payload)
 
         # JSONL record (single line)
-        self._emit_jsonl({
-            "type": "metrics",
-            "time": _utc_iso8601(),
-            self.cfg.step_key: int(step),
-            "prefix": prefix,
-            "metrics": flat,  # already prefixed keys
-        })
+        self._emit_jsonl(
+            {
+                "type": "metrics",
+                "time": _utc_iso8601(),
+                self.cfg.step_key: int(step),
+                "prefix": prefix,
+                "metrics": flat,  # already prefixed keys
+            }
+        )

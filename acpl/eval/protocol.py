@@ -17,6 +17,7 @@ from acpl.utils.logging import MetricLogger
 try:
     from tqdm.auto import tqdm
 except Exception:  # pragma: no cover
+
     def tqdm(x, **kwargs):
         return x
 
@@ -87,7 +88,9 @@ class CISummary:
     n: int
 
 
-def _student_interval(samples: torch.Tensor, alpha: float) -> tuple[float, float, float, float, int]:
+def _student_interval(
+    samples: torch.Tensor, alpha: float
+) -> tuple[float, float, float, float, int]:
     """
     Student-t (or normal for large n) CI on the mean.
 

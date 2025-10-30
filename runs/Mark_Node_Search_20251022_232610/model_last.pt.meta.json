@@ -1,0 +1,9 @@
+{
+  "codec": "torch",
+  "created_at": null,
+  "epoch": 50,
+  "git": null,
+  "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/runs/Mark_Node_Search_20251022_232610/model_last.pt",
+  "size": 2775594,
+  "step": null
+}

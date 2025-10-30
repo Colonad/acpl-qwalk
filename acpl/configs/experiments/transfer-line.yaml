@@ -1,58 +1,66 @@
-# Experiment manifest: State transfer on a line (degree=2)
+# Experiment 0) Pre-registration manifest — Transfer on line graphs
 goal: transfer
-task: state_transfer
-graph:
-  family: line
+
+data:
+  family: line                # graph family
   train_sizes: [64, 96, 128, 160, 192]
-  val_holdout_sizes: [72, 136, 184]
-  test_ood_sizes: [256]
-horizon:
-  T: [64, 96, 128]
-policy:
-  gnn:
-    kind: GIN
-    layers: 2
-    hidden: 128
-    norm: graphnorm
-    dropout: 0.1
-  controller:
-    kind: GRU
-    hidden: 128
-    dropout: 0.1
+  test_ood_sizes: [256]       # out-of-distribution test size
+  seed: 1234
+
+sim:
+  steps: [64, 96, 128]        # horizons (curriculum allowed)
+
+model:
+  gnn: { kind: gcn, hidden: 64 }
+  controller: { kind: gru, hidden: 64, layers: 1 }
+  head: { hidden: 0 }
+  time_pe_dim: 32
   coin:
-    map: SU2      # degree 2 -> SU(2) ZYZ angles
+    family: su2               # degree-2 coins (OK for line/cycle)
+
 features:
-  degree: true
+  use_degree: true
   pe:
-    method: coord
-    params:
-      axis: x_norm # x/(N-1)
-  extra: []
-optimization:
-  optimizer: adam
-  lr: 2.5e-4
-  weight_decay: 1.0e-5
+    kind: coord_1d            # simple 1D coordinate feature
+    note: "LapPE optional; coord_1d used for line"
+
+optim:
+  name: adam
+  lr: 3.0e-3
+  weight_decay: 0.0
   batch_episodes: 32
-  epochs: 120
-  grad_clip: 1.0
+  epochs: 50
+  grad_clip:
+    enabled: true
+    mode: norm
+    max_norm: 1.0
   regularizers:
-    temporal_smoothness: 1.0e-3
-    magnitude: 1.0e-5
+    temporal_smoothness: 0.0
+    magnitude: 0.0
+  scheduler:
+    kind: none
+
 randomness:
-  master_seed: 1234
-  split_routing: size_bands
-  seeds_per_run: 5
+  master_seed: 0
+  split_routing: "by_run_seed"
+  seeds_per_run: 3
+
 baselines:
-  - fixed_coin: hadamard
-  - global_time_varying_coin: true
-success_criteria:
-  transfer_min: 0.90   # P_T(target) on line (pre-registered threshold)
-compute_budget:
-  device: auto
-  dtype:
-    encoder: float32
-    state: complex128
-  wallclock_hours: 8
-  max_memory_gb: 16
-notes: >
-  Uses SU(2) ZYZ angles for dv=2 coins. Curriculum over T is allowed.
+  fixed_hadamard: true
+  fixed_grover: false
+  global_time_varying_coin: true
+  analytical_skw_akr: false
+
+success:
+  transfer_threshold: 0.90     # e.g., mean P_T[target] on line >= 0.9
+  ci_improvement_eps: 0.02     # pooled CI must improve by at least ε when claimed
+
+compute:
+  device: auto                 # cuda if available, else cpu
+  dtype: float32
+  wallclock_limit_min: 120
+  max_memory_gb: 8
+
+logging:
+  project: "acpl-experiments"
+  notes: "Pre-registered: transfer on line graphs; SU2 coins; curriculum over T."
