@@ -1,0 +1,9 @@
+{
+  "codec": "torch",
+  "created_at": null,
+  "epoch": 20,
+  "git": null,
+  "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/runs/fast_transfer-line_N64_T64_lr3e-3ForWrittenReport/model_last.pt",
+  "size": 461466,
+  "step": null
+}

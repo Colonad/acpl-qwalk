@@ -42,9 +42,3 @@ Thumbs.db
 
 # misc
 .env
-
-# Training artifacts
-runs/**/model_*.pt
-runs/**/model_*.ckpt
-*.pt
-*.ckpt
