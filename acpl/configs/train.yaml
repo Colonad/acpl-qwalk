@@ -217,7 +217,7 @@ hydra:
 # Compiling
 # -------------------------
 compile:
-  enabled: true
+  enabled: false
   backend: aot_eager
 
 
