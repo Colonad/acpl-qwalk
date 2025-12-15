@@ -125,6 +125,7 @@ def _bootstrap_interval(
     alpha: float,
     B: int,
 ) -> tuple[float, float, float, float, int]:
+    
     """
     Percentile bootstrap CI on the mean, with B resamples.
 
@@ -132,6 +133,9 @@ def _bootstrap_interval(
     -------
     (mean, lo, hi, stderr, n)
     """
+
+
+
     if samples.numel() == 0:
         return float("nan"), float("nan"), float("nan"), float("nan"), 0
 
@@ -142,17 +146,17 @@ def _bootstrap_interval(
     if n == 1:
         return mean, mean, mean, 0.0, 1
 
-    # Bootstrap resamples of the mean
     idx = torch.randint(0, n, size=(B, n), device=x.device)
     boot_means = x[idx].mean(dim=1)
-    lo = float(torch.quantile(boot_means, q=torch.tensor(alpha / 2, dtype=torch.float64)).item())
-    hi = float(
-        torch.quantile(boot_means, q=torch.tensor(1 - alpha / 2, dtype=torch.float64)).item()
-    )
 
-    # Bootstrap estimate of stderr (std of the bootstrap distribution)
+    q_lo = float(alpha / 2)
+    q_hi = float(1 - alpha / 2)
+    lo = float(torch.quantile(boot_means, q=q_lo).item())
+    hi = float(torch.quantile(boot_means, q=q_hi).item())
+
     stderr = float(boot_means.std(unbiased=True).item())
     return mean, lo, hi, stderr, n
+
 
 
 def compute_ci(

@@ -6,6 +6,47 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 
+from contextlib import nullcontext
+
+# AMP autocast — supports new (torch.amp) and old (torch.cuda.amp) APIs
+try:
+    # New-style API: torch.amp.autocast(device_type=..., enabled=...)
+    from torch.amp import autocast as _autocast  # type: ignore[attr-defined]
+
+    def _autocast_ctx(device_type: str, enabled: bool = True):
+        return _autocast(device_type=device_type, enabled=enabled)
+
+except Exception:
+    try:
+        # Older API: torch.cuda.amp.autocast(enabled=...) (CUDA-only)
+        from torch.cuda.amp import autocast as _cuda_autocast  # type: ignore
+
+        def _autocast_ctx(device_type: str, enabled: bool = True):
+            return _cuda_autocast(enabled=enabled) if device_type == "cuda" else nullcontext()
+
+    except Exception:
+        def _autocast_ctx(device_type: str, enabled: bool = True):
+            return nullcontext()
+
+
+
+# --- torch.compile / Dynamo safety -----------------------------------------
+# Inductor can crash if a compiled segment receives a sparse tensor input.
+# We keep sparse adjacency build+spmm in eager by disabling compilation for _spmm.
+try:
+    # Newer PyTorch
+    from torch.compiler import disable as _compile_disable  # type: ignore
+except Exception:
+    try:
+        import torch._dynamo as _dynamo  # type: ignore
+        _compile_disable = _dynamo.disable
+    except Exception:
+        def _compile_disable(fn):  # type: ignore
+            return fn
+# ---------------------------------------------------------------------------
+
+
+
 # ----------------------------- helpers (runtime-only) ----------------------------- #
 
 
@@ -67,13 +108,40 @@ def _normalize_renorm(
     return ei, norm_w
 
 
+@_compile_disable
 def _spmm(ei: torch.Tensor, ew: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     """
     Sparse COO matmul: (N×N)_sparse @ (N×F)_dense.
+
+    Important: torch.sparse.mm on CUDA does NOT support float16,
+    and autocast may try to run it in half. We therefore:
+      - upcast inputs to float32,
+      - disable autocast just for this op,
+      - cast back to the original dtype of x afterwards.
     """
     n = x.size(0)
-    A = torch.sparse_coo_tensor(ei, ew, size=(n, n), device=x.device)
-    return torch.sparse.mm(A, x)
+    device = x.device
+    orig_dtype = x.dtype
+
+    # Always compute in float32 for the sparse matmul
+    x32 = x.to(torch.float32)
+    ew32 = ew.to(torch.float32)
+
+    A = torch.sparse_coo_tensor(ei, ew32, size=(n, n), device=device).coalesce()
+
+    if device.type == "cuda":
+        # Run sparse.mm outside autocast to prevent it from going to half
+        with _autocast_ctx("cuda", enabled=False):
+            out32 = torch.sparse.mm(A, x32)
+    else:
+        out32 = torch.sparse.mm(A, x32)
+
+
+    # Cast back to the original dtype (fp16/bf16/etc.) if needed
+    if orig_dtype != torch.float32:
+        return out32.to(orig_dtype)
+    return out32
+
 
 
 # --------------------------------- layer & model --------------------------------- #

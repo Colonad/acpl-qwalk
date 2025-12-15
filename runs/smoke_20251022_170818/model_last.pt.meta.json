@@ -1,9 +1,0 @@
-{
-  "codec": "torch",
-  "created_at": null,
-  "epoch": 1,
-  "git": null,
-  "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/runs/smoke_20251022_170818/model_last.pt",
-  "size": 461018,
-  "step": null
-}

@@ -397,11 +397,31 @@ def apply_then_shift(
         atol=atol,
     )
 
+
+
+    # Ensure permutation index is on the same device as tmp (index_select requirement).
+    perm = shift.perm
+    if isinstance(perm, torch.Tensor):
+        if perm.dtype != torch.long:
+            perm = perm.to(dtype=torch.long)
+        if perm.device != tmp.device:
+            perm = perm.to(device=tmp.device)
+            # Cache it back onto shift to avoid repeated .to() in long rollouts.
+            try:
+               shift.perm = perm
+            except Exception:
+                pass
+    else:
+        raise TypeError("shift.perm must be a torch.Tensor")
+
+
+
+
     # Flip–flop shift is an index permutation over the arc axis
     if tmp.ndim == 1:
-        res = tmp.index_select(0, shift.perm)
+        res = tmp.index_select(0, perm)
     elif tmp.ndim == 2:
-        res = tmp.index_select(1, shift.perm)
+        res = tmp.index_select(1, perm)
     else:
         raise ValueError("psi must be rank-1 or rank-2 over the arc axis.")
 

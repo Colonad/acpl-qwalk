@@ -1,9 +1,0 @@
-{
-  "codec": "torch",
-  "created_at": null,
-  "epoch": 1,
-  "git": null,
-  "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/runs/B_exp_64nodes_64steps_seed42/model_last.pt",
-  "size": 463810,
-  "step": null
-}

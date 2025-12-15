@@ -261,6 +261,41 @@ def select_dtype(dtype_flag: str):
         raise ValueError(f"Unsupported dtype '{dtype_flag}'. Choose from {list(mapping)}.")
     return mapping[dtype_flag]
 
+def configure_cuda_perf(*, deterministic: bool = False, capture_scalar_outputs: bool = True) -> None:
+    """Enable Ampere-friendly GPU performance knobs (TF32, cuDNN benchmarking, Dynamo scalar capture)."""
+    if not torch.cuda.is_available():
+        return
+
+    # Enable TF32 tensor cores for float32 matmuls/conv (removes the warning + speeds up).
+    try:
+        torch.set_float32_matmul_precision("high")
+    except Exception:
+        pass
+
+    # Legacy flags (work on stable PyTorch)
+    try:
+        torch.backends.cuda.matmul.allow_tf32 = True
+    except Exception:
+        pass
+    try:
+        torch.backends.cudnn.allow_tf32 = True
+    except Exception:
+        pass
+
+    # cuDNN autotuning: faster, but nondeterministic
+    try:
+        torch.backends.cudnn.benchmark = not deterministic
+        torch.backends.cudnn.deterministic = deterministic
+    except Exception:
+        pass
+
+    # Reduce torch.compile graph breaks from Tensor.item() (optional)
+    if capture_scalar_outputs:
+        try:
+            import torch._dynamo as _dynamo  # type: ignore
+            _dynamo.config.capture_scalar_outputs = True
+        except Exception:
+            pass
 
 # -------------------------------
 # Config IO and overrides
@@ -481,8 +516,18 @@ class ThetaToHermitianAdaptor(nn.Module):
         nn.init.xavier_uniform_(self.proj.weight)
         nn.init.zeros_(self.proj.bias)
 
+        # Cache basis matrices per (d, device, dtype) to avoid recomputing
+        # sinusoid + outer products every time in the rollout loop.
+        # key: (int_d, torch.device, torch.dtype) -> Tensor(B, d, d)
+        self._basis_cache: dict[tuple[int, torch.device, torch.dtype], torch.Tensor] = {}
+
     @staticmethod
-    def _port_features(d: int, Kfreq: int, device=None, dtype=torch.float32) -> torch.Tensor:
+    def _port_features(
+        d: int,
+        Kfreq: int,
+        device=None,
+        dtype=torch.float32,
+    ) -> torch.Tensor:
         import math as _m
 
         j = torch.arange(d, device=device, dtype=dtype).unsqueeze(1)
@@ -494,36 +539,65 @@ class ThetaToHermitianAdaptor(nn.Module):
         return torch.cat(cols, dim=1)  # (d, 2K+1)
 
     def _basis_matrices(self, d: int, device, dtype) -> torch.Tensor:
-        Phi = self._port_features(d, self.Kfreq, device=device, dtype=dtype)  # (d,B)
+        """
+        Return cached basis matrices M_k (B, d, d) for this d/device/dtype.
+        """
+        d_int = int(d)
+        device = torch.device(device)
+        key = (d_int, device, dtype)
+
+        cached = self._basis_cache.get(key, None)
+        if cached is not None:
+            return cached
+
+        Phi = self._port_features(d_int, self.Kfreq, device=device, dtype=dtype)  # (d,B)
         Ms = []
         for k in range(Phi.shape[-1]):
             phi = Phi[:, k : k + 1]
-            Ms.append(phi @ phi.t())
-        return torch.stack(Ms, dim=0)  # (B,d,d)
+            Ms.append(phi @ phi.t())  # (d,d)
+        M = torch.stack(Ms, dim=0)  # (B,d,d)
+
+        self._basis_cache[key] = M
+        return M
 
     def hermitian_from_theta(self, theta_vt: torch.Tensor, d: int) -> torch.Tensor:
+        """
+        Map theta_vt (...,3) to a Hermitian matrix H (..., d, d) using cached bases.
+        """
         *batch, _ = theta_vt.shape
+        # Project theta into B coefficients
         w = self.proj(theta_vt.reshape(-1, 3)).view(*batch, self.B)  # (...,B)
-        M = self._basis_matrices(d, device=theta_vt.device, dtype=theta_vt.dtype)  # (B,d,d)
-        H = torch.tensordot(w, M, dims=([-1], [0]))
-        H = 0.5 * (H + H.transpose(-1, -2))
+
+        M = self._basis_matrices(d, device=theta_vt.device, dtype=torch.float32)  # (B,d,d)
+        M = M.to(dtype=w.dtype)
+
+        H = torch.tensordot(w, M, dims=([-1], [0]))  # (..., d, d)
+        H = 0.5 * (H + H.transpose(-1, -2))  # ensure Hermitian numerically
         return H
 
 
 def unitary_exp_iH(H: torch.Tensor, cdtype=torch.complex64) -> torch.Tensor:
     n = H.size(-1)
     Hs = 0.5 * (H + H.transpose(-1, -2))
-    H64 = Hs.to(torch.float64)
+
+    # RTX cards: keep FP32 on CUDA (FP64 is extremely slow)
+    if Hs.is_cuda:
+        Hwork = Hs.to(torch.float32)
+    else:
+        Hwork = Hs.to(torch.float64)
+
     eps = 1e-8
-    H64 = H64 + torch.eye(n, dtype=H64.dtype, device=H64.device) * eps
+    Hwork = Hwork + torch.eye(n, dtype=Hwork.dtype, device=Hwork.device) * eps
+
     try:
-        evals, evecs = torch.linalg.eigh(H64)
+        evals, evecs = torch.linalg.eigh(Hwork)  # supports batched (...,n,n)
         evals = torch.clamp(evals, min=-1e6, max=1e6)
         D = torch.diag_embed(torch.complex(torch.cos(evals), torch.sin(evals)).to(cdtype))
         Q = evecs.to(cdtype)
         return Q @ D @ Q.transpose(-1, -2).conj()
     except RuntimeError:
         return torch.matrix_exp(1j * Hs.to(cdtype))
+
 
 
 def unitary_cayley(H: torch.Tensor, cdtype=torch.complex64) -> torch.Tensor:
@@ -545,6 +619,9 @@ def apply_blockdiag_coins_anydeg(
     out = psi.clone()
     start = pm.node_ptr[:-1]
     end = pm.node_ptr[1:]
+
+
+
     N = pm.num_nodes
     for v in range(N):
         s, e = int(start[v]), int(end[v])
@@ -606,6 +683,13 @@ def make_rollout_anydeg_exp_or_cayley(
     start = pm.node_ptr[:-1]
     end = pm.node_ptr[1:]
 
+    # --- Fast path detection (closure constants for this pm) ---
+    deg = (end - start).to(torch.int64)
+    is_regular = bool(deg.numel() > 0 and (deg == deg[0]).all().item())
+    d0 = int(deg[0].item()) if is_regular else -1
+    fast_regular = bool(is_regular and d0 > 0 and int(pm.src.numel()) == int(pm.num_nodes * d0))
+
+
     def rollout(model: nn.Module, batch: dict):
         X: torch.Tensor = _maybe_squeeze_leading(batch["X"])
         edge_index: torch.Tensor = _maybe_squeeze_leading(batch["edge_index"])
@@ -620,20 +704,40 @@ def make_rollout_anydeg_exp_or_cayley(
 
         theta = model(X, edge_index, T=T)  # (T,N,3)
         psi = init_state_node0_uniform_ports(pm, cdtype=cdtype, device=X.device)
+        # Put perm on the right device once (avoid per-step .to())
+        perm = shift.perm
+        if perm.device != psi.device:
+            perm = perm.to(psi.device)
 
-        for t in range(T):
-            coins_v: list[torch.Tensor | None] = []
-            for v in range(pm.num_nodes):
-                s, e = int(start[v]), int(end[v])
-                d = e - s
-                if d <= 0:
-                    coins_v.append(None)
-                    continue
-                H = adaptor.hermitian_from_theta(theta[t, v : v + 1, :], d=d)[0]
-                U = unitary_exp_iH(H, cdtype) if family == "exp" else unitary_cayley(H, cdtype)
-                coins_v.append(U)
-            psi = apply_blockdiag_coins_anydeg(psi, pm, coins_v)
-            psi = psi.index_select(0, shift.perm)
+        if fast_regular:
+            Nn = pm.num_nodes
+            # theta[t] is (N,3) and adaptor will return (N,d0,d0)
+            for t in range(T):
+                H = adaptor.hermitian_from_theta(theta[t], d=d0)  # (Nn, d0, d0)
+                U = unitary_exp_iH(H, cdtype) if family == "exp" else unitary_cayley(H, cdtype)  # (Nn,d0,d0)
+
+                # psi is length A = Nn*d0, arranged in contiguous node blocks -> view as (Nn,d0)
+                psi_v = psi.reshape(Nn, d0) # (Nn, d0)
+                psi_v = torch.bmm(U, psi_v.unsqueeze(-1)).squeeze(-1)  # (Nn, d0)
+                psi = psi_v.reshape(-1)  # (A,)
+
+                psi = psi.index_select(0, perm)
+        else:
+            # Fallback: generic variable-degree path (your original code)
+            for t in range(T):
+                coins_v: list[torch.Tensor | None] = []
+                for v in range(pm.num_nodes):
+                    s, e = int(start[v]), int(end[v])
+                    d = e - s
+                    if d <= 0:
+                        coins_v.append(None)
+                        continue
+                    H = adaptor.hermitian_from_theta(theta[t, v : v + 1, :], d=d)[0]
+                    U = unitary_exp_iH(H, cdtype) if family == "exp" else unitary_cayley(H, cdtype)
+                    coins_v.append(U)
+                psi = apply_blockdiag_coins_anydeg(psi, pm, coins_v)
+                psi = psi.index_select(0, perm)
+
 
         P = partial_trace_coin(psi, pm).unsqueeze(0).to(dtype=torch.float32)
         return P, {"targets": targets}
@@ -800,7 +904,12 @@ def build_optimizer_and_ema(model: nn.Module, adaptor: nn.Module | None, optim_c
     else:
         raise ValueError(f"Unknown optimizer '{name}'")
 
-    optimizer = Optim(groups, lr=base_lr, weight_decay=base_wd, **kw)
+    # Try fused optimizer on CUDA (PyTorch supports this for some opts/builds)
+    use_fused = (next(model.parameters()).device.type == "cuda")
+    try:
+        optimizer = Optim(groups, lr=base_lr, weight_decay=base_wd, fused=use_fused, **kw)
+    except TypeError:
+        optimizer = Optim(groups, lr=base_lr, weight_decay=base_wd, **kw)
 
     ema_cfg = optim_cfg.get("ema", {})
     ema_enabled = bool(ema_cfg.get("enabled", False))
@@ -1003,6 +1112,17 @@ def main():
     cfg = load_yaml(cfg_path)
     cfg = apply_overrides(cfg, unknown)
 
+
+    # ---------------- Coin family (resolve early; used in multiple places) ----------------
+    coin_cfg = cfg.get("coin", {"family": "su2"}) or {}
+    if not isinstance(coin_cfg, dict):
+        # allow configs like: coin: exp
+        coin_cfg = {"family": str(coin_cfg)}
+    coin_family = str(coin_cfg.get("family", "su2")).lower().strip()
+    # -------------------------------------------------------------------------------
+
+
+
     if any(
         ("logging.dir=" in x) or ("dataset.num_episodes=" in x) or ("train.max_steps=" in x)
         for x in unknown
@@ -1017,6 +1137,9 @@ def main():
     _seed_everything(seed)
     device = select_device(cfg.get("device", "auto"))
     dtype = select_dtype(cfg.get("dtype", "float32"))
+    if device.type == "cuda":
+        # Set deterministic=True if you need strict reproducibility (slower).
+        configure_cuda_perf(deterministic=False, capture_scalar_outputs=True)
 
     # ---------------- Outputs (create early so logger can write JSONL here) ----------------
     train_cfg = cfg.get("train", {})
@@ -1026,7 +1149,7 @@ def main():
             Path(args.run_dir)
             if args.run_dir
             else Path("runs")
-            / f"B_{cfg.get('coin', {'family':'su2'}).get('family','su2')}_{cfg.get('data',{}).get('N', cfg.get('data',{}).get('num_nodes', 64))}nodes_{cfg.get('sim',{}).get('steps',64)}steps_seed{seed}"
+            / f"B_{coin_family}_{cfg.get('data',{}).get('N', cfg.get('data',{}).get('num_nodes', 64))}nodes_{cfg.get('sim',{}).get('steps',64)}steps_seed{seed}"
         )
     run_dir.mkdir(parents=True, exist_ok=True)
     plot_path = run_dir / "pt_target.png"
@@ -1097,6 +1220,14 @@ def main():
     if not isinstance(head_cfg, dict):
         head_cfg = {}
 
+
+
+    head_layernorm = bool(head_cfg.get("layernorm", True))
+    # Workaround: Inductor/Triton can fail compiling LayerNorm on tiny feature dims (e.g., 3)
+    if coin_family in ("exp", "cayley"):
+
+        head_layernorm = False
+
     acpl_cfg = ACPLPolicyConfig(
         in_dim=2,
         gnn_hidden=int(gnn_cfg.get("hidden", 64)),
@@ -1116,11 +1247,68 @@ def main():
         time_pe_learned_scale=True,
         head_hidden=int(head_cfg.get("hidden", 0)) if "hidden" in head_cfg else 0,
         head_out_scale=1.0,
-        head_layernorm=True,
+        head_layernorm=head_layernorm,
+
         head_dropout=float(head_cfg.get("dropout", 0.0)),
     )
     with _time_block("build_model"):
         model = ACPLPolicy(acpl_cfg).to(device=device)
+
+        # -------------------------------
+    # Optional: torch.compile (SAFE)
+    # -------------------------------
+    compile_cfg = cfg.get("compile", {}) or {}
+    compile_enabled = bool(compile_cfg.get("enabled", False))
+    compile_mode = str(compile_cfg.get("mode", "reduce-overhead"))
+    requested_backend = str(compile_cfg.get("backend", "inductor")).lower().strip()
+
+    # If true, user is explicitly asking to risk Inductor/Triton even on CUDA.
+    force_inductor = bool(compile_cfg.get("force_inductor", False))
+
+    # Build example inputs up front (used for warmup / validation)
+    dummy_X = torch.zeros((g.N, 2), device=device, dtype=dtype)
+
+    if compile_enabled:
+        model_eager = model
+
+        # Workaround: Inductor+Triton can hit "zuf0 is not defined" on some installs.
+        # Default to aot_eager on CUDA unless force_inductor=true.
+        backend = requested_backend
+        if device.type == "cuda" and backend in ("inductor", "default") and not force_inductor:
+            backend = "aot_eager"
+            print("[setup] torch.compile: switching backend to aot_eager (safe mode; avoids Triton)")
+
+        # If we *are* using Inductor, make it as synchronous as possible
+        if backend in ("inductor", "default"):
+            try:
+                import torch._inductor.config as _ic  # type: ignore
+                _ic.async_compile = False
+                _ic.compile_threads = 1
+            except Exception:
+                pass
+
+        try:
+            compile_kwargs = {"backend": backend}
+            # Only Inductor uses/accepts `mode` reliably; aot_eager may crash on some torch versions.
+            if backend in ("inductor", "default"):
+                compile_kwargs["mode"] = compile_mode
+
+            compiled = torch.compile(model_eager, **compile_kwargs)
+
+            # Warmup forces any compilation NOW (so we can fall back cleanly)
+            with torch.no_grad():
+                _ = compiled(dummy_X, g.edge_index, T=T)
+
+            mode_str = compile_mode if backend in ("inductor", "default") else "<omitted>"
+            print(f"[setup] torch.compile enabled for ACPLPolicy (backend={backend}, mode={mode_str})")
+
+        except Exception as e:
+            model = model_eager
+            print(f"[setup] torch.compile disabled (failed; falling back to eager): {e}")
+    else:
+        print("[setup] torch.compile disabled (compile.enabled=false)")
+
+
 
     # Simple node features (degree + coord)
     N = g.N
@@ -1128,9 +1316,6 @@ def main():
     coord1 = torch.arange(N, device=device, dtype=dtype).unsqueeze(1) / max(N - 1, 1)
     X = torch.cat([deg_feat, coord1], dim=1)  # (N,2)
 
-    # Coin family
-    coin_cfg = cfg.get("coin", {"family": "su2"})
-    family = str(coin_cfg.get("family", "su2")).lower().strip()
 
     # Optim (advanced)
     optim_cfg = cfg.get("optim", {})
@@ -1138,7 +1323,7 @@ def main():
         optim_cfg["lr"] = float(args.lr)
 
     adaptor = None
-    if family in ("exp", "cayley"):
+    if coin_family in ("exp", "cayley"):
         adaptor = ThetaToHermitianAdaptor(Kfreq=2).to(device)
 
     optimizer, ema = build_optimizer_and_ema(model, adaptor, optim_cfg)
@@ -1165,7 +1350,7 @@ def main():
     payload = {
         "X": X,
         "edge_index": g.edge_index,
-        "T": torch.tensor(T, dtype=torch.long, device=device),
+        "T": int(T),
         "targets": targets,
     }
     train_ds = SingleGraphEpisodeDataset(payload, num_episodes=episodes_per_epoch)
@@ -1184,14 +1369,14 @@ def main():
     )
 
     # Rollout + loss
-    if family == "su2":
+    if coin_family == "su2":
         rollout_fn = make_rollout_su2_dv2(pm, shift, cdtype=torch.complex64)
         title_suffix = "SU2 (deg=2)"
     else:
         rollout_fn = make_rollout_anydeg_exp_or_cayley(
-            pm, shift, adaptor=adaptor, family=family, cdtype=torch.complex64
+            pm, shift, adaptor=adaptor, family=coin_family, cdtype=torch.complex64
         )
-        title_suffix = f"{family.upper()} (any degree)"
+        title_suffix = f"{coin_family.upper()} (any degree)"
     loss_builder = make_transfer_loss(reduction=reduction, renorm=renorm)
 
     # Logging — write JSONL under run_dir (works with TB/W&B too)
@@ -1368,7 +1553,7 @@ def main():
     pt_curve_y: list[float] = []
 
     print(
-        f"[setup] device={device}, N={g.N}, T={T}, target={target_index}, family={family}, epochs={epochs}"
+        f"[setup] device={device}, N={g.N}, T={T}, target={target_index}, family={coin_family}, epochs={epochs}"
     )
     print(
         f"[setup] optimizer={optimizer.__class__.__name__}, groups={len(optimizer.param_groups)}; grad_clip={max_norm}"

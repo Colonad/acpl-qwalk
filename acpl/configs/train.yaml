@@ -145,6 +145,11 @@ optim:
   lr: 3.0e-3
   weight_decay: 0.0
   betas: [0.9, 0.999]
+
+  precision:
+    amp: on          # <- enable AMP ("on" or "auto")
+
+
   # Optional scheduler (disabled by default; enable via loop.scheduler_on=true)
   scheduler:
     kind: none                # none | cosine | step
@@ -170,10 +175,11 @@ loop:
   primary_on_targets: true
 
 train:
-  epochs: 1
+  epochs: 120
   batch_size: 1               # Phase A: single-episode batches
   num_workers: 0
   pin_memory: false
+
 
 # -------------------------
 # Logging
@@ -204,3 +210,14 @@ hydra:
   job:
     config:
       override_dirname: true
+
+
+
+# -------------------------
+# Compiling
+# -------------------------
+compile:
+  enabled: true
+  backend: aot_eager
+
+

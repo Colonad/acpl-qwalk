@@ -175,8 +175,13 @@ def segment_sum(
     -----
     • Implemented with index_add_; fast and differentiable.
     • Works for real and complex tensors.
+    • Ensures `index` is on the same device as `values` (important for CUDA).
     """
     _check_segment_inputs(values, index, num_segments)
+
+    # Ensure index lives on the same device as values (required for index_add_)
+    if index.device != values.device:
+        index = index.to(values.device)
 
     if values.ndim == 1:
         out = torch.zeros(num_segments, dtype=values.dtype, device=values.device)
@@ -192,6 +197,7 @@ def segment_sum(
         return out
 
     raise ValueError("values must be rank 1 or 2 (A) or (B, A).")
+
 
 
 def segment_max(
