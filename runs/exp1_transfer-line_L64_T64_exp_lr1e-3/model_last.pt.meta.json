@@ -1,9 +1,0 @@
-{
-  "codec": "torch",
-  "created_at": null,
-  "epoch": 120,
-  "git": null,
-  "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/runs/exp1_transfer-line_L64_T64_exp_lr1e-3/model_last.pt",
-  "size": 461658,
-  "step": null
-}

@@ -671,9 +671,12 @@ def make_rollout_anydeg_exp_or_cayley(
     shift: ShiftOp,
     *,
     adaptor: ThetaToHermitianAdaptor,
-    family: str,  # "exp" | "cayley"
+    family: str,
     cdtype,
+    theta_scale: float = 1.0,
+    theta_noise_std: float = 0.0,
 ) -> RolloutFn:
+
     from acpl.sim.utils import partial_trace_coin
 
     family = family.lower().strip()
@@ -703,6 +706,16 @@ def make_rollout_anydeg_exp_or_cayley(
             targets = targets.squeeze(0)
 
         theta = model(X, edge_index, T=T)  # (T,N,3)
+
+
+        if theta_scale != 1.0:
+            theta = theta * float(theta_scale)
+        if model.training and theta_noise_std > 0:
+            theta = theta + float(theta_noise_std) * torch.randn_like(theta)
+
+
+
+
         psi = init_state_node0_uniform_ports(pm, cdtype=cdtype, device=X.device)
         # Put perm on the right device once (avoid per-step .to())
         perm = shift.perm
@@ -1084,6 +1097,8 @@ def main():
     parser.add_argument("--T", type=int, default=None, help="Override horizon (steps)")
     parser.add_argument("--lr", type=float, default=None, help="Override learning rate")
     parser.add_argument("--run_dir", type=str, default=None, help="Output directory")
+    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint file or run dir")
+
     parser.add_argument(
         "--ci_only",
         action="store_true",
@@ -1215,6 +1230,12 @@ def main():
         target_index = int(target_index % g.N)
         print(f"[setup] normalized target_index {old} -> {target_index} (N={g.N})")
 
+
+    outdeg = (pm.node_ptr[1:] - pm.node_ptr[:-1]).tolist()
+    print(f"[debug] outdeg[0]={outdeg[0]} outdeg[target]={outdeg[target_index]} (target={target_index})")
+
+
+
     reduction = task_cfg.get("reduction", "mean")
     renorm = bool(task_cfg.get("renorm", True))
 
@@ -1312,6 +1333,9 @@ def main():
             with torch.no_grad():
                 _ = compiled(dummy_X, g.edge_index, T=T)
 
+
+            model = compiled  
+
             mode_str = compile_mode if backend in ("inductor", "default") else "<omitted>"
             print(f"[setup] torch.compile enabled for ACPLPolicy (backend={backend}, mode={mode_str})")
 
@@ -1388,9 +1412,21 @@ def main():
         rollout_fn = make_rollout_su2_dv2(pm, shift, cdtype=torch.complex64)
         title_suffix = "SU2 (deg=2)"
     else:
+
+        theta_scale = float(coin_cfg.get("theta_scale", 1.0))
+        theta_noise_std = float(coin_cfg.get("theta_noise_std", 0.0))
+
+
         rollout_fn = make_rollout_anydeg_exp_or_cayley(
-            pm, shift, adaptor=adaptor, family=coin_family, cdtype=torch.complex64
+            pm,
+            shift,
+            adaptor=adaptor,
+            family=coin_family,
+            cdtype=torch.complex64,
+            theta_scale=theta_scale,
+            theta_noise_std=theta_noise_std,
         )
+
         title_suffix = f"{coin_family.upper()} (any degree)"
     loss_builder = make_transfer_loss(reduction=reduction, renorm=renorm)
 
@@ -1443,18 +1479,21 @@ def main():
                         new_sd = {k.replace("module.", "", 1): v for k, v in sd.items()}
                         model.load_state_dict(new_sd, strict=False)
 
-                if adaptor is not None and isinstance(payload.get("adaptor", None), dict):
+                ad_sd = ckpt_payload.get("adaptor", None)
+                if adaptor is not None and isinstance(ad_sd, dict):
                     try:
-                        adaptor.load_state_dict(payload["adaptor"], strict=False)
+                        adaptor.load_state_dict(ad_sd, strict=False)
                     except Exception:
                         pass
 
-                opt_sd = payload.get("optimizer", None)
+
+                opt_sd = ckpt_payload.get("optimizer", None)
                 if isinstance(opt_sd, dict):
                     try:
                         optimizer.load_state_dict(opt_sd)
                     except Exception:
                         pass
+
 
                 if "epoch" in ckpt_payload:
                     start_epoch = int(ckpt_payload["epoch"])
