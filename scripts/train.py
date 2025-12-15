@@ -1168,8 +1168,21 @@ def main():
     # Port map / shift
     with _time_block("build_shift"):
         pairs = list(zip(g.edge_index[0].tolist(), g.edge_index[1].tolist(), strict=False))
+
+        # --- FIX: ensure undirected graphs are represented with BOTH arc directions ---
+        # If your graph builders already return both directions, set() will dedupe.
+        data_cfg0 = cfg.get("data", {}) or {}
+        directed = bool(data_cfg0.get("directed", False))  # allow override if you ever need directed
+        if not directed:
+            pairs = list(set(pairs) | set((v, u) for (u, v) in pairs))
+            pairs.sort()  # deterministic
+
         pm = build_portmap(pairs, num_nodes=g.N, coalesce=True)
+
+
+
         shift = build_shift(pm)
+
     # Sim horizon / task
     sim_cfg = cfg.get("sim", {}) or {}
     if not isinstance(sim_cfg, dict):
@@ -1312,7 +1325,9 @@ def main():
 
     # Simple node features (degree + coord)
     N = g.N
-    deg_feat = g.degrees.to(dtype=dtype).unsqueeze(1)  # (N,1)
+    deg_out = (pm.node_ptr[1:] - pm.node_ptr[:-1]).to(device=device, dtype=dtype)  # (N,)
+    deg_feat = deg_out.unsqueeze(1)  # (N,1)
+
     coord1 = torch.arange(N, device=device, dtype=dtype).unsqueeze(1) / max(N - 1, 1)
     X = torch.cat([deg_feat, coord1], dim=1)  # (N,2)
 
