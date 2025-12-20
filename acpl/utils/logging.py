@@ -55,7 +55,7 @@ class MetricLoggerConfig:
 
     # key names / misc
     step_key: str = "step"
-    echo_plain: bool = True  # print to stdout even if TB/W&B are used
+    echo_plain: bool = False  # print to stdout even if TB/W&B are used
 
 
 class MetricLogger:
@@ -206,7 +206,7 @@ class MetricLogger:
             return
 
         # echo to stdout if requested (even when using TB/W&B)
-        if self.cfg.echo_plain or self.backend == "plain":
+        if self.cfg.echo_plain:
             self._emit_plain(f"[{step:08d}] {name}: {_to_builtin(value):.6f}")
 
         # backend-specific
@@ -238,7 +238,7 @@ class MetricLogger:
 
         flat = {f"{prefix}{k}": _to_builtin(v) for k, v in scalars.items()}
 
-        if self.backend != "off" and (self.cfg.echo_plain or self.backend == "plain"):
+        if self.backend != "off" and self.cfg.echo_plain:
             msg = " ".join([f"{k}={_to_builtin(v):.6f}" for k, v in flat.items()])
             self._emit_plain(
                 f"[{step:08d}] {msg}" if prefix == "" else f"[{step:08d}] {prefix} {msg}"

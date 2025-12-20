@@ -71,7 +71,10 @@ class TransferLossConfig:
     margin: float = 0.0  # only used for "hinge"
     reduce: Literal["mean", "sum"] = "mean"
     eps: float = 1e-8
-
+    # IMPORTANT: disambiguate 2D inputs.
+    # If P has shape (B, N) (batched terminal probs), set this to "batch".
+    # If P has shape (T, N) (time series), set this to "time".
+    input_2d: Literal["time", "batch"] = "time"
 
 def _ensure_targets_tensor(
     targets: int | Sequence[int] | torch.Tensor,
@@ -89,14 +92,19 @@ def _ensure_targets_tensor(
     return t
 
 
-def _to_btn(P: torch.Tensor) -> tuple[torch.Tensor, bool, bool]:
+def _to_btn(P: torch.Tensor, *, input_2d: Literal["time", "batch"] = "time") -> tuple[torch.Tensor, bool, bool]:
     """
     Normalize shape to (B, T, N). Return (P_btn, had_batch, had_time).
     """
     if P.ndim == 1:  # (N,)
         return P.unsqueeze(0).unsqueeze(0), False, False
-    if P.ndim == 2:  # (T, N)  OR  (B, N)
-        return P.unsqueeze(0), False, True
+    if P.ndim == 2:  # (T, N) OR (B, N) — ambiguous, must be specified
+        if input_2d == "time":
+            # (T, N) -> (1, T, N)
+            return P.unsqueeze(0), False, True
+        else:
+            # (B, N) -> (B, 1, N)
+            return P.unsqueeze(1), True, False
     if P.ndim == 3:  # (B, T, N)
         return P, True, True
     raise ValueError("P must be (N,), (T,N), (B,N) or (B,T,N).")
@@ -139,6 +147,7 @@ def prob_on_targets(
     P: torch.Tensor,  # (N,) | (T,N) | (B,N) | (B,T,N)
     targets: int | Sequence[int] | torch.Tensor,
     *,
+    input_2d: Literal["time", "batch"] = "time",
     time_agg: Literal["last", "mean", "max", "softmax"] = "last",
     tau: float = 0.2,
     eps: float = 1e-8,
@@ -151,11 +160,25 @@ def prob_on_targets(
         p_omega: (B,) success mass per batch element after time aggregation.
         P_bN:    (B, N) aggregated position probability per batch.
     """
-    P_btn, had_batch, _ = _to_btn(P)  # (B,T,N)
+    P_btn, had_batch, _ = _to_btn(P, input_2d=input_2d)  # (B,T,N)
     device = P_btn.device
     P_btn = normalize_prob(P_btn, dim=-1, eps=eps)
     P_bN = aggregate_over_time(P_btn, mode=time_agg, tau=tau)  # (B,N)
     t_idx = _ensure_targets_tensor(targets, device=device)
+    # IMPORTANT: a meaningful softmax-over-time should weight by *target success* per time,
+    # not by the full distribution tensor (which was your previous behavior).
+    if time_agg == "softmax":
+        if tau <= 0:
+            raise ValueError("tau must be positive for softmax aggregation.")
+        # s_bt = Pr(in targets at time t)  -> (B, T)
+        s_bt = P_btn.index_select(-1, t_idx).sum(dim=-1)
+        w_bt = torch.softmax(s_bt / float(tau), dim=1)  # (B, T)
+        P_bN = (w_bt.unsqueeze(-1) * P_btn).sum(dim=1)  # (B, N)
+    else:
+        P_bN = aggregate_over_time(P_btn, mode=time_agg, tau=tau)  # (B, N)
+
+
+
     p_omega = success_on_targets(P_bN, t_idx, dim=-1, reduction="none")  # (B,)
     return p_omega, P_bN
 
@@ -188,8 +211,8 @@ def _nll_smoothed(
         y_omega = (1.0 - smooth_eps) / K
         y.index_fill_(0, targets, y_omega + y[targets] - (smooth_eps / N))
     y = normalize_prob(y, dim=0, eps=eps)
-    P_bN = P_bN.clamp_min(eps)
-    ce = -(y.unsqueeze(0) * P_bN.log()).sum(dim=-1)  # (B,)
+    logP = (P_bN + eps).log()
+    ce = -(y.unsqueeze(0) * logP).sum(dim=-1)  # (B,)
     return ce
 
 
@@ -214,7 +237,7 @@ def loss_state_transfer(
     if cfg is None:
         cfg = TransferLossConfig()
 
-    P_btn, _, _ = _to_btn(P)  # (B,T,N)
+    P_btn, _, _ = _to_btn(P, input_2d=cfg.input_2d)  # (B,T,N)
     device = P_btn.device
     eps = float(cfg.eps)
 
@@ -222,8 +245,8 @@ def loss_state_transfer(
 
     # Aggregate over time, and get success per batch
     p_omega, P_bN = prob_on_targets(
-        P_btn, t_idx, time_agg=cfg.time_agg, tau=cfg.tau, eps=eps
-    )  # (B,), (B,N)
+        P_btn, t_idx, input_2d=cfg.input_2d, time_agg=cfg.time_agg, tau=cfg.tau, eps=eps
+     )  # (B,), (B,N)
 
     # --- build scalar loss per sample ---
     if cfg.loss == "neg_prob":
@@ -232,9 +255,9 @@ def loss_state_transfer(
         if cfg.label_smoothing and cfg.label_smoothing > 0.0:
             per = _nll_smoothed(P_bN, t_idx, eps=eps, smooth_eps=float(cfg.label_smoothing))
         else:
-            per = -(p_omega.clamp_min(eps).log())
+            per = -((p_omega + eps).log())  # (B,)
     elif cfg.loss == "cvar_nll":
-        per_nll = -(p_omega.clamp_min(eps).log())
+        per_nll = -((p_omega + eps).log())
         loss = cvar(per_nll, alpha=float(cfg.cvar_alpha), reduction="mean")
         with torch.no_grad():
             info = {

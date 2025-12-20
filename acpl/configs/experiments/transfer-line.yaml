@@ -1,6 +1,15 @@
 # Experiment 0) Pre-registration manifest — Transfer on line graphs
 goal: transfer
 
+
+train:
+  epochs: 50
+  batch_size: 1
+  episodes_per_epoch: 200
+  ci_n_seeds: 5
+  ci_episodes: 100
+
+
 data:
   family: line                # graph family
   train_sizes: [64, 96, 128, 160, 192]
@@ -10,13 +19,29 @@ data:
 sim:
   steps: [64, 96, 128]        # horizons (curriculum allowed)
 
+
+
 model:
   gnn: { kind: gcn, hidden: 64 }
   controller: { kind: gru, hidden: 64, layers: 1 }
   head: { hidden: 0 }
   time_pe_dim: 32
   coin:
-    family: su2               # degree-2 coins (OK for line/cycle)
+    family: su2
+    theta_scale: 1.0
+    theta_noise_std: 0.0
+                
+
+task:
+  target_index: -1        # last node on the line
+  loss: nll               # IMPORTANT: don't use neg_prob unless you know why
+  eps: 1.0e-8
+  target_radius: 3        # warm-start window: {target-3..target}
+  normalize_prob: true
+  reduce: mean
+  cvar_alpha: 0.1
+
+
 
 features:
   use_degree: true
@@ -28,8 +53,6 @@ optim:
   name: adam
   lr: 3.0e-3
   weight_decay: 0.0
-  batch_episodes: 32
-  epochs: 50
   grad_clip:
     enabled: true
     mode: norm
@@ -61,6 +84,9 @@ compute:
   wallclock_limit_min: 120
   max_memory_gb: 8
 
-logging:
+log:
+  backend: plain
+  interval: 50
   project: "acpl-experiments"
+  run_name: "transfer-line"
   notes: "Pre-registered: transfer on line graphs; SU2 coins; curriculum over T."

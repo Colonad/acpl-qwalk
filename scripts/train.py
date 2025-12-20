@@ -109,38 +109,30 @@ def _fmt_epoch_summary(epoch_idx: int, means: dict[str, float], lr: float) -> st
 # -------------------------------
 
 
-# Seeding (deterministic + flags)
 def _seed_everything(seed: int) -> None:
     """
-    Prefer acpl.utils.seeding (Phase B8) and fall back to a minimal implementation.
+    Prefer acpl.utils.seeding.seed_everything and fall back to a minimal implementation.
     """
     try:
         from acpl.utils import seeding as _seeding  # type: ignore
 
-        # new API (Phase B8): seed_everything handles python/numpy/torch + cudnn flags
         if hasattr(_seeding, "seed_everything"):
-            _seeding.seed_everything(seed=seed, deterministic=True, warn_only=True)
-            return
-        # older API variants
-        if hasattr(_seeding, "set_deterministic"):
-            _seeding.set_deterministic(seed)  # type: ignore
+            # Matches acpl/utils/seeding.py in your uploaded utils.
+            _seeding.seed_everything(seed=seed, deterministic=True)
             return
     except Exception:
         pass
 
     # Fallback (minimal)
     import random
-
     random.seed(seed)
     torch.manual_seed(seed)
     try:
-        import numpy as _np  # noqa: WPS433
-
+        import numpy as _np
         _np.random.seed(seed)
     except Exception:
         pass
     try:
-        # conservative flags for determinism
         torch.backends.cudnn.deterministic = True  # type: ignore[attr-defined]
         torch.backends.cudnn.benchmark = False  # type: ignore[attr-defined]
     except Exception:
@@ -159,12 +151,12 @@ class _NullTimer:
 
 def _time_block(label: str):
     """
-    Prefer acpl.utils.timers.time_block context manager if available.
+    Prefer acpl.utils.timers.record context manager if available.
     """
     try:
-        from acpl.utils.timers import time_block as _tb  # type: ignore
-
-        return _tb(label)
+        from acpl.utils.timers import record as _record  # type: ignore
+        # record(name, ...) returns a context manager
+        return _record(label)
     except Exception:
         return _NullTimer()
 
@@ -181,11 +173,18 @@ class _CheckpointShim:
         except Exception:
             self.ck = None
 
+
     def atomic_save(self, obj: dict, path: Path) -> None:
         if self._ok and hasattr(self.ck, "atomic_save"):
             self.ck.atomic_save(obj, path)  # type: ignore
         else:
-            torch.save(obj, path)
+            # atomic fallback: write temp then rename
+            import os
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            torch.save(obj, tmp)
+            os.replace(tmp, path)
+
+
 
     def save_train_state(self, path: Path, **state) -> None:
         # Phase B8 API if present, else plain save
@@ -758,22 +757,72 @@ def make_rollout_anydeg_exp_or_cayley(
     return rollout
 
 
-def make_transfer_loss(reduction: str = "mean", renorm: bool = True):
-    def loss_builder(P: torch.Tensor, aux: dict, batch: dict) -> torch.Tensor:
+def make_transfer_loss(
+    loss_kind: str = "nll",
+    reduction: str = "mean",
+    renorm: bool = True,
+    eps: float = 1e-8,
+    margin: float = 0.0,
+):
+    """
+    Returns a callable: loss_builder(P, aux) -> loss
+
+    P: (B, N) probability-like tensor (will be renormalized if renorm=True)
+    aux: dict that must contain 'targets' (LongTensor indices of target nodes)
+    """
+    lk = str(loss_kind).lower().strip()
+    red = str(reduction).lower().strip()
+
+    def loss_builder(P: torch.Tensor, aux: dict, batch: dict | None = None) -> torch.Tensor:
+        # ensure real + float
+        if isinstance(P, torch.Tensor) and P.is_complex():
+            P = P.real
+        P = P.to(dtype=torch.float32)
+
+        # renormalize into a simplex if requested
         if renorm:
             P = P / (P.sum(dim=-1, keepdim=True).clamp_min(1e-12))
+
         targets = aux.get("targets", None)
         if targets is None:
             raise ValueError("Transfer loss requires 'targets' in aux.")
-        mass = P.index_select(dim=-1, index=targets).sum(dim=-1)
-        if reduction == "mean":
-            return -(mass.mean())
-        elif reduction == "sum":
-            return -(mass.sum())
-        elif reduction == "none":
-            return -(mass)
+
+        # normalize targets to a 1D LongTensor on same device
+        if isinstance(targets, int):
+            targets = torch.tensor([targets], device=P.device, dtype=torch.long)
+        elif isinstance(targets, (list, tuple)):
+            targets = torch.tensor(list(targets), device=P.device, dtype=torch.long)
+        elif isinstance(targets, torch.Tensor):
+            if targets.ndim == 0:
+                targets = targets.view(1)
+            targets = targets.to(device=P.device, dtype=torch.long)
         else:
-            raise ValueError(f"Unknown reduction '{reduction}'")
+            raise TypeError(f"Unsupported targets type: {type(targets)}")
+
+        # total prob mass on target set
+        mass = P.index_select(dim=-1, index=targets).sum(dim=-1)  # (B,)
+
+        if lk == "nll":
+            # IMPORTANT: do not clamp_min before log; it kills gradients when mass < eps.
+            loss = -torch.log(mass + eps)
+        elif lk in ("neg_prob", "negprob", "prob"):
+            loss = -mass
+        elif lk == "hinge":
+            if targets.numel() != 1:
+                raise ValueError("hinge loss currently supports a single target.")
+            t = int(targets[0].item())
+            best_other = torch.cat([P[..., :t], P[..., t + 1 :]], dim=-1).max(dim=-1).values
+            loss = torch.relu(float(margin) - (mass - best_other))
+        else:
+            raise ValueError(f"Unknown transfer loss '{loss_kind}'")
+
+        if red == "mean":
+            return loss.mean()
+        if red == "sum":
+            return loss.sum()
+        if red == "none":
+            return loss
+        raise ValueError(f"Unknown reduction '{reduction}'")
 
     return loss_builder
 
@@ -1098,7 +1147,7 @@ def main():
     parser.add_argument("--lr", type=float, default=None, help="Override learning rate")
     parser.add_argument("--run_dir", type=str, default=None, help="Output directory")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint file or run dir")
-
+    parser.add_argument("--seed", type=int, default=None, help="Override RNG seed")
     parser.add_argument(
         "--ci_only",
         action="store_true",
@@ -1127,7 +1176,8 @@ def main():
     cfg = load_yaml(cfg_path)
     cfg = apply_overrides(cfg, unknown)
 
-
+    if args.seed is not None:
+        cfg["seed"] = int(args.seed)
     # ---------------- Coin family (resolve early; used in multiple places) ----------------
     coin_cfg = cfg.get("coin", {"family": "su2"}) or {}
     if not isinstance(coin_cfg, dict):
@@ -1231,14 +1281,16 @@ def main():
         print(f"[setup] normalized target_index {old} -> {target_index} (N={g.N})")
 
 
-    outdeg = (pm.node_ptr[1:] - pm.node_ptr[:-1]).tolist()
-    print(f"[debug] outdeg[0]={outdeg[0]} outdeg[target]={outdeg[target_index]} (target={target_index})")
+    # outdeg = (pm.node_ptr[1:] - pm.node_ptr[:-1]).tolist()
+    # print(f"[debug] outdeg[0]={outdeg[0]} outdeg[target]={outdeg[target_index]} (target={target_index})")
+    # (optional) outdegree sanity check removed (was noisy in logs)
 
 
-
-    reduction = task_cfg.get("reduction", "mean")
-    renorm = bool(task_cfg.get("renorm", True))
-
+    reduction = task_cfg.get("reduce", task_cfg.get("reduction", "mean"))
+    renorm = bool(task_cfg.get("normalize_prob", task_cfg.get("renorm", True)))
+    loss_kind = str(task_cfg.get("loss", "nll")).lower().strip()
+    eps = float(task_cfg.get("eps", 1e-8))
+    margin = float(task_cfg.get("margin", 0.0))
     # Model config (each subkey may also be a string; coerce to dicts)
     model_cfg = cfg.get("model", {}) or {}
     if not isinstance(model_cfg, dict):
@@ -1265,7 +1317,9 @@ def main():
     acpl_cfg = ACPLPolicyConfig(
         in_dim=2,
         gnn_hidden=int(gnn_cfg.get("hidden", 64)),
-        gnn_out=int(gnn_cfg.get("hidden", 64)),
+        gnn_out=int(gnn_cfg.get("out", gnn_cfg.get("hidden", 64))),
+
+
         gnn_activation="gelu",
         gnn_dropout=float(gnn_cfg.get("dropout", 0.0)),
         gnn_layernorm=True,
@@ -1384,7 +1438,11 @@ def main():
     epochs = int(args.epochs if args.epochs is not None else train_cfg.get("epochs", 1))
     batch_size = int(train_cfg.get("batch_size", 1))
     episodes_per_epoch = max(1, int(train_cfg.get("episodes_per_epoch", 200)))
-    targets = torch.tensor([target_index], dtype=torch.long, device=device)
+    # --- target window shaping (helps when P(target) starts ~0) ---
+    target_radius = int(task_cfg.get("target_radius", 0))  # e.g., 3 means {target-3..target}
+    lo = max(0, target_index - target_radius)
+    hi = min(g.N, target_index + target_radius + 1)
+    targets = torch.arange(lo, hi, device=device, dtype=torch.long)
 
     payload = {
         "X": X,
@@ -1416,6 +1474,8 @@ def main():
         theta_scale = float(coin_cfg.get("theta_scale", 1.0))
         theta_noise_std = float(coin_cfg.get("theta_noise_std", 0.0))
 
+        print(f"[setup] theta_scale={theta_scale} theta_noise_std={theta_noise_std}")
+
 
         rollout_fn = make_rollout_anydeg_exp_or_cayley(
             pm,
@@ -1428,7 +1488,13 @@ def main():
         )
 
         title_suffix = f"{coin_family.upper()} (any degree)"
-    loss_builder = make_transfer_loss(reduction=reduction, renorm=renorm)
+    loss_builder = make_transfer_loss(
+        loss_kind=loss_kind,
+        reduction=reduction,
+        renorm=renorm,
+        eps=eps,
+        margin=margin,
+    )
 
     # Logging — write JSONL under run_dir (works with TB/W&B too)
     log_cfg = cfg.get("log", {})
@@ -1456,13 +1522,14 @@ def main():
 
     loop_cfg = LoopConfig(
         device=str(device),
-        log_every=10**9,  # effectively disables per-batch logger prints
+        log_every=log_interval,  # uses log.interval from config
         grad_clip=max_norm,
         cvar_alpha=float(task_cfg.get("cvar_alpha", 0.1)),
         primary_on_targets=True,
-        progress_bar=True,  # <- show a single tqdm bar over the training batches
+        progress_bar=True,
         amp=amp_enabled,
     )
+
 
     # Optional resume (B8 atomic-aware)
     start_epoch = 0
@@ -1642,6 +1709,23 @@ def main():
                 "train/loss": float(loss.detach().item()),
                 "train/lr": float(lr),
             }
+
+            # raw target probability mass (mean over batch)
+            with torch.no_grad():
+                tt = aux["targets"]
+                if isinstance(tt, int):
+                    tt = torch.tensor([tt], device=P.device)
+                elif isinstance(tt, (list, tuple)):
+                    tt = torch.tensor(list(tt), device=P.device)
+                mass = P.index_select(dim=-1, index=tt).sum(dim=-1).mean().item()
+
+            m["train/target/mass"] = float(mass)
+            # log10 mass is easier to read when it's tiny
+            m["train/target/log10_mass"] = float(math.log10(max(mass, 1e-300)))
+
+
+
+
             # metric groups: mix/* and (if targets) target/*
             for name, fn in metric_pack.items():
                 scalars = fn(P.detach(), **aux)  # returns dict[str, float]
@@ -1667,6 +1751,14 @@ def main():
                 hooks={"after_forward": _collect_hook},  # <- collect, don't print
             )
 
+           # with torch.no_grad():
+           #     s = 0.0
+           #     for p in model.parameters():
+           #         if p.requires_grad:
+           #             s += float(p.abs().sum().item())
+           #     print(f"[debug] |params|_1 = {s:.6f}")
+
+           #  removed: debug param-norm print (kept training output clean)
         # ---- print one training summary line block before eval ----
         means = avg.means()
         try:
