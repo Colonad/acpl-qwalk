@@ -1,5 +1,14 @@
+# acpl/configs/task/mixing.yaml
+# =============================================================================
 # ACPL — Task config: FAST MIXING to uniform (minimize TV(P_T, U))
-# Works on grids/irregular graphs. Encourages flatter distributions at terminal time.
+#
+# IMPORTANT (current repo tooling):
+# - scripts/gen_manifest.py does NOT support multi-family experiments yet.
+#   Therefore, this task config defaults to grid-2d only.
+# - If you want irregular mixing, override:
+#     data.family=["irregular"]
+#   and use a dedicated experiment manifest (mixing-irregular.yaml).
+# =============================================================================
 
 task:
   name: mixing
@@ -8,46 +17,64 @@ task:
   normalized_time_feature: true
 
 data:
-  family: ["grid-2d", "irregular"]       # irregular: ER/WS/d-regular mixes from your dataset loader
+  # Default to a single family to keep manifests and eval protocol clean.
+  family: ["grid-2d"]                   # override to ["irregular"] for irregular-only mixing
+
   grid:
     L_min: 32
     L_max: 96
-    boundary: "periodic"
+    boundary: "periodic"                # open | periodic
+
+  # Irregular mixing block (disabled by default via data.family).
   irregular:
-    kind: ["er", "d-regular", "ws"]      # choose subsets in loader
+    kind: ["er", "d-regular", "ws"]
     n_min: 256
     n_max: 1024
+    ensure_connected: true
     p_or_k:
       er_p: [0.01, 0.05]
       dreg_d: [3, 6]
       ws_k: [4, 8]
       ws_beta: [0.1, 0.2]
+
   features:
     include_degree: true
+
+    # Laplacian positional encodings
     laplacian_pe:
       enabled: true
       k: 16
       sign_fix: "max-abs-positive"
+
+    # Grid coordinate features (x/L, y/L)
     coords:
       enabled_on_grids: true
+      normalize: true
+
   batching:
     episodes_per_graph: 1
-    graphs_per_batch: 2                  # bigger graphs → smaller batch
+    graphs_per_batch: 2                 # larger graphs => smaller batch
     shuffle: true
-  seed: 1338
+    seed: 1338
 
 loss:
-  kind: "tv_to_uniform"                  # L = TV(P_T, U) = 0.5 * ||P_T - 1/N||_1
-  uniform_target: "per-graph"            # uniform over active vertices per-graph
+  # L = TV(P_T, U) = 0.5 * ||P_T - 1/N||_1
+  kind: "tv_to_uniform"
+  uniform_target: "per-graph"
   reduction: "mean"
+  clamp_min_p: 1.0e-12                  # small floor for numerics when forming derived metrics
 
 regularization:
+  # Temporal smoothness + magnitude penalties on coin parameters θ(v,t)
   smooth_theta: 2.0e-3
   l2_theta: 1.0e-4
+
+  # Spectral penalty on θ time-series (low-pass bias)
   spectral:
     enabled: true
     dct_weight: 1.0e-4
-    hf_bins: 0.5                         # stronger HF damping for smooth mixing schedules
+    hf_bins: 0.5                        # stronger HF damping for smooth mixing schedules
+
   grad_clip_norm: 1.0
 
 training:
@@ -57,10 +84,13 @@ training:
     lr: 1.5e-4
     betas: [0.9, 0.999]
     weight_decay: 2.0e-4
+    eps: 1.0e-8
+
   scheduler:
     enabled: true
-    name: "cosine"
-    warmup_steps: 1000
+    name: "cosine_warmup"
+    warmup_steps: 1000                  # runner maps to cosine_warmup / cosine schedule
+
   epochs: 80
   steps_per_epoch: 400
   accum_steps: 1
@@ -68,14 +98,15 @@ training:
   device: "cuda"
   log_every: 50
   log_grad_norm_every: 200
+
   ckpt:
     dir: "checkpoints/mixing"
     keep_last: 5
     save_every_steps: 2000
-    save_best_metric: "eval/mix/tv"      # lower is better
+    save_best_metric: "eval/mix/tv"     # lower is better
 
 ppo:
-  enabled: false                         # mixing objective is differentiable (keep false)
+  enabled: false                        # mixing objective is differentiable
 
 eval:
   seeds: [301, 302, 303, 401, 402]
@@ -87,18 +118,22 @@ eval:
     - "mix/l2"
     - "mix/H"
     - "mix/kl_pu"
+
+  # Optional robustness tests for mixing (typically used in the EXPERIMENT manifest)
   robustness:
     enabled: true
     edge_phase:
-      sigma: 0.0                         # off by default; set >0 in robustness sweeps
+      sigma: 0.0                        # off by default; set >0 for disorder experiments
       trials: 0
 
 viz:
   pt_timelines:
     enabled: true
-    sample_vertices: 12                  # randomly chosen for timeline plots
+    sample_vertices: 12                 # random vertices for timeline plots
+
   tv_curves:
-    enabled: true
+    enabled: true                       # TV(P_t, U) vs t
+
   spectra:
     enabled: true
     dct_show_bins: 24

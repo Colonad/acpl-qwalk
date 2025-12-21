@@ -1,92 +1,401 @@
-# Experiment 0) Pre-registration manifest — Transfer on line graphs
-goal: transfer
+# acpl/configs/experiments/transfer-line.yaml
+# =============================================================================
+# ACPL — EXPERIMENT MANIFEST (Pre-registration)
+# Experiment: Transfer on Line Graphs
+#
+# Novelty claims this experiment supports:
+#   C1) Adaptive (node+time) coin policies (ACPL) outperform fixed/global/node-only
+#       baselines on IID and OOD line sizes, with CI-backed improvements.
+#   C2) Ablations show causality: removing PE/spatial/temporal adaptivity hurts.
+#   C3) OOD size generalization: train on N<=192, test on N=256 (and optional N=320).
+#   C4) Representation evidence: node embeddings are structured (variance/PCA), and
+#       correlate with distance-to-target / position along the line.
+#
+# Outputs must include:
+#   - CI metrics (eval_ci.json or eval_ci.jsonl)
+#   - Summary stats (eval_stats.json + eval_stats.txt)
+#   - Node embeddings bundle (pt/csv/pca plot/stats)
+#   - Plots: P_t(target) curves, P_T distribution, spectra of θ(t), etc.
+# =============================================================================
 
+experiment:
+  name: "transfer-line"
+  goal: "state transfer on line graphs"
+  description: >
+    Pre-registered experiment evaluating Adaptive Coin Policy Learning (ACPL) on
+    state transfer over 1D line graphs. Trains on a band of sizes and evaluates
+    both IID and OOD generalization. Includes strong baselines and ablations,
+    CI-style evaluation, and interpretability artifacts (node embeddings + variance).
+  tags: ["transfer", "line", "ood", "ablations", "baselines", "embeddings", "ci"]
+  notes: "SU(2) degree-2 coins; curriculum over horizon T; fixed val/test manifests."
 
-train:
-  epochs: 50
-  batch_size: 1
-  episodes_per_epoch: 200
-  ci_n_seeds: 5
-  ci_episodes: 100
+# -----------------------------------------------------------------------------
+# 0) Defaults / component wiring (Phase-B style)
+# -----------------------------------------------------------------------------
+# These act like Hydra defaults or simple pointers for your scripts to load:
+defaults:
+  task_config: "acpl/configs/task/transfer.yaml"
+  optim_config: "acpl/configs/optim.yaml"
 
+# -----------------------------------------------------------------------------
+# 1) Determinism + provenance
+# -----------------------------------------------------------------------------
+repro:
+  master_seed: 0
+  # Seeds for separate TRAIN runs (repeats). Minimum novelty-grade is 3.
+  train_seeds: [0, 1, 2]                # recommended: [0,1,2,3,4] for final report
+  # Seeds used inside CI evaluation routine (episode sampling, bootstrap, etc.).
+  eval_seeds: [101, 102, 103, 201, 202]
+  deterministic_torch: true
+  cublas_workspace_config: ":4096:8"
+  pythonhashseed: 0
+  save_git_info: true                   # save commit hash/dirty flag if available
+  save_resolved_config: true            # dump final merged YAML into run_dir
 
+# -----------------------------------------------------------------------------
+# 2) Data & split protocol (IID + OOD)
+# -----------------------------------------------------------------------------
 data:
-  family: line                # graph family
-  train_sizes: [64, 96, 128, 160, 192]
-  test_ood_sizes: [256]       # out-of-distribution test size
-  seed: 1234
+  family: "line"
 
+  # --- Training sampling policy ---
+  # You can train on a band or a fixed list. Fixed list is recommended for controlled
+  # comparisons; band is recommended for smooth scaling.
+  train_sizes:
+    mode: "fixed_list"                  # fixed_list | uniform_band
+    fixed_list: [64, 96, 128, 160, 192]
+    band:
+      N_min: 64
+      N_max: 192
+
+  # --- Validation (IID holdout) ---
+  # Must be disjoint from train sampling to prevent leakage.
+  val_sizes:
+    mode: "fixed_list"
+    fixed_list: [80, 112, 176]
+
+  # --- Test (IID and OOD) ---
+  test_iid_sizes:
+    mode: "fixed_list"
+    fixed_list: [96, 160]               # optional IID test
+
+  test_ood_sizes:
+    mode: "fixed_list"
+    fixed_list: [256]                   # primary OOD claim
+    extra_optional: [320]               # run if compute budget allows
+
+  # --- Episode / graph generation knobs ---
+  ensure_connected: true                # for line it's always connected; kept for schema uniformity
+  batching:
+    episodes_per_graph: 1
+    graphs_per_batch_train: 8           # line graphs are cheap
+    graphs_per_batch_eval: 4
+    shuffle_train: true
+
+  # --- Manifest locking (critical for novelty-grade evaluation) ---
+  manifests:
+    enabled: true
+    root_dir: "acpl/data/manifests"
+    # These files lock val/test episodes so CI is comparable across variants.
+    val_manifest: "transfer-line-val.json"
+    test_iid_manifest: "transfer-line-test-iid.json"
+    test_ood_manifest: "transfer-line-test-ood.json"
+    # Episode counts per split (per seed) for CI
+    episodes:
+      val: 200
+      test_iid: 200
+      test_ood: 300
+    # How manifests are built (deterministic)
+    build:
+      seed: 1234
+      # Episode key includes: (N, source_index, target_index_scheme, horizon_T, episode_seed)
+      # If horizon curriculum is used, you can either:
+      # (A) lock manifests per-horizon, or
+      # (B) lock graphs only and resample horizon-specific episodes deterministically.
+      horizon_policy: "per_horizon_manifest"     # per_horizon_manifest | graphs_only
+      per_horizon:
+        enabled: true
+        horizons: [64, 96, 128]
+      episode_seed_base: 900000                  # base offset for episode RNG
+
+# -----------------------------------------------------------------------------
+# 3) Simulation protocol (DTQW rollout + curriculum)
+# -----------------------------------------------------------------------------
 sim:
-  steps: [64, 96, 128]        # horizons (curriculum allowed)
+  # Curriculum is allowed but must be pre-registered.
+  curriculum:
+    enabled: true
+    schedule:
+      - horizon_T: 64
+        epochs: 20
+      - horizon_T: 96
+        epochs: 20
+      - horizon_T: 128
+        epochs: 30
+    # If disabled, use a single horizon (override task.horizon_T).
+  # If you want a single horizon run for ablations, keep curriculum same across all variants.
+  rollout:
+    # Controls numerical checks (optional)
+    check_unitarity: false              # enable for debugging; may slow down
+    check_simplex_every: 0              # 0=off; else every K steps in training loop
 
-
-
+# -----------------------------------------------------------------------------
+# 4) Model / policy specification (ACPL)
+# -----------------------------------------------------------------------------
 model:
-  gnn: { kind: gcn, hidden: 64 }
-  controller: { kind: gru, hidden: 64, layers: 1 }
-  head: { hidden: 0 }
-  time_pe_dim: 32
+  # Graph encoder
+  gnn:
+    kind: "gcn"                         # gcn | gat | gin | pna (if implemented)
+    layers: 3
+    hidden_dim: 64
+    dropout: 0.0
+    norm: "graphnorm"                   # none | batchnorm | layernorm | graphnorm
+    residual: true
+
+  # Temporal controller for θ(v,t)
+  controller:
+    kind: "gru"                         # gru | transformer | mlp
+    hidden_dim: 64
+    layers: 1
+    bidirectional: true                 # helps on symmetric line tasks
+    time_pe_dim: 32
+    normalized_time_feature: true
+
+  # Coin head maps node embedding + controller state -> θ parameters
+  head:
+    kind: "mlp"
+    hidden_dim: 0                       # 0 => linear head
+    activation: "gelu"
+
+  # Coin family mapping
   coin:
-    family: su2
+    family: "su2"                       # su2 (d=2). For mixed-degree tasks use exp/cayley.
     theta_scale: 1.0
-    theta_noise_std: 0.0
-                
+    theta_noise_std: 0.0                # optional exploration noise during training
+    # Optional: hard clamp on angles (kept for numerical safety)
+    clamp:
+      enabled: false
+      min: -3.14159
+      max: 3.14159
 
+# -----------------------------------------------------------------------------
+# 5) Task binding (ties into acpl/configs/task/transfer.yaml)
+# -----------------------------------------------------------------------------
 task:
-  target_index: -1        # last node on the line
-  loss: nll               # IMPORTANT: don't use neg_prob unless you know why
-  eps: 1.0e-8
-  target_radius: 3        # warm-start window: {target-3..target}
-  normalize_prob: true
-  reduce: mean
-  cvar_alpha: 0.1
+  # Use "last node" convention; many runners treat -1 as last index.
+  # If your pipeline normalizes target_index -1 -> N-1, keep it here.
+  source_index: 0
+  target_index: -1
+  target_radius: 3                      # warm-start window near target (if your builder supports it)
 
+  loss:
+    kind: "nll"                         # nll | cvar_nll | neg_prob | hinge
+    time_agg: "last"                    # last | mean | max | softmax
+    tau: 0.2
+    eps: 1.0e-8
+    label_smoothing: 0.0
+    cvar_alpha: 0.1
+    margin: 0.0
+    reduction: "mean"
+    normalize_prob: true
+    check_simplex: false
 
-
+# -----------------------------------------------------------------------------
+# 6) Features (inputs to policy)
+# -----------------------------------------------------------------------------
 features:
-  use_degree: true
-  pe:
-    kind: coord_1d            # simple 1D coordinate feature
-    note: "LapPE optional; coord_1d used for line"
+  include_degree: true
 
+  # 1D coordinate positional encoding for line:
+  coord_1d:
+    enabled: true
+    normalize: true                     # map i -> i/(N-1)
+    center: false                       # optional: (i - (N-1)/2)/((N-1)/2)
+
+  # Optional Laplacian PE (can be toggled for ablation)
+  laplacian_pe:
+    enabled: false                      # default off for line; turn on in a "LapPE" study
+    k: 16
+    sign_fix: "max-abs-positive"
+
+# -----------------------------------------------------------------------------
+# 7) Optimization / regularization (can map to acpl/configs/optim.yaml)
+# -----------------------------------------------------------------------------
 optim:
-  name: adam
+  name: "adam"
   lr: 3.0e-3
   weight_decay: 0.0
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+
   grad_clip:
     enabled: true
-    mode: norm
+    mode: "norm"                        # norm | value
     max_norm: 1.0
+
   regularizers:
-    temporal_smoothness: 0.0
+    temporal_smoothness: 0.0            # start at 0 for transfer-line; turn on in stability study
     magnitude: 0.0
+    spectral:
+      enabled: false                    # off by default for line; enable in "smooth schedule" study
+      dct_weight: 0.0
+      hf_bins: 0.25
+
   scheduler:
-    kind: none
+    kind: "none"
 
-randomness:
-  master_seed: 0
-  split_routing: "by_run_seed"
-  seeds_per_run: 3
+# -----------------------------------------------------------------------------
+# 8) Baselines & ablations (MANDATORY for novelty)
+# -----------------------------------------------------------------------------
+comparisons:
+  # --- Baselines ---
+  # Each baseline should run on the SAME manifests and evaluation protocol.
+  baselines:
+    - name: "fixed_hadamard"
+      enabled: true
+      description: "Standard fixed Hadamard coin everywhere, all times."
+    - name: "fixed_grover"
+      enabled: false
+      description: "Grover diffusion coin (mostly relevant for regular graphs, optional for line)."
+    - name: "global_time_coin"
+      enabled: true
+      description: "θ(t) learned but shared across nodes (time-adaptive only)."
+    - name: "node_only_coin"
+      enabled: true
+      description: "θ(v) learned but constant over time (spatial-adaptive only)."
+    - name: "random_fixed_coin"
+      enabled: true
+      description: "Seeded random fixed SU(2) coin, sanity baseline."
 
-baselines:
-  fixed_hadamard: true
-  fixed_grover: false
-  global_time_varying_coin: true
-  analytical_skw_akr: false
+  # --- Ablations (causal story) ---
+  ablations:
+    - name: "nope"
+      enabled: true
+      description: "Remove positional encodings; keep degree feature."
+    - name: "globalcoin"
+      enabled: true
+      description: "Force θ(v,t)=θ(t) even for ACPL model."
+    - name: "timefrozen"
+      enabled: true
+      description: "Force θ(v,t)=θ(v) (no temporal adaptivity)."
+    - name: "nodepermute"
+      enabled: true
+      description: "Permutation equivariance sanity test."
 
-success:
-  transfer_threshold: 0.90     # e.g., mean P_T[target] on line >= 0.9
-  ci_improvement_eps: 0.02     # pooled CI must improve by at least ε when claimed
+# -----------------------------------------------------------------------------
+# 9) Evaluation protocol (CI + plots + stats + embeddings)
+# -----------------------------------------------------------------------------
+eval:
+  enabled: true
 
+  ci:
+    alpha: 0.1
+    # “ci_n_seeds” means evaluation repeats with different eval_seeds (not training seeds).
+    # Training seed repeats are handled separately in repro.train_seeds.
+    n_eval_seeds: 5
+    episodes_per_seed:
+      val: 100
+      test_iid: 100
+      test_ood: 150
+    method: "bootstrap"                 # bootstrap | t_interval (if implemented)
+    bootstrap:
+      n_resamples: 2000
+      block_by: "episode"               # episode | graph (if multiple episodes per graph)
+
+  metrics:
+    # Primary transfer metrics
+    - "target/success"
+    - "target/maxp"
+    - "target/nll"
+    # Context distribution metrics (helpful novelty narrative: sharp vs mixed)
+    - "mix/tv"
+    - "mix/H"
+
+  # Robustness hooks (off for transfer-line by default, but supported)
+  robustness:
+    enabled: false
+    edge_phase:
+      sigma_grid: [0.0, 0.05, 0.1]
+      trials: 8
+
+  # --- Artifact contract ---
+  artifacts:
+    write_dir: "eval"                   # under run_dir
+    write_ci: true
+    write_per_seed: true
+    write_tables: true                  # writes eval_stats.txt + Markdown summary table
+    write_json: true                    # stats JSON, per-seed JSON, run card
+
+    stats:
+      enabled: true
+      quantiles: [0.05, 0.25, 0.5, 0.75, 0.95]
+      include_probability_checks: true
+      include_unitarity_checks: false   # enable if you log unitarity drift
+      include_time_series: true         # stores summary of P_t(target) curves
+
+    embeddings:
+      enabled: true
+      # Which layer’s embeddings:
+      source: "gnn"                     # gnn | controller | head | auto
+      aggregate_time: "last"            # last | mean
+      max_nodes_for_plot: 256           # line OOD N=256: plot all; for larger, subsample
+      pca:
+        enabled: true
+        n_components: 2
+      color_by:
+        - "coord_1d"
+        - "distance_to_target"
+        - "degree"
+      save:
+        raw_pt: true
+        raw_csv: true
+        pca_csv: true
+        pca_png: true
+        stats_json: true
+
+    plots:
+      enabled: true
+      # Transfer-specific plots
+      pt_target_curve: true             # plot p_t(target) over time (mean ± CI)
+      final_distribution: true          # plot P_T over nodes
+      theta_spectra: true               # DCT/FFT spectrum of θ(t) (supports smoothness claims)
+      # generic
+      tv_curve: true
+
+# -----------------------------------------------------------------------------
+# 10) Success criteria (pre-registered thresholds)
+# -----------------------------------------------------------------------------
+success_criteria:
+  # Example claim: “mean terminal success on OOD >= 0.90”
+  transfer_threshold:
+    metric: "target/success"
+    split: "test_ood"
+    threshold: 0.90
+
+  # Claim improvement margin for novelty statements:
+  ci_improvement:
+    metric: "target/success"
+    split: "test_ood"
+    min_abs_improvement: 0.02           # ACPL CI should beat best baseline by ≥ ε
+
+  # Optional: if you use NLL, require NLL decrease too
+  nll_sanity:
+    metric: "target/nll"
+    split: "test_ood"
+    max_value: 0.20                     # example; adjust after initial pilot
+
+# -----------------------------------------------------------------------------
+# 11) Compute budget + resource constraints
+# -----------------------------------------------------------------------------
 compute:
-  device: auto                 # cuda if available, else cpu
-  dtype: float32
+  device: "auto"                        # auto | cuda | cpu
+  dtype: "float32"
+  amp: true
   wallclock_limit_min: 120
   max_memory_gb: 8
-
-log:
-  backend: plain
-  interval: 50
-  project: "acpl-experiments"
-  run_name: "transfer-line"
-  notes: "Pre-registered: transfer on line graphs; SU2 coins; curriculum over T."
+  # Optional: for reproducible throughput measurements
+  track_throughput: true
+  profile:
+    enabled: false
+    warmup_steps: 50
+    profile_steps: 100

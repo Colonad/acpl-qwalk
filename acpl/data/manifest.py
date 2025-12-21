@@ -615,13 +615,14 @@ class EpisodeCache(Generic[K, V]):
                 # Fallback: repr-based (less strict but stable enough in practice)
                 blob = repr((args, sorted(kwargs.items(), key=lambda kv: kv[0])))
             # Namespacing by function identity to avoid collisions across different memoized functions
-            return blob + "|" + getattr(fn, "__qualname__", getattr(fn, "__name__", "fn"))  # type: ignore
-
+            # Function identity is appended inside `deco(fn)` where `fn` is defined.
+            return blob  # type: ignore[return-value]
         key_fn_local = key_fn or _default_key_fn
 
         def deco(fn: Callable[..., V]) -> Callable[..., V]:
             def wrapped(*args: Any, **kwargs: Any) -> V:
                 k = key_fn_local(*args, **kwargs)
+                k = f"{k}|{getattr(fn, '__qualname__', getattr(fn, '__name__', 'fn'))}"
                 return self.get_or_create(
                     k,
                     lambda _k: fn(*args, **kwargs),
@@ -734,13 +735,21 @@ def make_eval_manifest(
         raise ValueError("make_eval_manifest only supports 'val' and 'test'.")
 
     cfg = _normalize_config(config)
-    # Respect per-split knobs when previewing graph/task choices
+    if int(count) < 0:
+        raise ValueError("count must be >= 0")
+
+    # Respect per-split knobs when previewing graph/task choices.
+    # NOTE: EpisodeGenerator is instantiated with `split=...`, so any split-specific
+    # graph/task distributions are honored when we compute family/size metadata below.
     gen = EpisodeGenerator(cfg, split=split)
 
-    # Ensure desired count is honored by configuring generator's split_counts
-    # (so export_eval_index size is deterministic and capped).
-    pairs = gen.export_eval_index(split)  # already respects split_counts in generator
-
+    # Deterministically generate the requested number of eval indices.
+    # `EpisodeGenerator.export_eval_index` guarantees self-consistency:
+    #   episode_seed == derive_seed(manifest_hex, split, global_idx)
+    pairs = gen.export_eval_index(split, count=int(count))
+    if len(pairs) != int(count):
+        raise RuntimeError(f"export_eval_index returned {len(pairs)} entries (expected {int(count)})")
+ 
     base = Path(out_dir) / gen.manifest_hexdigest
     _ensure_dir(base)
     jsonl_path = base / f"{split}.jsonl"
@@ -909,7 +918,10 @@ def _cli(argv: Sequence[str]) -> int:
     args = ap.parse_args(argv)
 
     cfg = _load_config(args.config)
-    # Ensure the generator will materialize exactly 'count' items for the split
+    # Keep count in the config as a convenience hint (EpisodeGenerator will consult
+    # manifest["split_counts"] if export_eval_index(count=...) is not provided). We *also*
+    # pass `count` explicitly to make_eval_manifest, which is the source of truth for CLI.
+
     cfg = dict(cfg)
     sc = dict(cfg.get("split_counts", {}))
     sc[args.split] = int(args.count)

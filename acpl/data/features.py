@@ -491,8 +491,14 @@ def _maybe_bits_from_coords(coords: torch.Tensor) -> torch.Tensor:
     """
     If coords look like {0,1}^n (n>=1), return them as bitstrings; else return empty.
     """
-    if coords is None or coords.numel() == 0:
-        return torch.zeros(0, 0, device=coords.device if coords is not None else "cpu")
+    if coords is None:
+        return torch.zeros(0, 0, dtype=torch.float32, device="cpu")
+    # Preserve batch dimension even if coords have 0 columns.
+    if coords.ndim != 2:
+        raise ValueError("coords must be 2D (N,C)")
+    N, C = coords.shape
+    if C == 0 or coords.numel() == 0:
+        return torch.zeros(N, 0, dtype=torch.float32, device=coords.device)
     N, C = coords.shape
     if C == 0:
         return torch.zeros(N, 0, dtype=torch.float32, device=coords.device)

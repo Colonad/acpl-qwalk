@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from hashlib import blake2b
 import json
 import math
+import os
+from .splits import route_triplet, default_phase_b2_rules
 import threading
 import time
 from typing import Any, Literal, TypeAlias
@@ -234,7 +236,8 @@ def _build_graph_from_config(
 
     # GRID (LxL – our graphs.py uses grid_graph(L, Ly=None))
     if fam == "grid":
-        L = int(cfg.get("L", int(math.sqrt(cfg.get("num_nodes", 64))) or 8))
+        nn = cfg.get("num_nodes", cfg.get("N", 64))
+        L = int(cfg.get("L", int(math.sqrt(nn)) or 8))
         Ly = int(cfg.get("Ly", L))
         ei, deg, coords, ptr = grid_graph(L, Ly, seed=int(rng.integers(0, 2**31)))
         return _torch_to_numpy(ei, deg, coords, ptr)
@@ -321,7 +324,8 @@ def _spec_from_manifest(manifest: Mapping[str, Any]) -> FeatureSpec:
         use_lap_pe=bool(f.get("use_lap_pe", False)),
         lap_pe_k=int(f.get("lap_pe_k", 0)),
         lap_pe_norm=str(f.get("lap_pe_norm", "sym")),
-        lap_pe_random_sign=bool(f.get("lap_pe_random_sign", True)),
+        # Deterministic by default (matches FeatureSpec + features.py docstring)
+        lap_pe_random_sign=bool(f.get("lap_pe_random_sign", False)),
         use_rwse=bool(f.get("use_rwse", False)),
         rwse_K=int(f.get("rwse_K", 0)),
         build_arcs=False,  # arc features not needed by policy here
@@ -478,12 +482,23 @@ class EpisodeGenerator:
         self._manifest_raw = dict(manifest)
         self._manifest_hex = _stable_hexdigest(self._data_affecting_view(self._manifest_raw))
         self._manifest_hexdigest = self._manifest_hex  # alias to avoid AttributeError
-        self._router_master_seed = 0  # harmless default used by export_eval_jsonl if ever called
+        # ---- Phase B2 canonical router config (triplet router) ----
+        router_cfg = self._manifest_raw.get("router", self._manifest_raw.get("split_router", {}))
+        if not isinstance(router_cfg, Mapping):
+            router_cfg = {}
+
+        self._router_master_seed = int(
+            router_cfg.get("master_seed", self._manifest_raw.get("router_master_seed", 0)) or 0
+        )
+
+        rules = router_cfg.get("rules", None)
+        self._router_rules: Mapping[str, Any] = rules if isinstance(rules, Mapping) else default_phase_b2_rules()
         self._cache = cache or EpisodeLRUCache(
             capacity_bytes=cache_capacity_bytes, ttl_seconds=cache_ttl_seconds
         )
-        self._eval_index_cache: dict[SplitName, list[tuple[int, int]]] = {}
-
+        # Cache for CI eval index lists (keyed by (split, count, base_offset)).
+        self._eval_index_cache: dict[tuple[SplitName, int, int], list[tuple[int, int]]] = {}
+ 
     # ---------------- Public API ----------------
 
     @property
@@ -501,11 +516,20 @@ class EpisodeGenerator:
             if hit is not None:
                 return hit
 
-        seed = _derive_episode_seed(self._manifest_hex, self._split, int(index))
-        rng = np.random.Generator(np.random.PCG64(seed))
+        gidx = int(index)
 
-        # Concrete graph config for this episode
-        g_cfg = self._materialize_graph_config(self._manifest_raw, rng=rng)
+        # Canonical routing (global index -> split, ep_seed, cfg/task)
+        routed_split, ep_seed, g_cfg, task, _base_seed = self._route_triplet_for_global(gidx)
+        if routed_split != self._split:
+            raise ValueError(
+                f"Global episode index {gidx} routes to split={routed_split!r}, "
+                f"but this generator is split={self._split!r}. "
+                f"Use export_eval_index(split=..., ...) (or your sampler) to pick indices for a split."
+            )
+
+        # Episode RNG: drive graph realization, ψ0 randomization, noise sampling, etc.
+        rng = np.random.Generator(np.random.PCG64(int(ep_seed)))
+
         # Build graph (as NumPy arrays)
         edge_index, degrees, coords, arc_ptr = _build_graph_from_config(
             g_cfg, seed=int(rng.integers(0, 2**31))
@@ -514,12 +538,11 @@ class EpisodeGenerator:
         A = int(edge_index.shape[1])
         assert arc_ptr.shape[0] == N + 1, "arc_slices must be (N+1,) CSR pointer"
 
-        # PortMap (portable) from oriented arcs + CSR pointer we already have
+        # PortMap (portable)
         pm = _portable_portmap_from_oriented(edge_index, arc_ptr, N)
 
-        # Node features via FeatureSpec
+        # Node features (same as before)
         spec = _spec_from_manifest(self._manifest_raw)
-        # These builders are torch-based; convert to torch for feature building, then back.
         if torch is None:
             raise RuntimeError("Torch is required for building features in this project.")
         t_edge = torch.from_numpy(edge_index)
@@ -528,11 +551,8 @@ class EpisodeGenerator:
         X_t, _ = build_node_features(t_edge, t_deg, t_coords, spec=spec)
         feats = X_t.detach().cpu().numpy().astype(np.float32, copy=False)
 
-        # Task & ψ0
-        task = self._materialize_task(N=N, rng=rng)
+        # ψ0 + noise using episode RNG
         psi0 = self._build_initial_state(task, pm=pm, coords=coords, rng=rng)
-
-        # Noise recipe (sample parameters but do not mutate the graph/state here)
         noise = self._sample_noise(self._manifest_raw.get("noise", {}), A=A, rng=rng)
 
         ep = EpisodeNP(
@@ -552,7 +572,7 @@ class EpisodeGenerator:
             psi0=psi0.astype(np.complex64, copy=False),
             noise=noise,
             task=task,
-            rng_seed=int(seed),
+            rng_seed=int(ep_seed),
             manifest_hexdigest=self._manifest_hex,
         )
 
@@ -639,7 +659,7 @@ class EpisodeGenerator:
     @staticmethod
     def _choose_from_split_field(field: Any, *, split: SplitName, rng: np.random.Generator) -> Any:
         """
-        Resolve a manifest value that can be:
+        Resolve a manifeseed = _derive_episode_seed(self._manifest_hex, self._split, int(index))st value that can be:
           • scalar,
           • a {split: value} mapping,
           • a list/tuple to sample from,
@@ -660,6 +680,158 @@ class EpisodeGenerator:
                 continue
             # Scalar / terminal
             return value
+
+
+    # ---- Phase B2: canonical (global) materialization + triplet routing ----
+
+    @staticmethod
+    def _choose_global_field(field: Any, *, rng: np.random.Generator) -> Any:
+        """
+        Like _choose_from_split_field, but DOES NOT depend on self._split.
+        If the field is a {train/val/test/all: ...} mapping, pick a stable canonical branch
+        (all > train > val > test). Otherwise behave like normal sampling (lists/tuples).
+        """
+        value = field
+        while True:
+            if isinstance(value, Mapping):
+                keys = set(value.keys())
+                split_keys = {"train", "val", "test", "all"}
+                if keys and keys.issubset(split_keys):
+                    if "all" in value:
+                        value = value["all"]
+                        continue
+                    if "train" in value:
+                        value = value["train"]
+                        continue
+                    if "val" in value:
+                        value = value["val"]
+                        continue
+                    value = value.get("test")
+                    continue
+                # non split-map: terminal for this unwrapping step
+                return value
+
+            if isinstance(value, (list, tuple)):
+                if not value:
+                    raise ValueError("Empty list in manifest field.")
+                value = value[int(rng.integers(0, len(value)))]
+                continue
+
+            return value
+
+    def _materialize_graph_config_global(
+        self, m: Mapping[str, Any], *, rng: np.random.Generator
+    ) -> dict[str, Any]:
+        cfg: dict[str, Any] = {}
+        cfg["family"] = str(self._choose_global_field(m.get("family", "line"), rng=rng)).lower()
+
+        for k in (
+            "num_nodes",
+            "N",
+            "L",
+            "Ly",
+            "n",
+            "p",
+            "d",
+            "k",
+            "kx",
+            "ky",
+            "beta",
+            "radius",
+            "dim",
+            "torus",
+            "degree_preserving",
+        ):
+            if k in m:
+                cfg[k] = self._choose_global_field(m.get(k), rng=rng)
+
+        if "graph_params" in m and isinstance(m["graph_params"], Mapping):
+            for k, v in m["graph_params"].items():
+                cfg.setdefault(k, self._choose_global_field(v, rng=rng))
+
+        return cfg
+
+    def _materialize_task_global(self, *, N: int, rng: np.random.Generator) -> dict[str, Any]:
+        m = self._manifest_raw
+        name = str(self._choose_global_field(m.get("task", "transfer"), rng=rng)).lower()
+        T = int(self._choose_global_field(m.get("T", max(64, N)), rng=rng))
+
+        params: dict[str, Any] = {}
+        if isinstance(m.get("task_params"), Mapping):
+            for k, v in m["task_params"].items():
+                params[k] = self._choose_global_field(v, rng=rng)
+
+        if name == "transfer":
+            src = int(params.get("source", 0))
+            tgt = int(params.get("target", N - 1))
+            return {"name": "transfer", "source": max(0, min(N - 1, src)), "target": max(0, min(N - 1, tgt)), "T": T}
+
+        if name == "search":
+            marks = params.get("marks")
+            if not isinstance(marks, Iterable):
+                marks = [int(rng.integers(0, N))]
+            marks = sorted({int(max(0, min(N - 1, x))) for x in marks})
+            return {"name": "search", "marks": marks, "T": T}
+
+        if name == "mixing":
+            return {"name": "mixing", "T": T}
+
+        if name == "robust":
+            tgt = int(params.get("target", N - 1))
+            return {"name": "robust", "target": max(0, min(N - 1, tgt)), "T": T, "noise": params.get("noise", {})}
+
+        return {"name": name, "T": T, **params}
+
+    def _route_triplet_for_global(
+        self, gidx: int
+    ) -> tuple[SplitName, int, dict[str, Any], dict[str, Any], int]:
+        """
+        Canonical Phase B2 routing:
+          global index gidx -> (split, ep_seed, cfg, task, base_seed)
+        """
+        g = int(gidx)
+        if g < 0:
+            raise ValueError("global episode index must be >= 0")
+
+        base_seed = self._canonical_seed_for_global(g)
+
+        # Coarse identity (cfg/task) from base_seed (independent of split)
+        rng0 = np.random.Generator(np.random.PCG64(int(base_seed)))
+        cfg = self._materialize_graph_config_global(self._manifest_raw, rng=rng0)
+
+        # Infer N for task materialization (matches _make_cfg_task_for_global logic)
+        N = None
+        if "num_nodes" in cfg:
+            N = int(cfg["num_nodes"])
+        elif "N" in cfg:
+            N = int(cfg["N"])
+        elif "L" in cfg:
+            L = int(cfg["L"])
+            Ly = int(cfg.get("Ly", L))
+            N = int(L * Ly)
+        elif "n" in cfg and str(cfg.get("family", "")).lower() == "hypercube":
+            N = 2 ** int(cfg["n"])
+        else:
+            N = 64
+
+        task = self._materialize_task_global(N=int(N), rng=rng0)
+
+        fam, size_kv = self._family_and_size_kv(cfg)
+        tname = str(task.get("name", "transfer")).lower()
+
+        split, ep_seed = route_triplet(
+            family=fam,
+            size_kv=size_kv,
+            task=tname,
+            base_seed=int(base_seed),
+            episode_id=g,
+            rules=self._router_rules,
+            master_seed=int(self._router_master_seed),
+        )
+        return split, int(ep_seed), cfg, task, int(base_seed)
+
+
+
 
     def _materialize_graph_config(
         self, m: Mapping[str, Any], *, rng: np.random.Generator
@@ -911,6 +1083,12 @@ class EpisodeGenerator:
         if e > s:
             amp = 1.0 / math.sqrt(float(e - s))
             psi[pm.node_arcs[s:e]] = amp + 0.0j
+        else:
+            # Source has no outgoing arcs (isolated node). Fall back to uniform over arcs.
+            if A > 0:
+                amp = 1.0 / math.sqrt(float(A))
+                psi[:] = amp + 0.0j
+
         return psi
 
     @staticmethod
@@ -936,34 +1114,91 @@ class EpisodeGenerator:
         return out
 
     # ---------------- CI reproducibility exports (new) ----------------
-    def export_eval_index(self, split: SplitName) -> list[tuple[int, int]]:
+    def export_eval_index(
+        self,
+        split: SplitName,
+        *,
+        count: int | None = None,
+        
+        base_offset: int | None = None,
+    ) -> list[tuple[int, int]]:
         """
-        Return a deterministic list of (global_idx, episode_seed) for 'val' or 'test'.
-        NOTE: This helper is CI-only; it does NOT depend on _mat_indices.
+        Return a deterministic list of (global_idx, episode_seed) pairs for CI-style evaluation.
+
+        Parameters
+        ----------
+        split:
+            Must be "val" or "test".
+        count:
+            Number of indices to generate. If None, we attempt to read:
+                manifest["split_counts"][split]
+            and fall back to 64 (val) / 128 (test).
+        base_offset:
+            Optional additive offset used to generate "global_idx" values:
+                global_idx = base_offset + i
+            If None, a stable offset is derived from the manifest hex digest.
+
+        Important invariants
+        --------------------
+        * `global_idx` is the *index you should pass into* `EpisodeGenerator.episode(global_idx)`.
+        * `episode_seed` is **exactly** `_derive_episode_seed(manifest_hex, split, global_idx)`.
+
+        This makes the eval manifest self-consistent: you can always regenerate the same
+        episode from (manifest_hex, split, global_idx) and obtain the stored episode_seed.
+
+        Notes
+        -----
+        - This helper is CI-only: it does *not* depend on `_mat_indices` (the training sampler).
+        - We intentionally keep the "global_idx" space shifted by a manifest-derived base
+          offset so indices from different manifests do not trivially collide when you
+          concatenate multiple eval lists.
         """
-        if split not in ("val", "test"):
-            raise ValueError("export_eval_index only supports 'val' and 'test'.")
-        cached = self._eval_index_cache.get(split)
+        if split not in ("train", "val", "test"):
+            raise ValueError("split must be 'train', 'val', or 'test'.")
+
+        # Resolve count (priority: explicit arg > manifest["split_counts"] > defaults)
+        if count is None:
+            sc = self._manifest_raw.get("split_counts", {})
+            if isinstance(sc, Mapping) and split in sc:
+                try:
+                    count = int(sc[split])
+                except Exception:
+                    count = None
+        if count is None:
+            count = 64 if split == "val" else 128
+
+        count_i = int(count)
+        if count_i < 0:
+            raise ValueError("count must be >= 0")
+
+        # Resolve base offset
+        if base_offset is None:
+            base_offset = int(int(self._manifest_hex[:16], 16) % (2**31 - 1))
+        base_i = int(base_offset)
+
+        key = (split, count_i, base_i)
+        cached = self._eval_index_cache.get(key)
         if cached is not None:
             return list(cached)
 
-        # Deterministic, small default: 64 items for val, 128 for test
-        need = 64 if split == "val" else 128
         out: list[tuple[int, int]] = []
-        # Use the manifest hash to derive a canonical stream of global indices
-        base = int(int(self._manifest_hex[:16], 16) % (2**31 - 1))
-        for gidx in range(need):
-            ep_seed = _derive_episode_seed(self._manifest_hex, split, gidx)
-            out.append((gidx + base, ep_seed))
-        self._eval_index_cache[split] = out
-        return list(out)
+        g = int(base_i)
+        while len(out) < count_i:
+            routed_split, ep_seed, _cfg, _task, _base_seed = self._route_triplet_for_global(g)
+            if routed_split == split:
+                out.append((g, int(ep_seed)))
+            g += 1
 
+        self._eval_index_cache[key] = out
+        return list(out)
     def export_eval_jsonl(
         self,
         *,
         split: SplitName,
         out_dir: str | bytes | os.PathLike,
         overwrite: bool = False,
+        count: int | None = None,
+        base_offset: int | None = None,
     ) -> tuple[str, str]:
         """
         Materialize the eval list and write to JSONL at:
@@ -979,12 +1214,14 @@ class EpisodeGenerator:
         from pathlib import Path
 
         # Build entries (without constructing episodes)
-        pairs = self.export_eval_index(split)
+        pairs = self.export_eval_index(split, count=count, base_offset=base_offset)
         entries = []
         for gidx, epseed in pairs:
-            base_seed = self._canonical_seed_for_global(gidx)
-            cfg, task = self._make_cfg_task_for_global(gidx)
+            routed_split, ep_seed2, cfg, task, base_seed = self._route_triplet_for_global(gidx)
+            if routed_split != split:
+                raise ValueError(f"export_eval_jsonl: index {gidx} routed to {routed_split}, expected {split}")
             fam, size_kv = self._family_and_size_kv(cfg)
+
             entries.append(
                 {
                     "manifest_hex": self._manifest_hex,

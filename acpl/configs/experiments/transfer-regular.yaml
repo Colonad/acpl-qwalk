@@ -1,146 +1,347 @@
-# ============================================================
+# acpl/configs/experiments/transfer-regular.yaml
+# =============================================================================
+# ACPL — EXPERIMENT MANIFEST (Pre-registration)
 # Experiment: transfer-regular
-# Goal: Transfer to a fixed target on d-regular random graphs.
-# ============================================================
+# Goal: State transfer on d-regular random graphs (mixed structure; any-degree coins).
+#
+# Novelty claims this experiment supports:
+#   T1) Node+time-adaptive coin policies (ACPL) outperform global/time-only baselines
+#       on regular graphs where geometry is nontrivial (CI-backed).
+#   T2) OOD generalization in graph size: train N<=192, test N=256.
+#   T3) Graph-distribution robustness: evaluate across random graph draws and seeds.
+#   T4) Ablations: remove node adaptivity / time adaptivity / LapPE / smoothness to show causality.
+#   T5) Interpretability: node embeddings + variance/statistics correlate with success/failure regimes.
+#
+# SINGLE-FAMILY (regular) to match scripts/gen_manifest.py constraints.
+# =============================================================================
 
-# -----------------------
-# 0) Goal & task
-# -----------------------
-task:
-  name: transfer          # {transfer | search | mixing | robust}
-  target_index: -1        # g.N-1 by default (set explicitly at runtime if desired)
-  reduction: mean         # mean loss across episodes
-  renorm: true            # renormalize final distribution before scoring
-  cvar_alpha: 0.1
+experiment:
+  name: "transfer-regular"
+  goal: "transfer to fixed target on d-regular random graphs"
+  description: >
+    Pre-registered evaluation of ACPL for state transfer on d-regular random graphs.
+    Uses any-degree coin parameterizations (exp/cayley) and compares against global
+    baselines and ablations. Reports IID and OOD size generalization.
+  tags: ["transfer", "regular", "ood", "ablations", "baselines", "ci", "embeddings", "stats"]
+  notes: >
+    Regular graphs remove geometric shortcuts present in lines/grids; successful transfer
+    requires learned, structure-sensitive coin schedules. Evaluation uses frozen manifests.
 
-# -----------------------
-# 1) Graph family & sizes
-# -----------------------
+defaults:
+  task_config: "acpl/configs/task/transfer.yaml"
+  optim_config: "acpl/configs/optim.yaml"
+
+# -----------------------------------------------------------------------------
+# Reproducibility
+# -----------------------------------------------------------------------------
+repro:
+  master_seed: 1234
+  train_seeds: [0, 1, 2, 3, 4]          # novelty-grade; can reduce if compute tight
+  eval_seeds: [111, 112, 113, 211, 212]
+  deterministic_torch: true
+  cublas_workspace_config: ":4096:8"
+  pythonhashseed: 0
+  save_git_info: true
+  save_resolved_config: true
+
+# -----------------------------------------------------------------------------
+# Data / splits / frozen evaluation manifests
+# -----------------------------------------------------------------------------
 data:
-  family: regular         # d-regular random graphs
+  family: "regular"
+
   regular:
-    N: 64                 # train size (will be swept via seeds/episodes)
-    d: 3                  # node degree
-  # OOD test in the paper: N=256 (handled at eval time / separate run)
-  seed: 1234
+    d: 3                                 # primary condition (paper mainline)
+    # Optional: do secondary experiments with d in {4,6} later as an extension.
 
-# -----------------------
-# 2) Horizons (can be a curriculum)
-# -----------------------
+  train_sizes:
+    mode: "fixed_list"
+    fixed_list: [64, 96, 128, 160, 192]
+
+  val_sizes:
+    mode: "fixed_list"
+    fixed_list: [72, 136, 184]
+
+  test_iid_sizes:
+    mode: "fixed_list"
+    fixed_list: [96, 128, 160]           # optional IID sanity check
+
+  test_ood_sizes:
+    mode: "fixed_list"
+    fixed_list: [256]
+
+  batching:
+    episodes_per_graph: 1
+    graphs_per_batch_train: 2
+    graphs_per_batch_eval: 1
+    shuffle_train: true
+
+  manifests:
+    enabled: true
+    root_dir: "acpl/data/manifests"
+
+    val_manifest: "transfer-regular-val.json"
+    test_iid_manifest: "transfer-regular-test-iid.json"
+    test_ood_manifest: "transfer-regular-test-ood.json"
+
+    episodes:
+      val: 120
+      test_iid: 120
+      test_ood: 150
+
+    build:
+      seed: 1234
+      episode_seed_base: 910000
+      horizon_policy: "per_horizon_manifest"
+      per_horizon:
+        enabled: true
+        horizons: [64, 96, 128]
+
+# -----------------------------------------------------------------------------
+# Simulation / horizon protocol
+# -----------------------------------------------------------------------------
 sim:
-  steps: [64, 96, 128]    # our train loop will pick T=max(steps)=128 by default
+  horizons:
+    candidates: [64, 96, 128]
+    choose_on_val: true
+    criterion_metric: "eval/target/success"
+    tie_break: "smaller_T"
 
-# -----------------------
-# 3) Policy (GNN, controller, coin map)
-# -----------------------
+  rollout:
+    check_unitarity: false
+    check_simplex_every: 0
+
+# -----------------------------------------------------------------------------
+# Task binding (transfer)
+# -----------------------------------------------------------------------------
+task:
+  name: "transfer"
+  objective: "maximize P_T(target)"
+  normalized_time_feature: true
+
+  # For regular graphs, source/target are usually not geometric endpoints.
+  # If your episode builder supports schemes: use "random" + "random".
+  # Otherwise keep explicit indices for N=64, and rely on batch-provided targets for variable N.
+  source: "custom_index"
+  target: "custom_index"
+  source_index: 0
+  target_index: -1                       # last vertex if builder normalizes; else override in runner
+
+  loss:
+    kind: "nll"
+    time_agg: "last"
+    cvar_alpha: 0.1
+    reduction: "mean"
+    eps: 1.0e-8
+    clamp_min_p: 1.0e-12
+    normalize_prob: true
+
+# -----------------------------------------------------------------------------
+# Model / policy (any-degree coin)
+# -----------------------------------------------------------------------------
 model:
   gnn:
-    kind: gcn             # {gcn | gat | gin | pna}  (ACPLPolicy reads 'kind' internally)
-    hidden: 128
+    kind: "gcn"                           # start with GCN; can upgrade to PNA/GIN in sweeps
+    layers: 3
+    hidden_dim: 128
     dropout: 0.0
+    norm: "graphnorm"
+    residual: true
+
   controller:
-    kind: gru             # {gru | transformer}
-    hidden: 128
+    kind: "gru"
+    hidden_dim: 128
     layers: 2
-    dropout: 0.0
     bidirectional: false
-  head:
-    hidden: 0             # linear head
     dropout: 0.0
-  time_pe_dim: 32         # learned time positional encoding dim
+    time_pe_dim: 32
+    normalized_time_feature: true
 
-# Coin parameterization (any degree via Hermitian adaptor)
-coin:
-  family: exp             # {su2 (deg=2 only) | exp | cayley}; 'exp' supports any degree
+  coin:
+    # regular graphs have degree d>=3 -> need any-degree coin parameterization
+    family: "exp"                         # exp | cayley
+    theta_scale: 1.0
+    theta_noise_std: 0.0
 
-# -----------------------
-# 4) Node features
-# -----------------------
+# -----------------------------------------------------------------------------
+# Features
+# -----------------------------------------------------------------------------
 features:
-  degree: true
-  pe:
-    kind: lappe           # {lappe | none}; Laplacian PE
-    K: 16
-  coord_rule: none        # no absolute coords on random regular graphs
+  include_degree: true
+  laplacian_pe:
+    enabled: true
+    k: 16
+    sign_fix: "max-abs-positive"
+  coords:
+    enabled: false                        # no coords for random regular graphs
 
-# -----------------------
-# 5) Optimization
-# -----------------------
-train:
-  epochs: 50
-  batch_size: 1                 # each “episode” = one rollout on the same graph config
-  episodes_per_epoch: 256       # number of episodes per epoch
-  ci_n_seeds: 5                 # pooled-CI evaluation seeds
-  ci_episodes: 128              # episodes per seed at CI time
-
+# -----------------------------------------------------------------------------
+# Optimization / regularization
+# -----------------------------------------------------------------------------
 optim:
-  name: adam
+  name: "adamw"
   lr: 2.5e-4
   weight_decay: 0.0
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+
   grad_clip:
     enabled: true
-    mode: norm
+    mode: "norm"
     max_norm: 1.0
-  precision:
-    amp: auto
+
+  regularizers:
+    temporal_smoothness: 1.0e-3
+    magnitude: 5.0e-5
+    spectral:
+      enabled: true
+      dct_weight: 5.0e-5
+      hf_bins: 0.25
+
   scheduler:
-    kind: cosine_warmup
+    kind: "cosine_warmup"
     cosine_warmup:
       warmup_steps: 200
-      t_max: 5000
+      t_max: 8000
       eta_min: 1.0e-5
-  ema:
-    enabled: true
-    decay: 0.999
-    warmup_steps: 100
-    update_every: 1
-    pin_to_device: true
 
-# Optional param-group rules (regex on parameter names)
-optim.param_groups:
-  enabled: false
-  rules: []
+training:
+  method: "backprop"
+  epochs: 50
+  steps_per_epoch: 256
+  accum_steps: 1
+  amp: true
+  device: "cuda"
+  log_every: 50
+  log_grad_norm_every: 200
+  ckpt:
+    dir: "checkpoints/transfer-regular"
+    keep_last: 6
+    save_every_steps: 2000
+    save_best_metric: "eval/target/success"
 
-# -----------------------
-# 6) Randomness
-# -----------------------
-seed: 0                   # master seed for this run (swept externally if needed)
+# -----------------------------------------------------------------------------
+# Baselines + ablations (novelty-grade)
+# -----------------------------------------------------------------------------
+comparisons:
+  baselines:
+    - name: "fixed_grover"
+      enabled: true
+      description: "Fixed Grover diffusion coin on d-regular graphs."
 
-# -----------------------
-# 7) Baselines (not used by the trainer, kept for bookkeeping)
-baselines:
-  - name: hadamard_global
-    desc: Fixed Hadamard coin (deg=2 graphs only; listed for completeness)
-  - name: grover_global
-    desc: Fixed Grover coin on regular graphs
-  - name: global_time_varying
-    desc: Single global coin U_t shared by all nodes, time-varying
+    - name: "global_time_coin"
+      enabled: true
+      description: "θ(t) learned but shared across nodes (tests node adaptivity)."
 
-# -----------------------
-# 8) Success criteria (paper thresholds)
-success:
-  # Example thresholds; adjust per your report’s table.
-  transfer_min_pt_target: 0.90
-  ci_improvement_eps: 0.02
+    - name: "node_only_coin"
+      enabled: true
+      description: "θ(v) learned but constant over time (tests time adaptivity)."
 
-# -----------------------
-# 9) Compute budget
-# -----------------------
-device: auto              # auto -> cuda if available else cpu
-dtype: float32
-budget:
+    - name: "fixed_random_unitary"
+      enabled: true
+      description: "Seeded random fixed unitary coin baseline (degree-aware)."
+
+  ablations:
+    - name: "no_lappe"
+      enabled: true
+      description: "Disable Laplacian positional encodings."
+
+    - name: "smooth0"
+      enabled: true
+      description: "Set temporal_smoothness=0."
+
+    - name: "mag0"
+      enabled: true
+      description: "Set magnitude regularizer=0."
+
+    - name: "spectral0"
+      enabled: true
+      description: "Disable spectral (DCT) regularizer."
+
+# -----------------------------------------------------------------------------
+# Evaluation protocol (CI + artifacts)
+# -----------------------------------------------------------------------------
+eval:
+  enabled: true
+
+  ci:
+    alpha: 0.1
+    n_eval_seeds: 5
+    episodes_per_seed:
+      val: 80
+      test_iid: 80
+      test_ood: 100
+    method: "bootstrap"
+    bootstrap:
+      n_resamples: 2000
+      block_by: "episode"
+
+  metrics:
+    - "target/success"
+    - "target/maxp"
+    - "target/nll"
+    - "mix/tv"
+    - "mix/H"
+
+  artifacts:
+    write_dir: "eval"
+    write_ci: true
+    write_per_seed: true
+    write_tables: true
+    write_json: true
+
+    stats:
+      enabled: true
+      quantiles: [0.05, 0.25, 0.5, 0.75, 0.95]
+      include_probability_checks: true
+      include_time_series: true
+
+    embeddings:
+      enabled: true
+      source: "gnn"
+      aggregate_time: "last"
+      max_nodes_for_plot: 2048
+      pca:
+        enabled: true
+        n_components: 2
+      color_by:
+        - "degree"
+      save:
+        raw_pt: true
+        raw_csv: true
+        pca_csv: true
+        pca_png: true
+        stats_json: true
+
+    plots:
+      enabled: true
+      pt_timeline: true
+      tv_curve: true
+      theta_spectra: true
+
+# -----------------------------------------------------------------------------
+# Success criteria (pre-registered)
+# -----------------------------------------------------------------------------
+success_criteria:
+  transfer_threshold:
+    metric: "target/success"
+    split: "test_ood"
+    min_value: 0.90
+
+  ci_improvement_over_best_baseline:
+    metric: "target/success"
+    split: "test_ood"
+    min_abs_improvement: 0.02
+
+# -----------------------------------------------------------------------------
+# Compute budget
+# -----------------------------------------------------------------------------
+compute:
+  device: "auto"
+  dtype:
+    encoder: "float32"
+    state: "complex128"
+  amp: true
   wallclock_hours: 4
   max_memory_gb: 8
-
-# -----------------------
-# 10) Logging
-# -----------------------
-log:
-  backend: plain          # {plain | tensorboard | wandb}
-  project: acpl-qwalk
-  run_name: "${task.name}-${data.family}-N${data.regular.N}-d${data.regular.d}-T${sim.steps}"
-  interval: 50
-  ci_bootstrap_samples: 1000
-
-# Where to write run artifacts (overridable via CLI: logging.dir=...)
-train.run_dir: null
+  track_throughput: true

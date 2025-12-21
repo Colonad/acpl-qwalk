@@ -8,6 +8,8 @@ from dataclasses import dataclass
 import math
 from pathlib import Path
 import re
+import hashlib
+
 import sys
 from types import SimpleNamespace
 from typing import Any
@@ -139,6 +141,22 @@ def _seed_everything(seed: int) -> None:
         pass
 
 
+
+def _derive_episode_seed(manifest_hex: str, split: str, index: int) -> int:
+    """
+    Deterministic seed from (manifest_hex, split, global_index).
+    Keep this consistent with your acpl.data generator seeding.
+    """
+    h = hashlib.blake2b(digest_size=8)
+    h.update(str(manifest_hex).encode("utf-8"))
+    h.update(b"/")
+    h.update(str(split).encode("utf-8"))
+    h.update(b"/")
+    h.update(str(int(index)).encode("utf-8"))
+    return int.from_bytes(h.digest(), "little", signed=False)
+
+
+
 # Timers
 class _NullTimer:
     def __enter__(self):  # noqa: D401
@@ -260,6 +278,16 @@ def select_dtype(dtype_flag: str):
         raise ValueError(f"Unsupported dtype '{dtype_flag}'. Choose from {list(mapping)}.")
     return mapping[dtype_flag]
 
+
+def select_cdtype(state_flag: str):
+    s = str(state_flag).lower().strip()
+    mapping = {"complex64": torch.complex64, "complex128": torch.complex128}
+    if s not in mapping:
+        raise ValueError(f"Unsupported state dtype '{state_flag}'. Choose from {list(mapping)}.")
+    return mapping[s]
+
+
+
 def configure_cuda_perf(*, deterministic: bool = False, capture_scalar_outputs: bool = True) -> None:
     """Enable Ampere-friendly GPU performance knobs (TF32, cuDNN benchmarking, Dynamo scalar capture)."""
     if not torch.cuda.is_available():
@@ -363,6 +391,199 @@ def apply_overrides(cfg: dict, overrides: list[str]) -> dict:
     return cfg
 
 
+
+def _coerce_prereg_to_trainer_schema(cfg: dict, *, cfg_path: Path) -> dict:
+    """
+    Coerce "pre-registration" experiment YAMLs (goal/graph/horizon/policy/optimization/...)
+    into the trainer schema expected by this script (task/data/sim/model/coin/train/optim/log/...).
+
+    If cfg already looks like a trainer-schema config, this is a no-op.
+    """
+    if not isinstance(cfg, dict):
+        return cfg
+
+    # Heuristic: already trainer-like
+    if "data" in cfg and "sim" in cfg and ("model" in cfg or "coin" in cfg) and ("train" in cfg or "optim" in cfg):
+        return cfg
+
+    # Heuristic: prereg-like
+    prereg_like = ("goal" in cfg) and (("graph" in cfg) or ("horizon" in cfg) or ("policy" in cfg) or ("optimization" in cfg))
+    if not prereg_like:
+        return cfg
+
+    goal = str(cfg.get("goal", "transfer")).lower().strip()
+
+    # ---- seed / device / dtype ----
+    rnd = cfg.get("randomness", {}) or {}
+    cb = cfg.get("compute_budget", {}) or {}
+    cb_dtype = (cb.get("dtype", {}) or {}) if isinstance(cb.get("dtype", {}), dict) else {}
+
+    cfg.setdefault("seed", int(rnd.get("master_seed", cfg.get("seed", 0) or 0)))
+    cfg.setdefault("device", cb.get("device", "auto"))
+
+    # encoder dtype (this script's `dtype`)
+    cfg.setdefault("dtype", str(cb_dtype.get("encoder", cfg.get("dtype", "float32"))))
+
+    # state dtype (new optional field used below)
+    cfg.setdefault("state_dtype", str(cb_dtype.get("state", cfg.get("state_dtype", "complex64"))))
+
+    # ---- task ----
+    t = cfg.get("task", None)
+    if not isinstance(t, dict):
+        # prereg has `task: spatial_search` (string); we keep it as a name hint
+        t = {"name": goal}
+        cfg["task"] = t
+    t.setdefault("name", goal)
+
+    # ---- data (from graph) ----
+    graph = cfg.get("graph", {}) or {}
+    data = cfg.get("data", {}) or {}
+    if not isinstance(data, dict):
+        data = {}
+    cfg["data"] = data
+
+    fam = str(graph.get("family", data.get("family", "line"))).lower().strip()
+    data.setdefault("family", fam)
+
+    # carry marks_per_episode for search
+    if "marks_per_episode" in graph and "marks_per_episode" not in data:
+        data["marks_per_episode"] = int(graph.get("marks_per_episode", 1))
+
+    # grid sizing
+    if fam in ("grid", "grid-2d", "grid2d"):
+        data.setdefault("grid", {})
+        if not isinstance(data["grid"], dict):
+            data["grid"] = {}
+        g = data["grid"]
+
+        # pick a default L if not provided (prefer 64 if present)
+        L = None
+        train_L = graph.get("train_L", None)
+        if isinstance(train_L, (list, tuple)) and len(train_L) > 0:
+            vals = [int(x) for x in train_L]
+            if 64 in vals:
+                L = 64
+            else:
+                L = vals[len(vals) // 2]
+        if L is None:
+            # fallback to any existing L/Lx/Ly, else 32
+            if "L" in g:
+                L = int(g["L"])
+            elif "Lx" in g and "Ly" in g:
+                L = int(g["Lx"])
+            else:
+                L = int(graph.get("L", 32))
+
+        g.setdefault("Lx", int(L))
+        g.setdefault("Ly", int(L))
+
+    # hypercube sizing (map to this script's 'cube' builder)
+    if fam in ("hypercube", "cube"):
+        data.setdefault("cube", {})
+        if not isinstance(data["cube"], dict):
+            data["cube"] = {}
+        # prereg uses n as dimension; this script uses cube.d
+        n = None
+        hc = graph.get("hypercube", {}) if isinstance(graph.get("hypercube", {}), dict) else {}
+        if "n" in hc:
+            n = int(hc["n"])
+        data["cube"].setdefault("d", int(n) if n is not None else int(data["cube"].get("d", 6)))
+        data["family"] = "cube"
+
+    # ---- sim (from horizon) ----
+    horizon = cfg.get("horizon", {}) or {}
+    sim = cfg.get("sim", {}) or {}
+    if not isinstance(sim, dict):
+        sim = {}
+    cfg["sim"] = sim
+
+    # Keep curriculum list in sim.steps, but also set task.horizon_T preference if possible
+    cand = horizon.get("T_candidates", None)
+    if isinstance(cand, (list, tuple)) and len(cand) > 0:
+        sim.setdefault("steps", [int(x) for x in cand])
+        # prefer 128 if present; else median
+        cvals = [int(x) for x in cand]
+        pref = 128 if 128 in cvals else cvals[len(cvals) // 2]
+        t.setdefault("horizon_T", int(pref))
+    else:
+        # fallback: explicit horizon_T if present
+        sim.setdefault("steps", int(t.get("horizon_T", 128)))
+
+    # ---- model/coin (from policy) ----
+    policy = cfg.get("policy", {}) or {}
+    model = cfg.get("model", {}) or {}
+    if not isinstance(model, dict):
+        model = {}
+    cfg["model"] = model
+
+    pg = policy.get("gnn", {}) or {}
+    pc = policy.get("controller", {}) or {}
+    if "gnn" not in model:
+        model["gnn"] = {}
+    if "controller" not in model:
+        model["controller"] = {}
+    if not isinstance(model["gnn"], dict):
+        model["gnn"] = {}
+    if not isinstance(model["controller"], dict):
+        model["controller"] = {}
+
+    model["gnn"].setdefault("hidden", int(pg.get("hidden", 128)))
+    model["gnn"].setdefault("dropout", float(pg.get("dropout", 0.1)))
+    model["controller"].setdefault("kind", str(pc.get("kind", "gru")).lower())
+    model["controller"].setdefault("hidden", int(pc.get("hidden", 128)))
+    model["controller"].setdefault("layers", int(pc.get("layers", 1)))
+    model["controller"].setdefault("dropout", float(pc.get("dropout", 0.0)))
+
+    coin = cfg.get("coin", {}) or {}
+    if not isinstance(coin, dict):
+        coin = {"family": str(coin)}
+    cfg["coin"] = coin
+
+    pcoin = policy.get("coin", {}) or {}
+    cmap = str(pcoin.get("map", coin.get("family", "exp"))).lower().strip()
+    # map prereg "cayley" -> this script's coin.family
+    if cmap in ("cayley", "exp", "su2"):
+        coin.setdefault("family", cmap)
+    else:
+        coin.setdefault("family", "exp")
+
+    # ---- train/optim (from optimization) ----
+    opt = cfg.get("optimization", {}) or {}
+    train = cfg.get("train", {}) or {}
+    optim = cfg.get("optim", {}) or {}
+    if not isinstance(train, dict):
+        train = {}
+    if not isinstance(optim, dict):
+        optim = {}
+    cfg["train"] = train
+    cfg["optim"] = optim
+
+    train.setdefault("epochs", int(opt.get("epochs", 160)))
+
+    # this script is "episode-per-step" right now; set a sane default episodes_per_epoch
+    # (we can’t truly batch episodes without refactoring rollouts)
+    batch_eps = int(opt.get("batch_episodes", 32))
+    train.setdefault("batch_size", 1)
+    train.setdefault("episodes_per_epoch", int(opt.get("episodes_per_epoch", max(64, 8 * batch_eps))))
+
+    optim.setdefault("name", str(opt.get("optimizer", "adam")).lower())
+    optim.setdefault("lr", float(opt.get("lr", 2.5e-4)))
+    optim.setdefault("weight_decay", float(opt.get("weight_decay", 1e-5)))
+    optim.setdefault("grad_clip", float(opt.get("grad_clip", 1.0)))
+
+    # ---- log ----
+    log = cfg.get("log", {}) or {}
+    if not isinstance(log, dict):
+        log = {}
+    cfg["log"] = log
+    log.setdefault("backend", "plain")
+    log.setdefault("interval", 50)
+    log.setdefault("run_name", cfg_path.stem)
+
+    return cfg
+
+
+
 def _to_namespace(d):
     if isinstance(d, dict):
         return SimpleNamespace(**{k: _to_namespace(v) for k, v in d.items()})
@@ -392,7 +613,155 @@ class SingleGraphEpisodeDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict:
         return self.payload
+class MarkedGraphEpisodeDataset(Dataset):
+    """
+    Per-episode marked set Ω sampling + mark-indicator node feature.
 
+    For search:
+      - sample marks_per_episode nodes as Ω
+      - set batch["targets"] = Ω
+      - append a 0/1 mark indicator to X (so policy conditions on Ω)
+
+    The sampling is deterministic per (base_seed, epoch, idx) for reproducibility.
+    """
+
+    def __init__(
+        self,
+        payload: dict,
+        *,
+        num_episodes: int,
+        N: int,
+        marks_per_episode: int,
+        manifest_hex: str,
+        split: str,
+    ):
+        super().__init__()
+        self.payload = payload
+        self.num_episodes = int(num_episodes)
+        self.N = int(N)
+        self.k = int(max(1, marks_per_episode))
+        self.manifest_hex = str(manifest_hex)
+        self.split = str(split)
+        self.epoch = 0
+
+
+        # Cache device from X (we assume payload["X"] is on the right device already)
+        X = payload["X"]
+        if not isinstance(X, torch.Tensor):
+            raise TypeError("payload['X'] must be a torch.Tensor")
+        self.device = X.device
+
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = int(epoch)
+
+    def __len__(self):
+        return self.num_episodes
+
+    def _episode_seed(self, idx: int) -> int:
+        # Global index for this split/epoch so each epoch uses a fresh, deterministic set
+        gidx = int(self.epoch) * int(self.num_episodes) + int(idx)
+        return _derive_episode_seed(self.manifest_hex, self.split, gidx)
+
+    def __getitem__(self, idx: int) -> dict:
+        # Deterministic sampling for this episode
+        gen = torch.Generator(device="cpu")
+        gen.manual_seed(self._episode_seed(idx))
+
+        # Sample Ω without replacement
+        perm = torch.randperm(self.N, generator=gen)
+        marks = perm[: self.k].to(device=self.device, dtype=torch.long)
+
+        # Build mark indicator feature
+        X_base: torch.Tensor = self.payload["X"]  # (N, 2) expected in your current script
+        mark_feat = torch.zeros((self.N, 1), device=self.device, dtype=X_base.dtype)
+        mark_feat.index_fill_(0, marks, 1.0)
+        X_ep = torch.cat([X_base, mark_feat], dim=1)  # (N, 3)
+
+        out = dict(self.payload)
+        out["X"] = X_ep
+        out["targets"] = marks  # define Ω as the "targets" for loss/metrics
+        out["marks"] = marks
+        return out
+
+class RobustTargetEpisodeDataset(Dataset):
+    """
+    Robust transfer-style episodes:
+      - sample k target nodes per episode as Ω (targets)
+      - optionally append a 0/1 target-indicator channel to X
+      - optionally sample a start_node per episode (rollout can use it)
+
+    Deterministic per (base_seed, epoch, idx).
+    """
+
+    def __init__(
+        self,
+        payload: dict,
+        *,
+        num_episodes: int,
+        N: int,
+        targets_per_episode: int = 1,
+        manifest_hex: str,
+        split: str,
+        append_target_indicator: bool = True,
+        random_start: bool = True,
+    ):
+        super().__init__()
+        self.payload = payload
+        self.num_episodes = int(num_episodes)
+        self.N = int(N)
+        self.k = int(max(1, targets_per_episode))
+        self.manifest_hex = str(manifest_hex)
+        self.split = str(split)
+        self.append_target_indicator = bool(append_target_indicator)
+        self.random_start = bool(random_start)
+        self.epoch = 0
+
+        X = payload["X"]
+        if not isinstance(X, torch.Tensor):
+            raise TypeError("payload['X'] must be a torch.Tensor")
+        self.device = X.device
+
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = int(epoch)
+
+    def __len__(self):
+        return self.num_episodes
+
+    def _episode_seed(self, idx: int) -> int:
+        h = hashlib.blake2b(digest_size=8)
+        h.update(str(self.base_seed).encode("utf-8"))
+        h.update(b"/")
+        h.update(str(self.epoch).encode("utf-8"))
+        h.update(b"/")
+        h.update(str(int(idx)).encode("utf-8"))
+        return int.from_bytes(h.digest(), "little", signed=False)
+
+    def __getitem__(self, idx: int) -> dict:
+        gen = torch.Generator(device="cpu")
+        gen.manual_seed(self._episode_seed(idx))
+
+        perm = torch.randperm(self.N, generator=gen)
+
+        # Targets Ω
+        targets = perm[: self.k].to(device=self.device, dtype=torch.long)
+
+        # Optional random start node
+        if self.random_start:
+            start_node = int(perm[self.k].item()) if (self.k < self.N) else int(perm[0].item())
+        else:
+            start_node = int(self.payload.get("start_node", 0))
+
+        out = dict(self.payload)
+        out["targets"] = targets
+        out["start_node"] = start_node
+
+        if self.append_target_indicator:
+            X_base: torch.Tensor = self.payload["X"]  # (N,2) expected
+            tfeat = torch.zeros((self.N, 1), device=self.device, dtype=X_base.dtype)
+            tfeat.index_fill_(0, targets, 1.0)
+            out["X"] = torch.cat([X_base, tfeat], dim=1)  # (N,3)
+
+        return out
 
 # -------------------------------
 # Initial state helpers
@@ -406,6 +775,30 @@ def init_state_node0_uniform_ports(pm: PortMap, *, cdtype, device) -> torch.Tens
     d0 = max(1, e0 - s0)
     amp = 1.0 / math.sqrt(d0)
     psi[s0:e0] = amp
+    return psi
+
+
+def init_state_node_uniform_ports(pm: PortMap, node: int, *, cdtype, device) -> torch.Tensor:
+    """
+    Uniform superposition over the outgoing ports of a chosen node.
+    """
+    node = int(node) % int(pm.num_nodes)
+    A = pm.src.numel()
+    psi = torch.zeros(A, dtype=cdtype, device=device)
+    s, e = int(pm.node_ptr[node]), int(pm.node_ptr[node + 1])
+    d = max(1, e - s)
+    amp = 1.0 / math.sqrt(d)
+    psi[s:e] = amp
+    return psi
+
+
+def init_state_uniform_arcs(pm: PortMap, *, cdtype, device) -> torch.Tensor:
+    """
+    Uniform superposition over *all arcs/ports* (the natural |s> state for spatial search).
+    """
+    A = int(pm.src.numel())
+    amp = 1.0 / math.sqrt(max(1, A))
+    psi = torch.ones(A, dtype=cdtype, device=device) * amp
     return psi
 
 
@@ -639,7 +1032,7 @@ def apply_blockdiag_coins_anydeg(
 # -------------------------------
 
 
-def make_rollout_su2_dv2(pm: PortMap, shift: ShiftOp, *, cdtype) -> RolloutFn:
+def make_rollout_su2_dv2(pm: PortMap, shift: ShiftOp, *, cdtype, init_mode: str = "node0") -> RolloutFn:
     from acpl.sim.step import step
     from acpl.sim.utils import partial_trace_coin
 
@@ -656,7 +1049,16 @@ def make_rollout_su2_dv2(pm: PortMap, shift: ShiftOp, *, cdtype) -> RolloutFn:
             targets = targets.squeeze(0)
 
         coins = model.coins_su2(X, edge_index, T=T)  # (T,N,2,2) complex
-        psi = init_state_node0_uniform_ports(pm, cdtype=coins.dtype, device=X.device)
+        if init_mode == "uniform":
+            psi = init_state_uniform_arcs(pm, cdtype=coins.dtype, device=X.device)
+        elif init_mode == "node":
+            s0 = batch.get("start_node", 0)
+            s0 = int(s0.item()) if isinstance(s0, torch.Tensor) else int(s0)
+            psi = init_state_node_uniform_ports(pm, s0, cdtype=coins.dtype, device=X.device)
+        else:
+            psi = init_state_node0_uniform_ports(pm, cdtype=coins.dtype, device=X.device)
+
+        
         for t in range(T):
             psi = step(psi, pm, coins[t], shift=shift)
         P = partial_trace_coin(psi, pm).unsqueeze(0).to(dtype=torch.float32)
@@ -672,9 +1074,11 @@ def make_rollout_anydeg_exp_or_cayley(
     adaptor: ThetaToHermitianAdaptor,
     family: str,
     cdtype,
+    init_mode: str = "node0",
     theta_scale: float = 1.0,
     theta_noise_std: float = 0.0,
 ) -> RolloutFn:
+
 
     from acpl.sim.utils import partial_trace_coin
 
@@ -715,7 +1119,17 @@ def make_rollout_anydeg_exp_or_cayley(
 
 
 
-        psi = init_state_node0_uniform_ports(pm, cdtype=cdtype, device=X.device)
+        if init_mode == "uniform":
+            psi = init_state_uniform_arcs(pm, cdtype=cdtype, device=X.device)
+        elif init_mode == "node":
+            s0 = batch.get("start_node", 0)
+            s0 = int(s0.item()) if isinstance(s0, torch.Tensor) else int(s0)
+            psi = init_state_node_uniform_ports(pm, s0, cdtype=cdtype, device=X.device)
+        else:
+            psi = init_state_node0_uniform_ports(pm, cdtype=cdtype, device=X.device)
+
+        
+        
         # Put perm on the right device once (avoid per-step .to())
         perm = shift.perm
         if perm.device != psi.device:
@@ -805,7 +1219,7 @@ def make_transfer_loss(
         if lk == "nll":
             # IMPORTANT: do not clamp_min before log; it kills gradients when mass < eps.
             loss = -torch.log(mass + eps)
-        elif lk in ("neg_prob", "negprob", "prob"):
+        elif lk in ("neg_prob", "negprob", "prob", "neg_success", "neg_success_t", "neg_success_terminal"):
             loss = -mass
         elif lk == "hinge":
             if targets.numel() != 1:
@@ -825,6 +1239,81 @@ def make_transfer_loss(
         raise ValueError(f"Unknown reduction '{reduction}'")
 
     return loss_builder
+
+
+
+def _mix_uniform(N: int, device, dtype=torch.float32) -> torch.Tensor:
+    u = torch.full((N,), 1.0 / max(1, N), device=device, dtype=dtype)
+    return u
+
+
+def mixing_objective(P: torch.Tensor, kind: str = "tv", eps: float = 1e-12) -> torch.Tensor:
+    """
+    Return a per-batch objective value (B,).
+    Lower is better for: tv, js, hell, l2, kl_pu
+    Higher is better for: H (entropy)
+    """
+    kind = str(kind).lower().strip()
+    if P.is_complex():
+        P = P.real
+    P = P.to(torch.float32)
+    P = P / P.sum(dim=-1, keepdim=True).clamp_min(eps)
+
+    B, N = P.shape
+    U = _mix_uniform(N, device=P.device, dtype=P.dtype).expand(B, N)
+
+    if kind in ("tv", "total_variation"):
+        return 0.5 * (P - U).abs().sum(dim=-1)
+
+    if kind in ("l2",):
+        return torch.sqrt(((P - U) ** 2).sum(dim=-1).clamp_min(eps))
+
+    if kind in ("hell", "hellinger"):
+        # H^2 = 1 - sum sqrt(p_i u_i)
+        bc = torch.sqrt(P.clamp_min(eps) * U).sum(dim=-1)
+        return torch.sqrt((1.0 - bc).clamp_min(0.0))
+
+    if kind in ("kl_pu", "kl"):
+        # KL(P||U) = sum p log(p/u)
+        return (P.clamp_min(eps) * (torch.log(P.clamp_min(eps)) - torch.log(U.clamp_min(eps)))).sum(dim=-1)
+
+    if kind in ("js", "jensen_shannon"):
+        M = 0.5 * (P + U)
+        kl_pm = (P.clamp_min(eps) * (torch.log(P.clamp_min(eps)) - torch.log(M.clamp_min(eps)))).sum(dim=-1)
+        kl_um = (U.clamp_min(eps) * (torch.log(U.clamp_min(eps)) - torch.log(M.clamp_min(eps)))).sum(dim=-1)
+        return 0.5 * (kl_pm + kl_um)
+
+    if kind in ("h", "entropy"):
+        return -(P.clamp_min(eps) * torch.log(P.clamp_min(eps))).sum(dim=-1)
+
+    raise ValueError(f"Unknown mixing objective kind '{kind}'")
+
+
+def make_mixing_loss(kind: str = "tv", reduction: str = "mean", eps: float = 1e-12):
+    """
+    Loss for mixing:
+      - for tv/js/hell/l2/kl_pu: minimize distance-to-uniform
+      - for entropy: maximize entropy (so loss is -H)
+    """
+    kind = str(kind).lower().strip()
+    reduction = str(reduction).lower().strip()
+
+    def loss_builder(P: torch.Tensor, aux: dict, batch: dict | None = None) -> torch.Tensor:
+        v = mixing_objective(P, kind=kind, eps=eps)  # (B,) for distances OR (B,) entropy
+        if kind in ("h", "entropy"):
+            # maximize entropy -> minimize -H
+            v = -v
+
+        if reduction == "mean":
+            return v.mean()
+        if reduction == "sum":
+            return v.sum()
+        if reduction == "none":
+            return v
+        raise ValueError(f"Unknown reduction '{reduction}'")
+
+    return loss_builder
+
 
 
 # -------------------------------
@@ -1119,7 +1608,7 @@ def plot_series(xs: list[int], ys: list[float], *, out_png: Path, title: str):
     plt.figure()
     plt.plot(xs, ys, marker="o")
     plt.xlabel("Epoch")
-    plt.ylabel("P_T[target]")
+    plt.ylabel(title)
     plt.title(title)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -1174,7 +1663,38 @@ def main():
         sys.exit(1)
 
     cfg = load_yaml(cfg_path)
+
+    # allow pre-registration experiment YAMLs (goal/graph/horizon/policy/...) to run
+    cfg = _coerce_prereg_to_trainer_schema(cfg, cfg_path=cfg_path)
+
+    # IMPORTANT: actually apply CLI overrides like coin.family=exp optim.lr=1e-3 ...
     cfg = apply_overrides(cfg, unknown)
+
+    # Build a stable manifest hash for deterministic episode seeding (includes overrides)
+    _manifest_blob = yaml.safe_dump(cfg, sort_keys=True).encode("utf-8")
+    manifest_hex = hashlib.blake2b(_manifest_blob, digest_size=16).hexdigest()
+
+    
+    # ---------------- Task (define EARLY; used for horizon preference + model in_dim) ----------------
+    task_cfg = cfg.get("task", {}) or {}
+    if not isinstance(task_cfg, dict):
+        task_cfg = {"name": str(task_cfg)}
+
+    task_name = str(task_cfg.get("name", cfg.get("goal", "transfer"))).lower().strip()
+    is_search = ("search" in task_name)  # catches "search", "spatial_search", etc.
+
+    is_mixing = ("mix" in task_name)  # matches "mixing", "mix", "mixing-grid", etc.
+    is_robust = ("robust" in task_name)
+    is_transfer_like = (not is_mixing)  # transfer + search + robust (transfer-style)
+
+
+
+    # Search should start from uniform state unless overridden
+    default_init = "uniform" if is_search else ("node" if ("robust" in task_name) else "node0")
+    init_mode = str(task_cfg.get("init_state", default_init)).lower().strip()
+    if init_mode not in ("uniform", "node0", "node"):
+        raise ValueError(f"init_state must be 'uniform', 'node0', or 'node' (got {init_mode!r})")
+
 
     if args.seed is not None:
         cfg["seed"] = int(args.seed)
@@ -1202,6 +1722,9 @@ def main():
     _seed_everything(seed)
     device = select_device(cfg.get("device", "auto"))
     dtype = select_dtype(cfg.get("dtype", "float32"))
+    
+    cdtype = select_cdtype(cfg.get("state_dtype", "complex64"))
+
     if device.type == "cuda":
         # Set deterministic=True if you need strict reproducibility (slower).
         configure_cuda_perf(deterministic=False, capture_scalar_outputs=True)
@@ -1263,10 +1786,17 @@ def main():
             if len(steps_val) == 0:
                 T = 64
             else:
-                T = int(max(steps_val))
-            print(f"[setup] sim.steps provided as {list(steps_val)}; using T={T} for this run.")
+                # Prefer task.horizon_T if provided; else fall back to max(sim.steps)
+                pref = task_cfg.get("horizon_T", None)
+                if pref is not None:
+                    T = int(pref)
+                    print(f"[setup] sim.steps candidates={list(steps_val)}; using task.horizon_T={T}.")
+                else:
+                    T = int(max(steps_val))
+                    print(f"[setup] sim.steps provided as {list(steps_val)}; using T={T} for this run.")
         else:
-            T = int(steps_val)
+            # also accept task.horizon_T when sim.steps is scalar-ish
+            T = int(task_cfg.get("horizon_T", steps_val))
 
     # task may be a string like "transfer" from CLI; we only need defaults here
     task_cfg = cfg.get("task", {}) or {}
@@ -1286,11 +1816,28 @@ def main():
     # (optional) outdegree sanity check removed (was noisy in logs)
 
 
-    reduction = task_cfg.get("reduce", task_cfg.get("reduction", "mean"))
-    renorm = bool(task_cfg.get("normalize_prob", task_cfg.get("renorm", True)))
-    loss_kind = str(task_cfg.get("loss", "nll")).lower().strip()
-    eps = float(task_cfg.get("eps", 1e-8))
-    margin = float(task_cfg.get("margin", 0.0))
+    loss_cfg = cfg.get("loss", {}) or {}
+    if not isinstance(loss_cfg, dict):
+        loss_cfg = {}
+
+    reduction = str(
+        loss_cfg.get("reduction", task_cfg.get("reduce", task_cfg.get("reduction", "mean")))
+    ).lower().strip()
+
+    renorm = bool(
+        loss_cfg.get("normalize_prob", task_cfg.get("normalize_prob", task_cfg.get("renorm", True)))
+    )
+
+    loss_kind = str(
+        loss_cfg.get("kind", task_cfg.get("loss", "nll"))
+    ).lower().strip()
+
+    eps = float(loss_cfg.get("eps", task_cfg.get("eps", 1e-8)))
+    margin = float(loss_cfg.get("margin", task_cfg.get("margin", 0.0)))
+
+    # cvar_alpha used by the metric pack + loop config
+    cvar_alpha = float(loss_cfg.get("cvar_alpha", task_cfg.get("cvar_alpha", 0.1)))
+
     # Model config (each subkey may also be a string; coerce to dicts)
     model_cfg = cfg.get("model", {}) or {}
     if not isinstance(model_cfg, dict):
@@ -1314,8 +1861,13 @@ def main():
 
         head_layernorm = False
 
+    use_indicator = bool(task_cfg.get("use_indicator", is_search or is_robust))
+    in_dim = 3 if use_indicator else 2
+
+
     acpl_cfg = ACPLPolicyConfig(
-        in_dim=2,
+        in_dim=in_dim,
+
         gnn_hidden=int(gnn_cfg.get("hidden", 64)),
         gnn_out=int(gnn_cfg.get("out", gnn_cfg.get("hidden", 64))),
 
@@ -1354,7 +1906,7 @@ def main():
     force_inductor = bool(compile_cfg.get("force_inductor", False))
 
     # Build example inputs up front (used for warmup / validation)
-    dummy_X = torch.zeros((g.N, 2), device=device, dtype=dtype)
+    dummy_X = torch.zeros((g.N, acpl_cfg.in_dim), device=device, dtype=dtype)
 
     if compile_enabled:
         model_eager = model
@@ -1438,20 +1990,101 @@ def main():
     epochs = int(args.epochs if args.epochs is not None else train_cfg.get("epochs", 1))
     batch_size = int(train_cfg.get("batch_size", 1))
     episodes_per_epoch = max(1, int(train_cfg.get("episodes_per_epoch", 200)))
-    # --- target window shaping (helps when P(target) starts ~0) ---
-    target_radius = int(task_cfg.get("target_radius", 0))  # e.g., 3 means {target-3..target}
-    lo = max(0, target_index - target_radius)
-    hi = min(g.N, target_index + target_radius + 1)
-    targets = torch.arange(lo, hi, device=device, dtype=torch.long)
 
-    payload = {
-        "X": X,
-        "edge_index": g.edge_index,
-        "T": int(T),
-        "targets": targets,
-    }
-    train_ds = SingleGraphEpisodeDataset(payload, num_episodes=episodes_per_epoch)
-    eval_ds = SingleGraphEpisodeDataset(payload, num_episodes=max(1, episodes_per_epoch // 4))
+    if is_search:
+        marks_per_episode = int(data_cfg.get("marks_per_episode", task_cfg.get("marks_per_episode", 1)))
+
+        payload = {
+            "X": X,  # base (N,2); dataset appends mark channel -> (N,3)
+            "edge_index": g.edge_index,
+            "T": int(T),
+            "targets": None,
+        }
+
+        train_ds = MarkedGraphEpisodeDataset(
+            payload,
+            num_episodes=episodes_per_epoch,
+            N=g.N,
+            marks_per_episode=marks_per_episode,
+            manifest_hex=manifest_hex,
+            split="train",
+        )
+        eval_ds = MarkedGraphEpisodeDataset(
+            payload,
+            num_episodes=max(1, episodes_per_epoch // 4),
+            N=g.N,
+            marks_per_episode=marks_per_episode,
+            manifest_hex=manifest_hex,
+            split="val",
+        )
+
+
+    elif is_robust:
+        # robust transfer-style: random Ω per episode, optional random start node
+        targets_per_episode = int(task_cfg.get("targets_per_episode", 1))
+        random_start = bool(task_cfg.get("random_start", True))
+        append_indicator = bool(task_cfg.get("use_indicator", True))
+
+        payload = {
+            "X": X,  # base (N,2); dataset may append target indicator -> (N,3)
+            "edge_index": g.edge_index,
+            "T": int(T),
+            "targets": None,      # dataset sets this
+            "start_node": 0,      # dataset may override
+        }
+
+        train_ds = RobustTargetEpisodeDataset(
+            payload,
+            num_episodes=episodes_per_epoch,
+            N=g.N,
+            targets_per_episode=targets_per_episode,
+            manifest_hex=manifest_hex,
+            split="train",
+            append_target_indicator=append_indicator,
+            random_start=random_start,
+        )
+        eval_ds = RobustTargetEpisodeDataset(
+            payload,
+            num_episodes=max(1, episodes_per_epoch // 4),
+            N=g.N,
+            targets_per_episode=targets_per_episode,
+            manifest_hex=manifest_hex,
+            split="val",
+            append_target_indicator=append_indicator,
+            random_start=random_start,
+        )
+
+
+    elif is_mixing:
+        # mixing: no targets needed
+        payload = {
+            "X": X,  # (N,2) typically
+            "edge_index": g.edge_index,
+            "T": int(T),
+        }
+        train_ds = SingleGraphEpisodeDataset(payload, num_episodes=episodes_per_epoch)
+        eval_ds = SingleGraphEpisodeDataset(payload, num_episodes=max(1, episodes_per_epoch // 4))
+
+    else:
+        # transfer: fixed target window
+        target_radius = int(task_cfg.get("target_radius", 0))
+        lo = max(0, target_index - target_radius)
+        hi = min(g.N, target_index + target_radius + 1)
+        targets = torch.arange(lo, hi, device=device, dtype=torch.long)
+
+        payload = {
+            "X": X,  # (N,2)
+            "edge_index": g.edge_index,
+            "T": int(T),
+            "targets": targets,
+        }
+
+        train_ds = SingleGraphEpisodeDataset(payload, num_episodes=episodes_per_epoch)
+        eval_ds = SingleGraphEpisodeDataset(payload, num_episodes=max(1, episodes_per_epoch // 4))
+
+
+
+
     train_loader = DataLoader(
         train_ds, batch_size=batch_size, shuffle=True, collate_fn=lambda xs: xs[0]
     )
@@ -1467,7 +2100,7 @@ def main():
 
     # Rollout + loss
     if coin_family == "su2":
-        rollout_fn = make_rollout_su2_dv2(pm, shift, cdtype=torch.complex64)
+        rollout_fn = make_rollout_su2_dv2(pm, shift, cdtype=cdtype, init_mode=init_mode)
         title_suffix = "SU2 (deg=2)"
     else:
 
@@ -1482,19 +2115,31 @@ def main():
             shift,
             adaptor=adaptor,
             family=coin_family,
-            cdtype=torch.complex64,
+            cdtype=cdtype,
+            init_mode=init_mode,
             theta_scale=theta_scale,
             theta_noise_std=theta_noise_std,
         )
 
+
         title_suffix = f"{coin_family.upper()} (any degree)"
-    loss_builder = make_transfer_loss(
-        loss_kind=loss_kind,
-        reduction=reduction,
-        renorm=renorm,
-        eps=eps,
-        margin=margin,
-    )
+    if is_mixing:
+        mix_kind = str(loss_cfg.get("mix_kind", task_cfg.get("mix_kind", "tv"))).lower().strip()
+        mix_eps = float(loss_cfg.get("mix_eps", task_cfg.get("mix_eps", 1e-12)))
+        loss_builder = make_mixing_loss(
+            kind=mix_kind,
+            reduction=reduction,
+            eps=mix_eps,
+        )
+    else:
+        loss_builder = make_transfer_loss(
+            loss_kind=loss_kind,
+            reduction=reduction,
+            renorm=renorm,
+            eps=eps,
+            margin=margin,
+        )
+
 
     # Logging — write JSONL under run_dir (works with TB/W&B too)
     log_cfg = cfg.get("log", {})
@@ -1524,8 +2169,8 @@ def main():
         device=str(device),
         log_every=log_interval,  # uses log.interval from config
         grad_clip=max_norm,
-        cvar_alpha=float(task_cfg.get("cvar_alpha", 0.1)),
-        primary_on_targets=True,
+        cvar_alpha=float(cvar_alpha),
+        primary_on_targets=(not is_mixing),
         progress_bar=True,
         amp=amp_enabled,
     )
@@ -1603,7 +2248,35 @@ def main():
         ci_alpha = float((cfg.get("log", {}) or {}).get("ci_alpha", 0.05))
 
         # make a tiny iterable of dict-batches for each seed
-        def _make_eval_iter(seed: int):
+        def _make_eval_iter(seed_i: int):
+            # Use epoch=seed_i to get a deterministic, disjoint set per CI seed
+            if is_search:
+                ds = MarkedGraphEpisodeDataset(
+                    payload,
+                    num_episodes=ci_episodes,
+                    N=g.N,
+                    marks_per_episode=int(data_cfg.get("marks_per_episode", task_cfg.get("marks_per_episode", 1))),
+                    manifest_hex=manifest_hex,
+                    split="test",
+                )
+                ds.set_epoch(seed_i)
+                return (ds[i] for i in range(len(ds)))
+
+            if is_robust:
+                ds = RobustTargetEpisodeDataset(
+                    payload,
+                    num_episodes=ci_episodes,
+                    N=g.N,
+                    targets_per_episode=int(task_cfg.get("targets_per_episode", 1)),
+                    manifest_hex=manifest_hex,
+                    split="test",
+                    append_target_indicator=bool(task_cfg.get("use_indicator", True)),
+                    random_start=bool(task_cfg.get("random_start", True)),
+                )
+                ds.set_epoch(seed_i)
+                return (ds[i] for i in range(len(ds)))
+
+            # transfer or mixing: deterministic episodes (unless you later add noise)
             ds = SingleGraphEpisodeDataset(payload, num_episodes=ci_episodes)
             return (ds[i] for i in range(len(ds)))
 
@@ -1691,6 +2364,14 @@ def main():
         else range(start_epoch + 1, epochs + 1)
     )
     for epoch in pbar_epochs:
+        # If the dataset supports per-epoch deterministic sampling (search/robust),
+        # update its internal epoch counter. Otherwise do nothing (transfer/mixing).
+        if hasattr(train_ds, "set_epoch"):
+            train_ds.set_epoch(epoch)
+        if hasattr(eval_ds, "set_epoch"):
+            eval_ds.set_epoch(epoch)
+
+
         # --- per-epoch collector (no prints during batches) ---
         avg = EpochAverager(prefix="")  # keys we push already include 'train/...'
         metric_pack = None
@@ -1710,18 +2391,21 @@ def main():
                 "train/lr": float(lr),
             }
 
-            # raw target probability mass (mean over batch)
-            with torch.no_grad():
-                tt = aux["targets"]
-                if isinstance(tt, int):
-                    tt = torch.tensor([tt], device=P.device)
-                elif isinstance(tt, (list, tuple)):
-                    tt = torch.tensor(list(tt), device=P.device)
-                mass = P.index_select(dim=-1, index=tt).sum(dim=-1).mean().item()
+            # raw target probability mass (mean over batch) if targets exist
+            tt = aux.get("targets", None)
+            if tt is not None:
+                with torch.no_grad():
+                    if isinstance(tt, int):
+                        tt = torch.tensor([tt], device=P.device)
+                    elif isinstance(tt, (list, tuple)):
+                        tt = torch.tensor(list(tt), device=P.device)
+                    elif isinstance(tt, torch.Tensor):
+                        tt = tt.to(device=P.device, dtype=torch.long)
 
-            m["train/target/mass"] = float(mass)
-            # log10 mass is easier to read when it's tiny
-            m["train/target/log10_mass"] = float(math.log10(max(mass, 1e-300)))
+                    mass = P.index_select(dim=-1, index=tt).sum(dim=-1).mean().item()
+
+                m["train/target/mass"] = float(mass)
+                m["train/target/log10_mass"] = float(math.log10(max(mass, 1e-300)))
 
 
 
@@ -1777,23 +2461,54 @@ def main():
                 for batch in eval_loader:
                     P, aux = rollout_fn(model, batch)
                     P = P / (P.sum(dim=-1, keepdim=True).clamp_min(1e-12))
-                    pt = P.index_select(dim=-1, index=aux["targets"]).sum(dim=-1)
-                    vals.extend(pt.cpu().tolist())
-                pt_avg = float(sum(vals) / max(1, len(vals)))
+
+                    if is_mixing:
+                        mix_kind = str(loss_cfg.get("mix_kind", task_cfg.get("mix_kind", "tv"))).lower().strip()
+                        v = mixing_objective(P, kind=mix_kind, eps=1e-12)  # distances OR entropy
+                        # unify: "higher is better" score
+                        if mix_kind in ("h", "entropy"):
+                            score = v
+                        else:
+                            score = -v
+                        vals.extend(score.detach().cpu().tolist())
+                    else:
+                        tt = aux.get("targets", None)
+                        if tt is None:
+                            raise RuntimeError("Expected targets for transfer/search/robust eval, but aux['targets'] is None.")
+                        if isinstance(tt, int):
+                            tt = torch.tensor([tt], device=P.device)
+                        elif isinstance(tt, (list, tuple)):
+                            tt = torch.tensor(list(tt), device=P.device)
+                        elif isinstance(tt, torch.Tensor):
+                            tt = tt.to(device=P.device, dtype=torch.long)
+
+                        pt = P.index_select(dim=-1, index=tt).sum(dim=-1)
+                        vals.extend(pt.detach().cpu().tolist())
+
+                primary_avg = float(sum(vals) / max(1, len(vals)))
                 pt_curve_x.append(epoch)
-                pt_curve_y.append(pt_avg)
+                pt_curve_y.append(primary_avg)
+
             if ema is not None:
                 ema.restore(model)
 
         # Plateau step if used
         if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             mode = scheduler_cfg.get("plateau", {}).get("mode", "min")
-            metric = pt_avg if mode == "max" else -pt_avg
+            metric = primary_avg if mode == "max" else -primary_avg
             scheduler.step(metric)
 
         # Print + plot + save (atomic)
         if epoch % 10 == 0 or epoch == 1 or epoch == epochs:
-            print(f"[epoch {epoch:04d}] P_T[target]={pt_avg:.4f}")
+            if is_mixing:
+                mix_kind = str(loss_cfg.get("mix_kind", task_cfg.get("mix_kind", "tv"))).lower().strip()
+                print(f"[epoch {epoch:04d}] mixing_score({mix_kind})={primary_avg:.4f} (higher is better)")
+            else:
+                print(f"[epoch {epoch:04d}] P_T[target]={primary_avg:.4f}")
+
+           
+           
+           
             with _time_block("plot_update"):
                 plot_series(
                     pt_curve_x, pt_curve_y, out_png=plot_path, title=f"P_T[target] — {title_suffix}"
@@ -1806,21 +2521,22 @@ def main():
             "optimizer": optimizer.state_dict(),
             "epoch": epoch,
             "config": cfg,
+            "manifest_hex": manifest_hex,
             "best_metric": best_metric if best_metric is not None else -1.0,
             "ema_shadow": (ema.shadow if ema is not None else None),
         }
 
         _CK.save_train_state(ckpt_last, **ckpt_state)
 
-        if (best_metric is None) or (pt_avg > best_metric):
-            best_metric = pt_avg
+        if (best_metric is None) or (primary_avg > best_metric):
+            best_metric = primary_avg
             ckpt_state["best_metric"] = best_metric
             _CK.atomic_save(ckpt_state, ckpt_best)
 
         if _tqdm is not None:
             try:
                 lr_now = optimizer.param_groups[0]["lr"]
-                pbar_epochs.set_postfix({"P_T[target]": f"{pt_avg:.3f}", "lr": f"{lr_now:.2e}"})
+                pbar_epochs.set_postfix({"primary": f"{primary_avg:.3f}", "lr": f"{lr_now:.2e}"})
             except Exception:
                 pass
 

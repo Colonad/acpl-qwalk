@@ -1,65 +1,349 @@
-# Experiment manifest: Marked-node search on 2D grid
-goal: search
-task: spatial_search
-graph:
-  family: grid
-  train_L: [32, 48, 64, 80]
-  val_holdout_L: [40, 72]
-  test_ood_L: [96]
-  marks_per_episode: 1
-horizon:
-  T_rule: "c*sqrt(|V|)"
-  T_candidates: [96, 128, 160, 192]
-  choose_on_val: true
-policy:
+# acpl/configs/experiments/search-grid.yaml
+# =============================================================================
+# ACPL — EXPERIMENT MANIFEST (Pre-registration)
+# Experiment: Marked-node search on 2D grid
+#
+# Novelty claims this experiment supports:
+#   S1) ACPL improves marked-node search success over fixed/global baselines
+#       across IID and OOD grid sizes (with CI).
+#   S2) Horizon selection rule + validation-selected T produces robust results.
+#   S3) OOD size generalization: train on L<=80, test on L=96.
+#   S4) Ablations show causality: removing coords/LapPE, or forcing global θ(t),
+#       degrades search success.
+#   S5) Embeddings evidence: node embeddings reflect geometry + marked-node roles.
+#
+# This manifest is SINGLE-FAMILY (grid-2d) to be compatible with scripts/gen_manifest.py.
+# =============================================================================
+
+experiment:
+  name: "search-grid"
+  goal: "marked-node search on 2D grids"
+  description: >
+    Pre-registered evaluation of ACPL for marked-node search on 2D grids.
+    We maximize the probability mass on a marked set Ω (default single mark),
+    and compare against analytical and algorithmic baselines.
+  tags: ["search", "grid-2d", "ood", "ablations", "baselines", "ci", "embeddings"]
+  notes: >
+    We report success curves and terminal success at the marked set. Primary
+    selection (if enabled) chooses horizon T on validation, but we also report
+    full performance across candidate horizons.
+
+defaults:
+  task_config: "acpl/configs/task/search.yaml"
+  optim_config: "acpl/configs/optim.yaml"
+
+# -----------------------------------------------------------------------------
+# Reproducibility
+# -----------------------------------------------------------------------------
+repro:
+  master_seed: 1234
+  train_seeds: [0, 1, 2]                 # novelty-grade: expand to [0,1,2,3,4] if compute allows
+  eval_seeds: [101, 102, 103, 201, 202]
+  deterministic_torch: true
+  cublas_workspace_config: ":4096:8"
+  pythonhashseed: 0
+  save_git_info: true
+  save_resolved_config: true
+
+# -----------------------------------------------------------------------------
+# Dataset split protocol (grid sizes) + frozen evaluation manifests
+# -----------------------------------------------------------------------------
+data:
+  family: "grid-2d"
+
+  grid:
+    boundary: "open"
+    mark_scheme: "single"
+    marks_per_episode: 1
+
+  train_sizes:
+    mode: "fixed_list"
+    fixed_list: [32, 48, 64, 80]
+
+  val_sizes:
+    mode: "fixed_list"
+    fixed_list: [40, 72]
+
+  test_iid_sizes:
+    mode: "fixed_list"
+    fixed_list: [48, 64]                 # optional IID sanity test
+
+  test_ood_sizes:
+    mode: "fixed_list"
+    fixed_list: [96]
+
+  batching:
+    episodes_per_graph: 1
+    graphs_per_batch_train: 2
+    graphs_per_batch_eval: 1
+    shuffle_train: true
+
+  manifests:
+    enabled: true
+    root_dir: "acpl/data/manifests"
+    val_manifest: "search-grid-val.json"
+    test_iid_manifest: "search-grid-test-iid.json"
+    test_ood_manifest: "search-grid-test-ood.json"
+
+    episodes:
+      val: 120
+      test_iid: 120
+      test_ood: 150
+
+    build:
+      seed: 1337
+      episode_seed_base: 930000
+      horizon_policy: "per_horizon_manifest"
+      per_horizon:
+        enabled: true
+        horizons: [96, 128, 160, 192]
+
+# -----------------------------------------------------------------------------
+# Horizon protocol
+# -----------------------------------------------------------------------------
+sim:
+  horizon_selection:
+    enabled: true
+    # Rule-of-thumb for reporting/initialization (not strictly enforced by generator)
+    T_rule: "c*sqrt(|V|)"                # documented in report
+    candidates: [96, 128, 160, 192]
+    choose_on_val: true
+    criterion_metric: "eval/target/success"
+    tie_break: "smaller_T"
+
+  rollout:
+    check_unitarity: false
+    check_simplex_every: 0
+
+# -----------------------------------------------------------------------------
+# Task binding
+# -----------------------------------------------------------------------------
+task:
+  name: "search"
+  objective: "maximize P_Omega(T)"
+  normalized_time_feature: true
+
+  grid:
+    boundary: "open"
+    mark_scheme: "single"
+    k: 1
+
+  loss:
+    kind: "neg_success"
+    clamp_min_p: 1.0e-12
+    reduction: "mean"
+
+# -----------------------------------------------------------------------------
+# Model / policy (Phase-B)
+# -----------------------------------------------------------------------------
+model:
   gnn:
-    kind: PNA    # degree-aware encoder for mixed roles
+    # PNA is degree-aware; useful even for grid due to local role differences near marks.
+    kind: "pna"
     layers: 3
-    hidden: 128
-    aggregators: [sum, mean, max, std]
-    scalers: [identity, amp, att]
-    norm: graphnorm
+    hidden_dim: 128
     dropout: 0.1
+    norm: "graphnorm"
+    residual: true
+
+    # If your implementation supports explicit PNA aggregator/scaler lists:
+    aggregators: ["sum", "mean", "max", "std"]
+    scalers: ["identity", "amplification", "attenuation"]
+
   controller:
-    kind: GRU
-    hidden: 128
+    kind: "gru"
+    hidden_dim: 128
+    layers: 1
+    bidirectional: false
     dropout: 0.1
+    time_pe_dim: 32
+    normalized_time_feature: true
+
   coin:
-    map: cayley  # dv=4 -> U(4) via Cayley retraction
-    generators: "full"  # q = d^2
+    # Grid degree=4 -> U(4) using Cayley/exp mapping. Prefer Cayley for stability.
+    family: "cayley"
+    generators: "full"
+    theta_scale: 1.0
+    theta_noise_std: 0.0
+
+# -----------------------------------------------------------------------------
+# Features
+# -----------------------------------------------------------------------------
 features:
-  degree: true
-  pe:
-    method: coords
-    params: {normalize: true}   # (x/L, y/L)
-  extra: []
-optimization:
-  optimizer: adam
+  include_degree: true
+  coords:
+    enabled: true
+    normalize: true
+  laplacian_pe:
+    enabled: true
+    k: 16
+    sign_fix: "max-abs-positive"
+
+# -----------------------------------------------------------------------------
+# Optimization / regularization
+# -----------------------------------------------------------------------------
+optim:
+  name: "adamw"
   lr: 2.5e-4
   weight_decay: 1.0e-5
-  batch_episodes: 32
-  epochs: 160
-  grad_clip: 1.0
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+
+  grad_clip:
+    enabled: true
+    mode: "norm"
+    max_norm: 1.0
+
   regularizers:
     temporal_smoothness: 1.0e-3
     magnitude: 1.0e-5
-randomness:
-  master_seed: 1234
-  split_routing: size_bands
-  seeds_per_run: 5
-baselines:
-  - analytical: AKR   # Ambainis–Kempe–Rivosh on grid
-  - fixed_coin: grover
-  - global_time_varying_coin: true
+    spectral:
+      enabled: true
+      dct_weight: 5.0e-5
+      hf_bins: 0.25
+
+  scheduler:
+    kind: "cosine_warmup"
+    cosine_warmup:
+      warmup_steps: 500
+      t_max: 16000
+      eta_min: 1.0e-5
+
+training:
+  method: "backprop"
+  epochs: 160
+  steps_per_epoch: 400
+  accum_steps: 1
+  amp: true
+  device: "cuda"
+  log_every: 50
+  log_grad_norm_every: 200
+  ckpt:
+    dir: "checkpoints/search-grid"
+    keep_last: 6
+    save_every_steps: 2000
+    save_best_metric: "eval/target/success"
+
+# -----------------------------------------------------------------------------
+# Baselines + ablations (novelty-grade)
+# -----------------------------------------------------------------------------
+comparisons:
+  baselines:
+    - name: "analytical_akr"
+      enabled: true
+      description: "Ambainis–Kempe–Rivosh (AKR) grid search reference (if implemented)."
+
+    - name: "fixed_grover_d4"
+      enabled: true
+      description: "Fixed Grover diffusion coin for degree-4 grids."
+
+    - name: "global_time_coin"
+      enabled: true
+      description: "θ(t) learned but shared across nodes."
+
+    - name: "fixed_random_unitary_d4"
+      enabled: true
+      description: "Seeded random fixed U(4) coin baseline."
+
+  ablations:
+    - name: "no_coords"
+      enabled: true
+      description: "Disable coordinate features."
+
+    - name: "no_lappe"
+      enabled: true
+      description: "Disable Laplacian PE."
+
+    - name: "globalcoin"
+      enabled: true
+      description: "Force θ(v,t)=θ(t) (no node adaptivity)."
+
+    - name: "timefrozen"
+      enabled: true
+      description: "Force θ(v,t)=θ(v) (no time adaptivity)."
+
+# -----------------------------------------------------------------------------
+# Evaluation protocol (CI + artifacts)
+# -----------------------------------------------------------------------------
+eval:
+  enabled: true
+
+  ci:
+    alpha: 0.1
+    n_eval_seeds: 5
+    episodes_per_seed:
+      val: 80
+      test_iid: 80
+      test_ood: 100
+    method: "bootstrap"
+    bootstrap:
+      n_resamples: 2000
+      block_by: "episode"
+
+  metrics:
+    - "target/success"
+    - "target/maxp"
+    - "mix/tv"
+    - "mix/js"
+    - "mix/H"
+    - "mix/kl_pu"
+
+  artifacts:
+    write_dir: "eval"
+    write_ci: true
+    write_per_seed: true
+    write_tables: true
+    write_json: true
+
+    stats:
+      enabled: true
+      quantiles: [0.05, 0.25, 0.5, 0.75, 0.95]
+      include_probability_checks: true
+      include_time_series: true
+
+    embeddings:
+      enabled: true
+      source: "gnn"
+      aggregate_time: "last"
+      max_nodes_for_plot: 1024
+      pca:
+        enabled: true
+        n_components: 2
+      color_by:
+        - "coord_x"
+        - "coord_y"
+        - "degree"
+      save:
+        raw_pt: true
+        raw_csv: true
+        pca_csv: true
+        pca_png: true
+        stats_json: true
+
+    plots:
+      enabled: true
+      success_curve: true
+      tv_curve: true
+      theta_spectra: true
+
+# -----------------------------------------------------------------------------
+# Success criteria (pre-registered)
+# -----------------------------------------------------------------------------
 success_criteria:
   improvement_over_best_baseline:
-    epsilon: 0.03     # lower 95% CI of improvement >= epsilon
-compute_budget:
-  device: auto
+    metric: "target/success"
+    split: "test_ood"
+    min_abs_improvement: 0.03
+
+# -----------------------------------------------------------------------------
+# Compute budget
+# -----------------------------------------------------------------------------
+compute:
+  device: "auto"
   dtype:
-    encoder: float32
-    state: complex128
+    encoder: "float32"
+    state: "complex128"
+  amp: true
   wallclock_hours: 16
   max_memory_gb: 24
-notes: >
-  Uses degree-4 local coins; Cayley map is numerically stable and fast.
+  track_throughput: true

@@ -31,19 +31,51 @@ __all__ = [
 # --------------------------------------------------------------------------------------
 
 
-def stable_hash64(x: str | bytes | int | tuple | Sequence) -> int:
+def stable_hash64(x: Any) -> int:
     """
     Deterministic 64-bit hash via SHA-256 → lower 8 bytes interpreted as unsigned.
     Accepts strings, bytes, ints, and (nested) sequences/tuples.
     """
 
-    def _to_bytes(obj) -> bytes:
+    def _to_bytes(obj: Any) -> bytes:
+        # NumPy scalar types (np.int64, np.float32, np.bool_, ...)
+        # Convert to plain Python scalars to avoid repr(...) differences across versions/platforms.
+        if isinstance(obj, np.generic):
+            return _to_bytes(obj.item())
+
+        if obj is None:
+            return b"None"
+
+        # Handle bool explicitly (bool is a subclass of int)
+        if isinstance(obj, bool):
+            return b"True" if obj else b"False"
+
         if isinstance(obj, bytes):
             return obj
+
         if isinstance(obj, str):
             return obj.encode("utf-8")
+
+        if isinstance(obj, float):
+            # Python's repr(float) is deterministic and round-trippable.
+            return repr(obj).encode("utf-8")
+
         if isinstance(obj, int):
             return str(obj).encode("utf-8")
+
+        # Deterministic mapping encoding (important if configs/groups are dict-like)
+        if isinstance(obj, Mapping):
+            items = list(obj.items())
+            # Sort keys by their byte encoding for stable ordering independent of insertion order
+            items.sort(key=lambda kv: _to_bytes(kv[0]))
+            b = b"{"
+            for i, (k, v) in enumerate(items):
+                if i > 0:
+                    b += b","
+                b += _to_bytes(k) + b":" + _to_bytes(v)
+            b += b"}"
+            return b
+
         if isinstance(obj, (tuple, list)):
             # include separators to avoid ambiguity
             b = b"["
@@ -53,8 +85,10 @@ def stable_hash64(x: str | bytes | int | tuple | Sequence) -> int:
                 b += _to_bytes(el)
             b += b"]"
             return b
-        # Fallback to repr for anything else that’s deterministic (e.g., dicts after sorting)
+
+        # Fallback to repr for anything else that’s deterministic
         return repr(obj).encode("utf-8")
+
 
     data = _to_bytes(x)
     h = hashlib.sha256(data).digest()

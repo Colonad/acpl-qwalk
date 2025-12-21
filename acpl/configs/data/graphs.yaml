@@ -11,13 +11,13 @@
 #
 # CLI overrides examples:
 #   python scripts/train.py +data=@data/graphs.yaml data.family=grid data.grid.Lx=10 data.grid.Ly=8
-#   python scripts/eval.py  +data=@data/graphs.yaml data.family=ws   data.ws.beta=0.35 data.ws.torus=true
-#   python scripts/eval.py  +data=@data/graphs.yaml data.posenc.kind=laplacian data.posenc.k=16
+#   python scripts/eval.py  +data=@data/graphs.yaml data.family=ws_grid data.ws_grid.beta=0.35 data.ws_grid.torus=true
+#   python scripts/eval.py  +data=@data/graphs.yaml data.family=ws      data.ws.beta=0.35 data.ws.k=8
 # -----------------------------------------------------------------------------
 
 # ------------------------------- Master switches ------------------------------
 
-# Pick one: line | cycle | grid | cube | regular | er | ws
+# Pick one: line | cycle | grid | cube | regular | er | ws | ws_grid
 family: line
 
 # Reproducibility seed for generators that use randomness (ER/WS/regular ties)
@@ -65,19 +65,44 @@ er:
   # Erdős–Rényi G(N, p). Edges coalesced, no self-loops.
   N: ${..N}
   p: 0.05              # edge probability in [0,1]
-  keep_connected: false  # if true, resample until connected (costly for small p)
+  keep_connected: true
+  max_tries: 2000
 
 ws:
-  # Watts–Strogatz on a 2D grid lattice with local neighborhoods, then rewire.
-  # Start from axis-aligned neighbors (kx in +x, ky in +y).
+  # Choose which WS generator to use:
+  #   ring -> watts_strogatz_graph(N,k,beta)
+  #   grid -> watts_strogatz_grid_graph(Lx,Ly,kx,ky,beta,torus,degree_preserving)
+  variant: grid   # ring | grid
+
+  # ---- ring (1D) ----
+  N: ${..N}
+  k: 8
+  beta: 0.2
+  keep_connected: true
+
+  # ---- grid (2D) ----
   Lx: 10
   Ly: 10
-  kx: 1                # neighborhood radius in +x
-  ky: 1                # neighborhood radius in +y
-  beta: 0.2            # rewiring probability in [0,1]
-  torus: false         # periodic boundary on both axes if true
-  # (Optional) ensure simple graph after rewiring (drop multi-edges/loops)
+  kx: 1
+  ky: 1
+  beta_grid: 0.2          # if your loader expects ws.beta, keep using ws.beta; otherwise use this
+  torus: false
+  degree_preserving: true
+  keep_connected_grid: false
+
+
+ws_grid:
+  # Watts–Strogatz-like small-world on a 2D grid (local neighbors then rewire).
+  Lx: 10
+  Ly: 10
+  kx: 1
+  ky: 1
+  beta: 0.2
+  torus: false
   sanitize: true
+  keep_connected: false
+  max_tries: 200
+
 
 # ------------------------- Positional encodings (PE) --------------------------
 # These settings control optional position/spectral features creation. Your

@@ -1,57 +1,220 @@
 # acpl/configs/task/transfer.yaml
-# -----------------------------------------------------------------------------
-# Phase A task config: **State transfer** on a single connected graph.
-# Default convention: source node = 0, target node = N-1 (last).
-# If your runner constructs the initial state from `source_index` and reads
-# the objective from `target_index`, this file is all you need to swap targets
-# or loss/aggregation behavior via CLI overrides.
-# -----------------------------------------------------------------------------
-
-name: transfer
-
-# -------------------------
-# Source / Target
-# -------------------------
-# By default we assume the episode builder will:
-#   • place the initial state on `source_index` (uniform over its outgoing ports)
-#   • compute the loss against `target_index`
+# =============================================================================
+# ACPL — Task config: STATE TRANSFER (Phase B style)
 #
-# NOTE: We don’t do arithmetic in YAML; set target_index explicitly for your N.
-# For line-64 experiments, that’s 63. For general N, override at launch:
-#   python scripts/train.py data.num_nodes=128 task.target_index=127
-source_index: 0
-target_index: 63     # set explicitly for your graph size; override from CLI if needed
+# Objective:
+#   Maximize terminal success at a designated target node j*:
+#       maximize P_T(target)
+#
+# Key design points (Phase B):
+#   - Node- and time-adaptive coins: θ(v,t) predicted by GNN + controller
+#   - Supports multiple graph families (line, regular, ER, WS), BUT:
+#       IMPORTANT: scripts/gen_manifest.py currently expects single-family experiments.
+#       Therefore, use ONE family per experiment manifest (e.g., transfer-line.yaml,
+#       transfer-regular.yaml), even though this task config can describe several.
+#
+# Typical CLI overrides:
+#   python scripts/train.py --experiment transfer-line --N 64 --T 63 ... task.target_index=63
+# =============================================================================
 
-# -------------------------
-# Loss family
-# -------------------------
-# nll        : −log P_t(target) after time aggregation
-# cvar_nll   : CVaR_α of −log P_t(target) (risk-sensitive)
-# neg_prob   : − P_t(target) (maximize probability directly)
-# hinge      : max(0, margin − [ P_t(target) − max_{u≠target} P_t(u) ])
-loss: nll
+task:
+  name: transfer
+  objective: "maximize P_T(target)"
+  horizon_T: 64
+  normalized_time_feature: true
 
-# -------------------------
-# Time aggregation
-# -------------------------
-# last     : use P at final step T−1
-# mean     : average P over t
-# max      : elementwise max over t (non-smooth)
-# softmax  : smooth attention over t with temperature `tau`
-time_agg: last
-tau: 0.2
+  # ---------------------------------------------------------------------------
+  # Source / Target selection
+  # ---------------------------------------------------------------------------
+  # Two supported modes (depending on your episode builder):
+  #   (A) scheme-based: use task.source/task.target in {"left","right","center","random","custom_index"}
+  #   (B) explicit indices: set source_index / target_index
+  #
+  # For fixed-N line experiments, explicit indices are most reproducible.
+  source: "custom_index"                # left | center | random | custom_index
+  target: "custom_index"                # right | center | random | custom_index
+  source_index: 0
+  target_index: 63
 
-# -------------------------
-# Loss shaping / numerics
-# -------------------------
-label_smoothing: 0.0   # ε in [0,1); NLL target prob becomes (1−ε) + ε/N
-cvar_alpha: 0.1        # tail mass for CVaR (used if loss=cvar_nll)
-margin: 0.0            # hinge margin (used if loss=hinge)
-reduce: mean           # mean | sum  (reduction over batch)
-eps: 1.0e-8            # floor to keep logs finite
+  # Optional: if your builder supports choosing the target “far away” on random graphs.
+  # (Safe to leave as metadata; ignored if unsupported.)
+  target_policy:
+    enabled: false
+    kind: "farthest"                    # farthest | random | diameter_approx
+    min_distance: 0
 
-# -------------------------
-# Probability handling
-# -------------------------
-normalize_prob: true   # renormalize P to simplex before loss (safety)
-check_simplex: false   # assert probabilities form a simplex (debug)
+data:
+  # ---------------------------------------------------------------------------
+  # IMPORTANT: default to single-family for eval-manifest compatibility.
+  # Choose the family in the experiment manifest, not here.
+  # ---------------------------------------------------------------------------
+  family: ["line"]                      # choose ONE per experiment manifest: ["line"] or ["regular"] or ["er"] or ["ws"]
+
+  # ---------------------------- LINE ---------------------------- #
+  line:
+    N_min: 64
+    N_max: 64
+    source: "left"
+    target: "right"
+
+  # --------------------------- REGULAR -------------------------- #
+  # d-regular random graphs (undirected). Requires any-degree coins -> exp/cayley.
+  regular:
+    enabled: false
+    N_min: 64
+    N_max: 192
+    d_grid: [3, 4, 6]
+    ensure_connected: true
+    source: "custom_index"
+    target: "custom_index"
+
+  # ----------------------------- ER ----------------------------- #
+  er:
+    enabled: false
+    n_min: 64
+    n_max: 256
+    p_grid: [0.02, 0.05]
+    ensure_connected: true
+    source: "custom_index"
+    target: "custom_index"
+
+  # ----------------------------- WS ----------------------------- #
+  ws:
+    enabled: false
+    n_min: 64
+    n_max: 256
+    k_grid: [4, 8]
+    beta_grid: [0.1, 0.2]
+    ensure_connected: true
+    source: "custom_index"
+    target: "custom_index"
+
+  # --------------------------- FEATURES -------------------------- #
+  features:
+    include_degree: true
+    laplacian_pe:
+      enabled: true
+      k: 16
+      sign_fix: "max-abs-positive"
+    coords:
+      enabled_on_grids: false
+      normalize: true
+
+  batching:
+    episodes_per_graph: 1
+    graphs_per_batch: 8                 # line graphs are cheap; lower for big random graphs
+    shuffle: true
+    seed: 1337
+
+loss:
+  # ---------------------------------------------------------------------------
+  # Loss family (Phase-A compatible + Phase-B “kind” schema)
+  # ---------------------------------------------------------------------------
+  # Supported:
+  #   - nll        : L = -log p̂(target) where p̂ is time-aggregated probability
+  #   - cvar_nll   : CVaR_α of -log p_t(target) over time
+  #   - neg_prob   : L = - p̂(target)
+  #   - hinge      : max(0, margin - [p̂(target) - max_{u≠target} p̂(u)])
+  kind: "nll"
+
+  # If true: expects batch provides target_index (recommended for variable-N).
+  # If false: uses task.target_index above.
+  target_from_batch: false
+
+  # ------------------------- Time aggregation ------------------------- #
+  time_agg: "last"                      # last | mean | max | softmax
+  tau: 0.2                              # used if time_agg=softmax
+
+  # ---------------------- shaping / numerics ------------------------- #
+  label_smoothing: 0.0
+  cvar_alpha: 0.1
+  margin: 0.0
+  reduction: "mean"
+  eps: 1.0e-8
+  clamp_min_p: 1.0e-12
+
+  # --------------------- probability safety -------------------------- #
+  normalize_prob: true
+  check_simplex: false
+
+regularization:
+  # Phase B5 regularizers on θ(v,t)
+  smooth_theta: 1.0e-3
+  l2_theta: 5.0e-5
+
+  spectral:
+    enabled: true
+    dct_weight: 5.0e-5
+    hf_bins: 0.25
+
+  grad_clip_norm: 1.0
+
+training:
+  method: "backprop"
+  optimizer:
+    name: "adamw"
+    lr: 1.0e-3
+    betas: [0.9, 0.999]
+    weight_decay: 1.0e-4
+    eps: 1.0e-8
+
+  scheduler:
+    enabled: true
+    name: "cosine_warmup"
+    warmup_steps: 250
+
+  epochs: 120
+  steps_per_epoch: 500
+  accum_steps: 1
+  amp: true
+  device: "cuda"
+
+  log_every: 50
+  log_grad_norm_every: 200
+
+  ckpt:
+    dir: "checkpoints/transfer"
+    keep_last: 5
+    save_every_steps: 2000
+    save_best_metric: "eval/target/success"   # higher is better
+
+ppo:
+  enabled: false
+  rollout_length: 64
+  epochs: 4
+  minibatch_size: 2048
+  clip_eps: 0.2
+  vf_coef: 0.5
+  ent_coef: 0.01
+  gamma: 0.995
+  gae_lambda: 0.95
+  max_grad_norm: 1.0
+
+eval:
+  seeds: [101, 102, 103, 201, 202]
+  ci_alpha: 0.1
+
+  metrics:
+    - "target/success"
+    - "target/maxp"
+    - "target/nll"
+    - "mix/tv"
+    - "mix/H"
+
+  robustness:
+    enabled: false
+    edge_phase:
+      sigma: 0.0
+      trials: 0
+
+viz:
+  pt_timelines:
+    enabled: true
+    topk_vertices: 10
+
+  tv_curves:
+    enabled: true
+
+  spectra:
+    enabled: true
+    dct_show_bins: 16

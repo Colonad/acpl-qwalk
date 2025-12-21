@@ -1,58 +1,386 @@
-# Experiment manifest: Fast mixing on a 2D lattice
-goal: mixing
-task: fast_mixing
-graph:
-  family: grid
-  train_L: [32, 48, 64, 80]
-  val_holdout_L: [40, 72]
-  test_ood_L: [96]
-horizon:
-  T_candidates: [64, 96, 128]
-  choose_on_val: true
-policy:
+# acpl/configs/experiments/mixing-grid.yaml
+# =============================================================================
+# ACPL — EXPERIMENT MANIFEST (Pre-registration)
+# Experiment: Fast Mixing on 2D periodic grids
+#
+# Novelty claims this experiment supports:
+#   C1) ACPL (node+time adaptive coins) mixes faster / reaches lower TV than
+#       fixed/static/global schedules on IID and OOD grid sizes (with CI).
+#   C2) Ablations show causality: removing coords/LapPE or removing node/time
+#       adaptivity degrades mixing performance.
+#   C3) OOD size generalization: train on L<=80, test on L=96 (periodic boundary).
+#   C4) Representation evidence: node embeddings reflect geometry and mixing roles
+#       (variance + PCA plots; color by coords and degree).
+#   C5) Optional robustness sweeps: mixing degradation under edge-phase disorder.
+#
+# IMPORTANT:
+# - This experiment manifest is SINGLE-FAMILY (grid-2d) to be compatible with
+#   scripts/gen_manifest.py as currently written (it does not support multi-family).
+# - Irregular graph mixing is a separate experiment manifest (mixing-irregular.yaml).
+# =============================================================================
+
+experiment:
+  name: "mixing-grid"
+  goal: "fast mixing to uniform on 2D periodic grids"
+  description: >
+    Pre-registered evaluation of Adaptive Coin Policy Learning (ACPL) for fast
+    mixing on 2D periodic lattice graphs. Primary metric is TV(P_T, Uniform).
+    Includes CI-style evaluation, baselines/ablations, OOD size generalization,
+    and interpretability artifacts (node embeddings + variance + spectra).
+  tags: ["mixing", "grid-2d", "periodic", "ood", "ablations", "baselines", "ci", "embeddings"]
+  notes: >
+    This is the grid-only mixing study. Irregular graphs are handled in a separate
+    manifest once the generator supports multi-family.
+
+defaults:
+  task_config: "acpl/configs/task/mixing.yaml"
+  optim_config: "acpl/configs/optim.yaml"
+
+# -----------------------------------------------------------------------------
+# 1) Determinism + provenance
+# -----------------------------------------------------------------------------
+repro:
+  master_seed: 1234
+  train_seeds: [0, 1, 2]                # minimum novelty-grade; recommended [0,1,2,3,4]
+  eval_seeds: [301, 302, 303, 401, 402] # matches your task config defaults
+  deterministic_torch: true
+  cublas_workspace_config: ":4096:8"
+  pythonhashseed: 0
+  save_git_info: true
+  save_resolved_config: true
+
+# -----------------------------------------------------------------------------
+# 2) Data & split protocol (IID + OOD) for GRID-2D
+# -----------------------------------------------------------------------------
+data:
+  family: "grid-2d"
+
+  grid:
+    boundary: "periodic"
+    # (Optional) coordinate normalization used in features; kept here as provenance
+    coords_normalize: true
+
+  # --- Training sizes ---
+  train_sizes:
+    mode: "fixed_list"                  # fixed_list | uniform_band
+    fixed_list: [32, 48, 64, 80]
+    band:
+      L_min: 32
+      L_max: 80
+
+  # --- Validation holdout sizes (IID) ---
+  val_sizes:
+    mode: "fixed_list"
+    fixed_list: [40, 72]
+
+  # --- IID test sizes (optional) ---
+  test_iid_sizes:
+    mode: "fixed_list"
+    fixed_list: [48, 64]                # optional; can be disabled in gen_manifest via --no-test-iid
+
+  # --- OOD test sizes ---
+  test_ood_sizes:
+    mode: "fixed_list"
+    fixed_list: [96]                    # primary OOD claim
+    extra_optional: [112]               # if compute allows
+
+  batching:
+    episodes_per_graph: 1
+    graphs_per_batch_train: 2           # large N=L^2; keep small
+    graphs_per_batch_eval: 1
+    shuffle_train: true
+
+  # --- Manifest locking (critical for CI + novelty tables) ---
+  manifests:
+    enabled: true
+    root_dir: "acpl/data/manifests"
+    val_manifest: "mixing-grid-val.json"
+    test_iid_manifest: "mixing-grid-test-iid.json"
+    test_ood_manifest: "mixing-grid-test-ood.json"
+    episodes:
+      val: 120                          # per horizon; adjust upward if cheap
+      test_iid: 120
+      test_ood: 150
+    build:
+      seed: 1338
+      episode_seed_base: 910000
+      horizon_policy: "per_horizon_manifest"
+      per_horizon:
+        enabled: true
+        horizons: [64, 96, 128]
+
+# -----------------------------------------------------------------------------
+# 3) Simulation protocol (horizon choice + curriculum)
+# -----------------------------------------------------------------------------
+sim:
+  # Original legacy manifest had "choose_on_val: true". We implement that as:
+  # - pre-register candidate horizons
+  # - (optionally) select best horizon on VAL for reporting, but still report full curves
+  horizon_selection:
+    enabled: true
+    candidates: [64, 96, 128]
+    choose_on_val: true
+    criterion_metric: "mix/tv"          # lower is better
+    tie_break: "smaller_T"
+
+  curriculum:
+    enabled: false                       # mixing usually trains at the target horizon directly
+    schedule:
+      - horizon_T: 64
+        epochs: 40
+      - horizon_T: 96
+        epochs: 40
+      - horizon_T: 128
+        epochs: 40
+
+  rollout:
+    check_unitarity: false
+    check_simplex_every: 0
+
+# -----------------------------------------------------------------------------
+# 4) Model / policy specification
+# -----------------------------------------------------------------------------
+model:
   gnn:
-    kind: GCN
+    kind: "gcn"
     layers: 3
-    hidden: 128
-    norm: graphnorm
+    hidden_dim: 128
     dropout: 0.1
+    norm: "graphnorm"
+    residual: true
+
   controller:
-    kind: GRU
-    hidden: 128
+    kind: "gru"
+    hidden_dim: 128
+    layers: 1
+    bidirectional: false                 # bidirectional can be optional; keep off initially for stability
     dropout: 0.1
+    time_pe_dim: 32
+    normalized_time_feature: true
+
+  head:
+    kind: "mlp"
+    hidden_dim: 0
+    activation: "gelu"
+
   coin:
-    map: cayley  # dv=4
+    # Grid degree is 4. Use Cayley/exp for d>2 (novelty: mixed-degree machinery generalizes).
+    family: "cayley"                     # cayley | exp  (pick one; cayley often stable for U(d))
     generators: "full"
+    theta_scale: 1.0
+    theta_noise_std: 0.0
+    clamp:
+      enabled: false
+
+# -----------------------------------------------------------------------------
+# 5) Task binding / overrides (ties to acpl/configs/task/mixing.yaml)
+# -----------------------------------------------------------------------------
+task:
+  name: "mixing"
+  objective: "minimize TV(P_T, Uniform)"
+  normalized_time_feature: true
+
+  # IMPORTANT for scripts/gen_manifest.py boundary extraction:
+  # It looks for task.grid.boundary (or task.boundary fallback).
+  grid:
+    boundary: "periodic"
+
+  loss:
+    kind: "tv_to_uniform"
+    uniform_target: "per-graph"
+    reduction: "mean"
+
+# -----------------------------------------------------------------------------
+# 6) Features
+# -----------------------------------------------------------------------------
 features:
-  degree: true
-  pe:
-    method: coords
-    params: {normalize: true}
-optimization:
-  optimizer: adam
+  include_degree: true
+  coords:
+    enabled: true
+    normalize: true                      # (x/L, y/L)
+  laplacian_pe:
+    enabled: true
+    k: 16
+    sign_fix: "max-abs-positive"
+
+# -----------------------------------------------------------------------------
+# 7) Optimization / regularization
+# -----------------------------------------------------------------------------
+optim:
+  name: "adamw"
   lr: 2.5e-4
   weight_decay: 1.0e-5
-  batch_episodes: 32
-  epochs: 120
-  grad_clip: 1.0
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+
+  grad_clip:
+    enabled: true
+    mode: "norm"
+    max_norm: 1.0
+
   regularizers:
-    temporal_smoothness: 5.0e-3   # stronger smoothing for mixing
+    temporal_smoothness: 5.0e-3          # stronger smoothing for mixing schedules
     magnitude: 1.0e-5
-randomness:
-  master_seed: 1234
-  split_routing: size_bands
-  seeds_per_run: 5
-baselines:
-  - fixed_coin: hadamard
-  - global_time_varying_coin: true
+    spectral:
+      enabled: true
+      dct_weight: 1.0e-4
+      hf_bins: 0.5
+
+  scheduler:
+    kind: "cosine_warmup"
+    cosine_warmup:
+      warmup_steps: 1000
+      t_max: 8000
+      eta_min: 1.0e-5
+
+training:
+  method: "backprop"
+  epochs: 120
+  steps_per_epoch: 400
+  accum_steps: 1
+  amp: true
+  device: "cuda"
+  log_every: 50
+  log_grad_norm_every: 200
+  ckpt:
+    dir: "checkpoints/mixing-grid"
+    keep_last: 5
+    save_every_steps: 2000
+    save_best_metric: "eval/mix/tv"      # lower is better
+
+# -----------------------------------------------------------------------------
+# 8) Baselines & ablations (novelty requirements)
+# -----------------------------------------------------------------------------
+comparisons:
+  baselines:
+    - name: "fixed_grover_d4"
+      enabled: true
+      description: "Fixed Grover diffusion coin for degree-4 grid."
+    - name: "fixed_random_unitary_d4"
+      enabled: true
+      description: "Seeded random fixed U(4) coin, sanity baseline."
+    - name: "global_time_coin"
+      enabled: true
+      description: "θ(t) learned but shared across nodes."
+    - name: "node_only_coin"
+      enabled: true
+      description: "θ(v) learned but constant over time."
+    - name: "fixed_identity_coin"
+      enabled: false
+      description: "Identity coin baseline (often weak, optional)."
+
+  ablations:
+    - name: "no_coords"
+      enabled: true
+      description: "Disable coordinate features."
+    - name: "no_lappe"
+      enabled: true
+      description: "Disable Laplacian PE."
+    - name: "globalcoin"
+      enabled: true
+      description: "Force θ(v,t)=θ(t)."
+    - name: "timefrozen"
+      enabled: true
+      description: "Force θ(v,t)=θ(v)."
+    - name: "nodepermute"
+      enabled: true
+      description: "Permutation equivariance sanity check."
+
+# -----------------------------------------------------------------------------
+# 9) Evaluation protocol (CI + plots + stats + embeddings)
+# -----------------------------------------------------------------------------
+eval:
+  enabled: true
+
+  ci:
+    alpha: 0.1
+    n_eval_seeds: 5
+    episodes_per_seed:
+      val: 80
+      test_iid: 80
+      test_ood: 100
+    method: "bootstrap"
+    bootstrap:
+      n_resamples: 2000
+      block_by: "episode"
+
+  metrics:
+    - "mix/tv"
+    - "mix/js"
+    - "mix/hell"
+    - "mix/l2"
+    - "mix/H"
+    - "mix/kl_pu"
+
+  robustness:
+    # Optional novelty addon: sweep edge-phase noise and show TV degradation curves.
+    enabled: true
+    edge_phase:
+      sigma_grid: [0.0, 0.02, 0.05, 0.1]
+      trials: 6
+
+  artifacts:
+    write_dir: "eval"
+    write_ci: true
+    write_per_seed: true
+    write_tables: true
+    write_json: true
+
+    stats:
+      enabled: true
+      quantiles: [0.05, 0.25, 0.5, 0.75, 0.95]
+      include_probability_checks: true
+      include_time_series: true
+
+    embeddings:
+      enabled: true
+      source: "gnn"
+      aggregate_time: "last"
+      max_nodes_for_plot: 1024           # L=32..96 => N=1024..9216; we subsample above this in embedding code
+      pca:
+        enabled: true
+        n_components: 2
+      color_by:
+        - "coord_x"
+        - "coord_y"
+        - "degree"
+      save:
+        raw_pt: true
+        raw_csv: true
+        pca_csv: true
+        pca_png: true
+        stats_json: true
+
+    plots:
+      enabled: true
+      tv_curve: true                     # TV(P_t, U) vs time
+      final_distribution: true           # P_T heatmap / flattened plot (if implemented)
+      theta_spectra: true
+
+# -----------------------------------------------------------------------------
+# 10) Success criteria (pre-registered)
+# -----------------------------------------------------------------------------
 success_criteria:
-  tv_threshold: 0.05    # TV(ρ_T, uniform) <= 0.05 by T<=128
-compute_budget:
-  device: auto
+  tv_threshold:
+    metric: "mix/tv"
+    split: "test_ood"
+    threshold: 0.05
+    horizon_max: 128
+
+  ci_improvement:
+    metric: "mix/tv"
+    split: "test_ood"
+    min_abs_improvement: 0.01            # ACPL beats best baseline by ≥ ε in TV (lower is better)
+
+# -----------------------------------------------------------------------------
+# 11) Compute budget
+# -----------------------------------------------------------------------------
+compute:
+  device: "auto"
   dtype:
-    encoder: float32
-    state: complex128
+    encoder: "float32"
+    state: "complex128"
+  amp: true
   wallclock_hours: 10
   max_memory_gb: 20
-notes: >
-  Emphasizes temporal smoothness; plots TV vs t will be generated in eval.
+  track_throughput: true

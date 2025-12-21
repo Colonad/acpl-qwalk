@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from collections import deque
 from dataclasses import dataclass
 import math
 
@@ -26,6 +27,10 @@ __all__ = [
     "watts_strogatz_grid_graph",
     "watts_strogatz_grid_graph_degree_preserving",
     "random_geometric_graph",
+    # Aliases (Hydra family names)
+    "ws_graph",
+    "ws_grid_graph",
+
 ]
 
 # ======================================================================================
@@ -180,6 +185,35 @@ def _coalesce_undirected_edges(
     return out
 
 
+def _norm_edge(u: int, v: int) -> tuple[int, int]:
+    return (u, v) if u < v else (v, u)
+
+
+def _is_connected(num_nodes: int, edges: Iterable[tuple[int, int]]) -> bool:
+    """
+    Connectivity check for an undirected graph.
+    Returns True iff all nodes are reachable from node 0 (for N>0).
+    """
+    if num_nodes <= 1:
+        return True
+    adj: list[list[int]] = [[] for _ in range(num_nodes)]
+    for u, v in edges:
+        adj[u].append(v)
+        adj[v].append(u)
+
+    q: deque[int] = deque([0])
+    seen = [False] * num_nodes
+    seen[0] = True
+    while q:
+        u = q.popleft()
+        for w in adj[u]:
+            if not seen[w]:
+                seen[w] = True
+                q.append(w)
+    return all(seen)
+
+
+
 def build_arc_index(
     undirected_edges: Sequence[tuple[int, int]],
     num_nodes: int,
@@ -227,6 +261,46 @@ def build_arc_index(
     degrees = _ensure_torch_long(deg)
     arc_slices = _ensure_torch_long(node_ptr)
     return edge_index, degrees, arc_slices
+
+
+
+def _is_connected(num_nodes: int, undirected_edges: Sequence[tuple[int, int]]) -> bool:
+    """
+    Check connectivity of an undirected simple graph given edges (u<v).
+    Treats isolated nodes as disconnected unless num_nodes <= 1.
+    """
+    if num_nodes <= 1:
+        return True
+    if len(undirected_edges) == 0:
+        return False
+
+    adj = [[] for _ in range(num_nodes)]
+    for u, v in undirected_edges:
+        adj[u].append(v)
+        adj[v].append(u)
+
+    # Start BFS/DFS from node 0 (or first node with any neighbor)
+    start = 0
+    if not adj[start]:
+        for i in range(num_nodes):
+            if adj[i]:
+                start = i
+                break
+        else:
+            return False
+
+    seen = [False] * num_nodes
+    stack = [start]
+    seen[start] = True
+    while stack:
+        u = stack.pop()
+        for w in adj[u]:
+            if not seen[w]:
+                seen[w] = True
+                stack.append(w)
+
+    return all(seen)
+
 
 
 def build_degree_buckets(degrees: torch.Tensor) -> dict[int, torch.Tensor]:
@@ -389,34 +463,72 @@ def hypercube_graph(
 
 
 def erdos_renyi_graph(
-    N: int, p: float, seed: int | None = None, ensure_simple: bool = True
+    N: int,
+    p: float,
+    seed: int | None = None,
+    ensure_simple: bool = True,
+    *,
+    keep_connected: bool = False,
+    max_tries: int = 2000,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     G(N,p) with optional duplicate/self-loop culling (ensure_simple=True).
+    Optionally resample until connected (keep_connected=True).
     Coordinates: normalized line positions (stable default for irregulars).
     """
     if N < 0:
         raise ValueError("N must be nonnegative.")
     if not (0.0 <= p <= 1.0):
         raise ValueError("p must be in [0,1].")
+    if max_tries <= 0:
+        raise ValueError("max_tries must be positive.")
+
     rng = _rng(seed)
-    edges: list[tuple[int, int]] = []
-    for u in range(N):
-        for v in range(u + 1, N):
-            if rng.random() < p:
-                edges.append((u, v))
-    edges = _coalesce_undirected_edges(edges, N) if ensure_simple else edges
-    edge_index, degrees, arc_slices = build_arc_index(edges, N)
-    coords = _coords_line(N)
-    return edge_index, degrees, coords, arc_slices
+
+    # Trivial sizes are always connected.
+    if N <= 1:
+        edges: list[tuple[int, int]] = []
+        edge_index, degrees, arc_slices = build_arc_index(edges, N)
+        coords = _coords_line(N)
+        return edge_index, degrees, coords, arc_slices
+
+    for attempt in range(max_tries):
+        edges: list[tuple[int, int]] = []
+        for u in range(N):
+            for v in range(u + 1, N):
+                if rng.random() < p:
+                    edges.append((u, v))
+
+        if ensure_simple:
+            edges = _coalesce_undirected_edges(edges, N)
+
+        if not keep_connected or _is_connected(N, edges):
+            edge_index, degrees, arc_slices = build_arc_index(edges, N)
+            coords = _coords_line(N)
+            return edge_index, degrees, coords, arc_slices
+
+    raise RuntimeError(
+        f"ER keep_connected failed after {max_tries} attempts (N={N}, p={p})."
+    )
 
 
 def watts_strogatz_graph(
-    N: int, k: int, beta: float, seed: int | None = None
+    N: int,
+    k: int,
+    beta: float,
+    seed: int | None = None,
+    *,
+    keep_connected: bool = False,
+    max_factor: int = 20,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    1D Watts–Strogatz small-world: ring lattice with k/2 neighbors each side, random rewiring prob=beta.
-    Coordinates stay on the unit circle (original ring positions) for PE stability.
+    1D Watts–Strogatz (degree-preserving variant).
+
+    Start from a k-regular ring lattice, then perform degree-preserving double-edge swaps.
+    This guarantees every node keeps degree exactly k (matching ACPL coin-dimension assumptions).
+
+    target_swaps = round(beta * |E|)
+    Deterministic given the same seed.
     """
     if N <= 0:
         raise ValueError("N must be positive.")
@@ -424,30 +536,86 @@ def watts_strogatz_graph(
         raise ValueError("k must be even and satisfy 0 <= k < N.")
     if not (0.0 <= beta <= 1.0):
         raise ValueError("beta must be in [0,1].")
+    if max_factor <= 0:
+        raise ValueError("max_factor must be positive.")
+
     rng = _rng(seed)
 
-    # ring lattice
-    edges_set = set()
+    # Build k-regular ring lattice
+    edges_set: set[tuple[int, int]] = set()
+    nbr: list[set[int]] = [set() for _ in range(N)]
     for u in range(N):
         for j in range(1, k // 2 + 1):
             v = (u + j) % N
-            a, b = (u, v) if u < v else (v, u)
-            edges_set.add((a, b))
+            a, b = _norm_edge(u, v)
+            if (a, b) not in edges_set:
+                edges_set.add((a, b))
+                nbr[a].add(b)
+                nbr[b].add(a)
 
-    # rewiring
-    edges = list(edges_set)
-    for a, b in edges:
-        if rng.random() < beta:
-            u = a  # rewire (u, b) by changing the larger endpoint deterministically
-            for _ in range(64):
-                w = int(rng.integers(0, N))
-                if w == u:
-                    continue
-                c, d = (u, w) if u < w else (w, u)
-                if (c, d) not in edges_set:
-                    edges_set.remove((a, b))
-                    edges_set.add((c, d))
-                    break
+    edges_list = sorted(edges_set)  # deterministic base ordering
+    E = len(edges_list)
+    target_swaps = int(round(beta * E))
+
+    if target_swaps > 0 and E >= 2:
+        attempts = 0
+        max_attempts = max_factor * max(1, target_swaps)
+        swaps_done = 0
+
+        while swaps_done < target_swaps and attempts < max_attempts:
+            attempts += 1
+            i = int(rng.integers(0, E))
+            j = int(rng.integers(0, E))
+            if i == j:
+                continue
+
+            a, b = edges_list[i]
+            c, d = edges_list[j]
+            if len({a, b, c, d}) < 4:
+                continue
+
+            # Two possible swap patterns
+            if rng.random() < 0.5:
+                x1 = _norm_edge(a, d)
+                x2 = _norm_edge(c, b)
+            else:
+                x1 = _norm_edge(a, c)
+                x2 = _norm_edge(b, d)
+
+            if x1[0] == x1[1] or x2[0] == x2[1]:
+                continue
+            if x1 in edges_set or x2 in edges_set:
+                continue
+
+            old1 = (a, b)
+            old2 = (c, d)
+
+            # Apply swap updates
+            edges_set.remove(old1)
+            edges_set.remove(old2)
+            nbr[a].remove(b); nbr[b].remove(a)
+            nbr[c].remove(d); nbr[d].remove(c)
+
+            edges_set.add(x1); edges_set.add(x2)
+            u1, v1 = x1
+            u2, v2 = x2
+            nbr[u1].add(v1); nbr[v1].add(u1)
+            nbr[u2].add(v2); nbr[v2].add(u2)
+
+            if keep_connected and not _is_connected(N, edges_set):
+                # Revert
+                edges_set.remove(x1); edges_set.remove(x2)
+                nbr[u1].remove(v1); nbr[v1].remove(u1)
+                nbr[u2].remove(v2); nbr[v2].remove(u2)
+
+                edges_set.add(old1); edges_set.add(old2)
+                nbr[a].add(b); nbr[b].add(a)
+                nbr[c].add(d); nbr[d].add(c)
+                continue
+
+            edges_list[i] = x1
+            edges_list[j] = x2
+            swaps_done += 1
 
     edges = _coalesce_undirected_edges(list(edges_set), N)
     edge_index, degrees, arc_slices = build_arc_index(edges, N)
@@ -524,15 +692,20 @@ def watts_strogatz_grid_graph(
     ky: int = 2,
     beta: float = 0.1,
     seed: int | None = None,
+    *,
+    torus: bool = False,
+    degree_preserving: bool = True,
+    keep_connected: bool = False,
+    max_factor: int = 20,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    2D Watts–Strogatz variant on an Lx×Ly lattice with fixed grid coordinates.
+    2D small-world on an Lx×Ly lattice with fixed grid coordinates.
 
-    Start from a 4*k-neighborhood lattice:
-      For each node (x,y), connect to (x+dx,y) for dx=1..kx and to (x,y+dy) for dy=1..ky
-      (right & up only; coalescing gives full symmetry).
-    Then, for each such edge, rewire with probability `beta` by changing the *larger* endpoint
-    to a random node (avoid self-loops/duplicates).
+    If degree_preserving=True (default), we do degree-preserving swaps (recommended for ACPL).
+    If degree_preserving=False, we do endpoint rewiring (degrees can vary), but deterministically
+    iterate edges in sorted order and avoid duplicates/self-loops.
+
+    torus=True enables periodic wrap on both axes.
     """
     if Ly is None:
         Ly = Lx
@@ -542,6 +715,21 @@ def watts_strogatz_grid_graph(
         raise ValueError("kx, ky must be nonnegative.")
     if not (0.0 <= beta <= 1.0):
         raise ValueError("beta must be in [0,1].")
+    if max_factor <= 0:
+        raise ValueError("max_factor must be positive.")
+
+    if degree_preserving:
+        return watts_strogatz_grid_graph_degree_preserving(
+            Lx=Lx,
+            Ly=Ly,
+            kx=kx,
+            ky=ky,
+            beta=beta,
+            torus=torus,
+            seed=seed,
+            max_factor=max_factor,
+            keep_connected=keep_connected,
+        )
 
     rng = _rng(seed)
     N = Lx * Ly
@@ -549,34 +737,52 @@ def watts_strogatz_grid_graph(
     def vid(x: int, y: int) -> int:
         return y * Lx + x
 
-    # initial lattice edges
-    edges_set = set()
+    edges_set: set[tuple[int, int]] = set()
+
+    # base lattice
     for y in range(Ly):
         for x in range(Lx):
             u = vid(x, y)
             for dx in range(1, kx + 1):
-                if x + dx < Lx:
-                    edges_set.add((u, vid(x + dx, y)))
+                if torus:
+                    v = vid((x + dx) % Lx, y)
+                    edges_set.add(_norm_edge(u, v))
+                else:
+                    if x + dx < Lx:
+                        v = vid(x + dx, y)
+                        edges_set.add(_norm_edge(u, v))
             for dy in range(1, ky + 1):
-                if y + dy < Ly:
-                    edges_set.add((u, vid(x, y + dy)))
+                if torus:
+                    v = vid(x, (y + dy) % Ly)
+                    edges_set.add(_norm_edge(u, v))
+                else:
+                    if y + dy < Ly:
+                        v = vid(x, y + dy)
+                        edges_set.add(_norm_edge(u, v))
 
-    # Rewire each edge with prob beta (like 1D WS but on the grid neighborhood)
-    edges = list(edges_set)
+    # endpoint rewiring (degrees may vary)
+    edges = sorted(edges_set)  # deterministic order
     for a, b in edges:
         if rng.random() < beta:
             u = min(a, b)
-            for _ in range(128):
+            for _ in range(256):
                 w = int(rng.integers(0, N))
                 if w == u:
                     continue
-                c, d = (u, w) if u < w else (w, u)
-                if (c, d) not in edges_set:
-                    edges_set.remove((min(a, b), max(a, b)))
-                    edges_set.add((c, d))
+                nw = _norm_edge(u, w)
+                if nw not in edges_set:
+                    edges_set.remove(_norm_edge(a, b))
+                    edges_set.add(nw)
                     break
 
     edges = _coalesce_undirected_edges(list(edges_set), N)
+
+    if keep_connected and not _is_connected(N, edges):
+        # If you asked for connectivity but used non-degree-preserving rewiring,
+        # we resample by rerunning with a bumped seed-like stream (deterministic given seed).
+        # Simpler: just error, since this path is not recommended for ACPL.
+        raise RuntimeError("Non-degree-preserving WS-grid produced a disconnected graph.")
+
     edge_index, degrees, arc_slices = build_arc_index(edges, N)
     coords = _coords_grid(Lx, Ly)
     return edge_index, degrees, coords, arc_slices
@@ -589,15 +795,18 @@ def watts_strogatz_grid_graph_degree_preserving(
     ky: int = 1,
     beta: float = 0.1,
     *,
+    torus: bool = False,
     seed: int | None = None,
     max_factor: int = 20,
+    keep_connected: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Degree-preserving small-world on an Lx×Ly lattice using double-edge swaps.
 
-    Perform `num_swaps = round(beta * |E|)` successful swaps:
-      pick (a,b) and (c,d) with all endpoints distinct, replace by (a,d) & (c,b) or (a,c) & (b,d),
-      subject to: no self-loops, no duplicate edges. Degrees remain *exactly* preserved.
+    - Build a base lattice (with optional torus wrap).
+    - Perform target_swaps = round(beta * |E|) successful swaps.
+    - Degrees remain exactly preserved.
+    - If keep_connected=True, reject swaps that disconnect the graph.
     """
     if Ly is None:
         Ly = Lx
@@ -607,6 +816,8 @@ def watts_strogatz_grid_graph_degree_preserving(
         raise ValueError("kx, ky must be nonnegative.")
     if not (0.0 <= beta <= 1.0):
         raise ValueError("beta must be in [0,1].")
+    if max_factor <= 0:
+        raise ValueError("max_factor must be positive.")
 
     rng = _rng(seed)
     N = Lx * Ly
@@ -614,66 +825,81 @@ def watts_strogatz_grid_graph_degree_preserving(
     def vid(x: int, y: int) -> int:
         return y * Lx + x
 
+    edges_set: set[tuple[int, int]] = set()
+
     # Base lattice
-    edges_set = set()
     for y in range(Ly):
         for x in range(Lx):
             u = vid(x, y)
             for dx in range(1, kx + 1):
-                if x + dx < Lx:
-                    v = vid(x + dx, y)
-                    a, b = (u, v) if u < v else (v, u)
-                    edges_set.add((a, b))
+                if torus:
+                    v = vid((x + dx) % Lx, y)
+                    edges_set.add(_norm_edge(u, v))
+                else:
+                    if x + dx < Lx:
+                        v = vid(x + dx, y)
+                        edges_set.add(_norm_edge(u, v))
             for dy in range(1, ky + 1):
-                if y + dy < Ly:
-                    v = vid(x, y + dy)
-                    a, b = (u, v) if u < v else (v, u)
-                    edges_set.add((a, b))
+                if torus:
+                    v = vid(x, (y + dy) % Ly)
+                    edges_set.add(_norm_edge(u, v))
+                else:
+                    if y + dy < Ly:
+                        v = vid(x, y + dy)
+                        edges_set.add(_norm_edge(u, v))
 
-    edges = list(edges_set)
-    E = len(edges)
-
+    edges_list = sorted(edges_set)  # deterministic base
+    E = len(edges_list)
     target_swaps = int(round(beta * E))
+
     if target_swaps == 0:
-        edges = _coalesce_undirected_edges(edges, N)
+        edges = _coalesce_undirected_edges(list(edges_set), N)
         edge_index, degrees, arc_slices = build_arc_index(edges, N)
         coords = _coords_grid(Lx, Ly)
         return edge_index, degrees, coords, arc_slices
 
-    def _norm(u: int, v: int) -> tuple[int, int]:
-        return (u, v) if u < v else (v, u)
-
     attempts = 0
     max_attempts = max_factor * max(1, target_swaps)
     swaps_done = 0
-    edges_list = list(edges_set)
+
     while swaps_done < target_swaps and attempts < max_attempts:
         attempts += 1
-        i = int(rng.integers(0, len(edges_list)))
-        j = int(rng.integers(0, len(edges_list)))
+        i = int(rng.integers(0, E))
+        j = int(rng.integers(0, E))
         if i == j:
             continue
+
         a, b = edges_list[i]
         c, d = edges_list[j]
         if len({a, b, c, d}) < 4:
             continue
 
         if rng.random() < 0.5:
-            x1, x2 = _norm(a, d), _norm(c, b)
+            x1, x2 = _norm_edge(a, d), _norm_edge(c, b)
         else:
-            x1, x2 = _norm(a, c), _norm(b, d)
+            x1, x2 = _norm_edge(a, c), _norm_edge(b, d)
 
         if x1[0] == x1[1] or x2[0] == x2[1]:
             continue
         if x1 in edges_set or x2 in edges_set:
             continue
 
-        old1 = _norm(a, b)
-        old2 = _norm(c, d)
+        old1 = _norm_edge(a, b)
+        old2 = _norm_edge(c, d)
+
+        # apply
         edges_set.remove(old1)
         edges_set.remove(old2)
         edges_set.add(x1)
         edges_set.add(x2)
+
+        if keep_connected and not _is_connected(N, edges_set):
+            # revert
+            edges_set.remove(x1)
+            edges_set.remove(x2)
+            edges_set.add(old1)
+            edges_set.add(old2)
+            continue
 
         edges_list[i] = x1
         edges_list[j] = x2
@@ -683,6 +909,55 @@ def watts_strogatz_grid_graph_degree_preserving(
     edge_index, degrees, arc_slices = build_arc_index(edges, N)
     coords = _coords_grid(Lx, Ly)
     return edge_index, degrees, coords, arc_slices
+
+
+
+
+
+
+
+
+
+def ws_graph(
+    N: int,
+    k: int,
+    beta: float,
+    seed: int | None = None,
+    *,
+    sanitize: bool = True,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    # Alias for Hydra family name "ws"
+    return watts_strogatz_graph(N=N, k=k, beta=beta, seed=seed, sanitize=sanitize)
+
+
+def ws_grid_graph(
+    Lx: int,
+    Ly: int | None = None,
+    kx: int = 1,
+    ky: int = 1,
+    beta: float = 0.1,
+    seed: int | None = None,
+    *,
+    torus: bool = False,
+    sanitize: bool = True,
+    keep_connected: bool = False,
+    max_tries: int = 200,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    # Alias for Hydra family name "ws_grid"
+    return watts_strogatz_grid_graph(
+        Lx=Lx,
+        Ly=Ly,
+        kx=kx,
+        ky=ky,
+        beta=beta,
+        seed=seed,
+        torus=torus,
+        sanitize=sanitize,
+        keep_connected=keep_connected,
+        max_tries=max_tries,
+    )
+
+
 
 
 # ======================================================================================

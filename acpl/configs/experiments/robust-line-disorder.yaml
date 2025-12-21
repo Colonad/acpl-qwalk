@@ -1,62 +1,379 @@
-# Experiment manifest: Robust transport on 1D line with static edge-phase disorder
-goal: robust
-task: robust_transport
-graph:
-  family: line
-  train_sizes: [64, 96, 128, 160, 192]
-  val_holdout_sizes: [72, 136, 184]
-  test_ood_sizes: [256]
-noise:
-  type: static_edge_phase
-  sigma: [0.05, 0.10, 0.20]
-  draw_per_episode: true
-horizon:
-  T: [64, 96, 128]
-policy:
+# acpl/configs/experiments/robust-line-disorder.yaml
+# =============================================================================
+# ACPL — EXPERIMENT MANIFEST (Pre-registration)
+# Experiment: Robust transport on 1D line under static edge-phase disorder
+#
+# Novelty claims this experiment supports:
+#   R1) Robust ACPL coins achieve higher expected success AND better tail-risk
+#       (CVaR_α) than baselines under disorder.
+#   R2) Robustness sweeps: performance vs sigma curves (degradation profiles).
+#   R3) OOD generalization: train on N<=192, test on N=256.
+#   R4) Ablations demonstrate causality: removing node-adaptivity, time-adaptivity,
+#       or removing robustness objectives degrades robustness metrics.
+#   R5) Interpretability: node embeddings + variance statistics correlate with
+#       robust transport structure.
+#
+# This manifest is SINGLE-FAMILY (line) to be compatible with scripts/gen_manifest.py.
+# =============================================================================
+
+experiment:
+  name: "robust-line-disorder"
+  goal: "robust transport on line graphs with static edge-phase disorder"
+  description: >
+    Pre-registered evaluation of ACPL under edge-phase disorder on 1D lines.
+    We report mean success and CVaR_0.1 success at the target, and sweep sigma
+    to produce robustness curves. We include IID and OOD size tests and ablation
+    studies.
+  tags: ["robust", "line", "edge_phase", "cvar", "ood", "ablations", "baselines", "ci"]
+  notes: >
+    Disorder is applied as static edge phases sampled once per episode and held fixed
+    across the walk. Evaluation uses multiple disorder draws per episode (trials).
+
+defaults:
+  task_config: "acpl/configs/task/robust.yaml"
+  optim_config: "acpl/configs/optim.yaml"
+
+# -----------------------------------------------------------------------------
+# Reproducibility
+# -----------------------------------------------------------------------------
+repro:
+  master_seed: 1234
+  train_seeds: [0, 1, 2, 3, 4]           # novelty-grade; can reduce to [0,1,2] if compute tight
+  eval_seeds: [551, 552, 553, 651, 652]
+  deterministic_torch: true
+  cublas_workspace_config: ":4096:8"
+  pythonhashseed: 0
+  save_git_info: true
+  save_resolved_config: true
+
+# -----------------------------------------------------------------------------
+# Data splits (sizes) + frozen evaluation manifests
+# -----------------------------------------------------------------------------
+data:
+  family: "line"
+
+  train_sizes:
+    mode: "fixed_list"
+    fixed_list: [64, 96, 128, 160, 192]
+
+  val_sizes:
+    mode: "fixed_list"
+    fixed_list: [72, 136, 184]           # held-out sizes (still within range, but distinct)
+
+  test_iid_sizes:
+    mode: "fixed_list"
+    fixed_list: [96, 128, 160]           # IID sanity test (optional)
+
+  test_ood_sizes:
+    mode: "fixed_list"
+    fixed_list: [256]
+
+  batching:
+    episodes_per_graph: 1
+    graphs_per_batch_train: 2
+    graphs_per_batch_eval: 1
+    shuffle_train: true
+
+  manifests:
+    enabled: true
+    root_dir: "acpl/data/manifests"
+    val_manifest: "robust-line-disorder-val.json"
+    test_iid_manifest: "robust-line-disorder-test-iid.json"
+    test_ood_manifest: "robust-line-disorder-test-ood.json"
+    episodes:
+      val: 120
+      test_iid: 120
+      test_ood: 150
+    build:
+      seed: 1447
+      episode_seed_base: 920000
+      horizon_policy: "per_horizon_manifest"
+      per_horizon:
+        enabled: true
+        horizons: [64, 96, 128]
+
+# -----------------------------------------------------------------------------
+# Simulation protocol
+# -----------------------------------------------------------------------------
+sim:
+  curriculum:
+    enabled: false
+
+  rollout:
+    check_unitarity: false
+    check_simplex_every: 0
+
+# -----------------------------------------------------------------------------
+# Task binding + robust objective definition
+# -----------------------------------------------------------------------------
+task:
+  name: "robust"
+  objective: "maximize robust success at target j*"
+  normalized_time_feature: true
+  horizon_T: 128
+
+  # Line endpoints convention (loader interprets these)
+  line:
+    source: "left"
+    target: "right"
+
+  # Loss is robust expectation + CVaR by default
+  loss:
+    kind: "robust_combo"
+    cvar_alpha: 0.10
+    reduction: "mean"
+    clamp_min_p: 1.0e-9
+
+# -----------------------------------------------------------------------------
+# Disorder spec (train-time) + evaluation sweeps
+# -----------------------------------------------------------------------------
+disorder:
+  train:
+    edge_phase:
+      enabled: true
+      sigma: 0.10                        # train-time sigma (can tune on val)
+      wrap: true
+      trials_per_episode: 1
+
+    coin_dephase:
+      enabled: false
+      sigma: 0.0
+
+    edge_dropout:
+      enabled: false
+      p: 0.0
+
+  eval:
+    edge_phase:
+      enabled: true
+      sigma_grid: [0.0, 0.05, 0.10, 0.15, 0.20]
+      trials: 8                          # disorder draws per eval episode per sigma
+
+    coin_dephase:
+      enabled: false
+      sigma_grid: [0.0, 0.05, 0.10]
+      trials: 6
+
+# -----------------------------------------------------------------------------
+# Model / policy
+# -----------------------------------------------------------------------------
+model:
   gnn:
-    kind: GIN
+    kind: "gin"                          # robust tends to like expressive encoders
     layers: 2
-    hidden: 128
-    norm: graphnorm
+    hidden_dim: 128
     dropout: 0.1
+    norm: "graphnorm"
+    residual: true
+
   controller:
-    kind: GRU
-    hidden: 128
+    kind: "gru"
+    hidden_dim: 128
+    layers: 1
+    bidirectional: false
     dropout: 0.1
+    time_pe_dim: 32
+    normalized_time_feature: true
+
   coin:
-    map: SU2
+    # Line degree=2 -> SU(2) is natural
+    family: "su2"
+    theta_scale: 1.0
+    theta_noise_std: 0.0
+
+# -----------------------------------------------------------------------------
+# Features
+# -----------------------------------------------------------------------------
 features:
-  degree: true
-  pe:
-    method: coord
-    params: {axis: x_norm}
-optimization:
-  optimizer: adam
+  include_degree: true
+  coords:
+    enabled: true
+    kind: "coord_1d"
+    normalize: true
+  laplacian_pe:
+    enabled: false                       # optional; can ablate later on line
+    k: 8
+    sign_fix: "max-abs-positive"
+
+# -----------------------------------------------------------------------------
+# Optimization / regularization
+# -----------------------------------------------------------------------------
+optim:
+  name: "adamw"
   lr: 2.5e-4
   weight_decay: 1.0e-5
-  batch_episodes: 32
-  epochs: 160
-  grad_clip: 1.0
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+
+  grad_clip:
+    enabled: true
+    mode: "norm"
+    max_norm: 1.0
+
   regularizers:
     temporal_smoothness: 2.0e-3
     magnitude: 1.0e-5
-randomness:
-  master_seed: 1234
-  split_routing: size_bands
-  seeds_per_run: 7
-baselines:
-  - fixed_coin: hadamard
-  - global_time_varying_coin: true
+    spectral:
+      enabled: true
+      dct_weight: 1.0e-4
+      hf_bins: 0.5
+
+  scheduler:
+    kind: "cosine_warmup"
+    cosine_warmup:
+      warmup_steps: 500
+      t_max: 12000
+      eta_min: 1.0e-5
+
+training:
+  method: "backprop"
+  epochs: 160
+  steps_per_epoch: 400
+  accum_steps: 1
+  amp: true
+  device: "cuda"
+  log_every: 50
+  log_grad_norm_every: 200
+  ckpt:
+    dir: "checkpoints/robust-line-disorder"
+    keep_last: 6
+    save_every_steps: 2000
+    save_best_metric: "eval/target/success"   # higher is better
+
+# -----------------------------------------------------------------------------
+# Baselines + ablations (novelty-grade)
+# -----------------------------------------------------------------------------
+comparisons:
+  baselines:
+    - name: "fixed_hadamard"
+      enabled: true
+      description: "Fixed Hadamard coin on degree-2 line (classic)."
+
+    - name: "global_time_coin"
+      enabled: true
+      description: "θ(t) learned but shared across nodes; tests node-adaptivity importance."
+
+    - name: "node_only_coin"
+      enabled: true
+      description: "θ(v) learned but constant over time; tests time-adaptivity importance."
+
+    - name: "fixed_random_su2"
+      enabled: true
+      description: "Seeded random fixed SU(2) coin baseline."
+
+  ablations:
+    - name: "no_robustness"
+      enabled: true
+      description: "Train without disorder (sigma=0) then evaluate under sigma sweep."
+
+    - name: "cvar_off"
+      enabled: true
+      description: "Set cvar_alpha=0 (pure expectation), compare tail-risk behavior."
+
+    - name: "mc1"
+      enabled: true
+      description: "Set monte_carlo.episodes=1 to show variance/robustness tradeoff."
+
+    - name: "smooth0"
+      enabled: true
+      description: "Set temporal_smoothness=0 to test smooth schedule importance."
+
+# -----------------------------------------------------------------------------
+# Evaluation protocol (CI + robustness curves + artifacts)
+# -----------------------------------------------------------------------------
+eval:
+  enabled: true
+
+  ci:
+    alpha: 0.1
+    n_eval_seeds: 5
+    episodes_per_seed:
+      val: 80
+      test_iid: 80
+      test_ood: 100
+    method: "bootstrap"
+    bootstrap:
+      n_resamples: 2000
+      block_by: "episode"
+
+  metrics:
+    - "target/success"
+    - "target/maxp"
+    - "target/cvar_success"              # if your metrics pack emits this
+    - "mix/tv"
+    - "mix/H"
+
+  robustness:
+    enabled: true
+    edge_phase:
+      sigma_grid: [0.0, 0.05, 0.10, 0.15, 0.20]
+      trials: 8
+
+  artifacts:
+    write_dir: "eval"
+    write_ci: true
+    write_per_seed: true
+    write_tables: true
+    write_json: true
+
+    stats:
+      enabled: true
+      quantiles: [0.05, 0.25, 0.5, 0.75, 0.95]
+      include_probability_checks: true
+      include_time_series: true
+      include_robust_sweep_tables: true
+
+    embeddings:
+      enabled: true
+      source: "gnn"
+      aggregate_time: "last"
+      max_nodes_for_plot: 2048
+      pca:
+        enabled: true
+        n_components: 2
+      color_by:
+        - "coord_1d"
+        - "degree"
+        - "target_distance"              # if available (else ignored by viz)
+      save:
+        raw_pt: true
+        raw_csv: true
+        pca_csv: true
+        pca_png: true
+        stats_json: true
+
+    plots:
+      enabled: true
+      success_vs_sigma: true
+      cvar_vs_sigma: true
+      tv_curve: true
+      theta_spectra: true
+
+# -----------------------------------------------------------------------------
+# Success criteria (pre-registered)
+# -----------------------------------------------------------------------------
 success_criteria:
   cvar_alpha: 0.10
-  cvar_improvement_epsilon: 0.03
-  mean_success_improvement_epsilon: 0.03
-compute_budget:
-  device: auto
+
+  cvar_improvement:
+    metric: "target/cvar_success"
+    split: "test_ood"
+    min_abs_improvement: 0.03
+
+  mean_success_improvement:
+    metric: "target/success"
+    split: "test_ood"
+    min_abs_improvement: 0.03
+
+# -----------------------------------------------------------------------------
+# Compute budget
+# -----------------------------------------------------------------------------
+compute:
+  device: "auto"
   dtype:
-    encoder: float32
-    state: complex128
+    encoder: "float32"
+    state: "complex128"
+  amp: true
   wallclock_hours: 16
   max_memory_gb: 24
-notes: >
-  Report mean, quantiles, and CVaR_0.1 across M=100 disorder draws per episode.
+  track_throughput: true
