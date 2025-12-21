@@ -9,6 +9,7 @@ import math
 from pathlib import Path
 import re
 import hashlib
+import inspect
 
 import sys
 from types import SimpleNamespace
@@ -728,14 +729,9 @@ class RobustTargetEpisodeDataset(Dataset):
         return self.num_episodes
 
     def _episode_seed(self, idx: int) -> int:
-        h = hashlib.blake2b(digest_size=8)
-        h.update(str(self.base_seed).encode("utf-8"))
-        h.update(b"/")
-        h.update(str(self.epoch).encode("utf-8"))
-        h.update(b"/")
-        h.update(str(int(idx)).encode("utf-8"))
-        return int.from_bytes(h.digest(), "little", signed=False)
-
+        # Global index for this split/epoch so each epoch uses a fresh, deterministic set
+        gidx = int(self.epoch) * int(self.num_episodes) + int(idx)
+        return _derive_episode_seed(self.manifest_hex, self.split, gidx)
     def __getitem__(self, idx: int) -> dict:
         gen = torch.Generator(device="cpu")
         gen.manual_seed(self._episode_seed(idx))

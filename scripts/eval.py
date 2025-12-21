@@ -32,6 +32,7 @@ from collections.abc import Iterable, Mapping
 import importlib
 import io
 import json
+import hashlib
 import os
 from pathlib import Path
 import sys
@@ -730,6 +731,18 @@ def run_eval(
                 # if trainer override applier isn't present, ignore
                 pass
 
+
+        # Stable manifest hash (matches train.py behavior when available)
+        manifest_hex = ckpt.get("manifest_hex", None)
+        if not isinstance(manifest_hex, str) or not manifest_hex:
+            try:
+                import yaml as _yaml  # optional; train.py uses YAML for hashing
+                blob = _yaml.safe_dump(cfg, sort_keys=True).encode("utf-8")
+            except Exception:
+                blob = json.dumps(cfg, sort_keys=True, default=str).encode("utf-8")
+            manifest_hex = hashlib.blake2b(blob, digest_size=16).hexdigest()
+
+
         seed_base = int(cfg.get("seed", 0))
         torch_device = th.select_device(device)
         dtype = th.select_dtype(cfg.get("dtype", "float32"))
@@ -741,11 +754,14 @@ def run_eval(
             task_cfg = {"name": str(task_cfg)}
         task_name = str(task_cfg.get("name", cfg.get("goal", "transfer"))).lower().strip()
         is_search = ("search" in task_name)
+        is_mixing = ("mix" in task_name)
+        is_robust = ("robust" in task_name)
 
-        init_mode = str(task_cfg.get("init_state", "uniform" if is_search else "node0")).lower().strip()
-        if init_mode not in ("uniform", "node0"):
-            init_mode = "uniform" if is_search else "node0"
 
+        default_init = "uniform" if is_search else ("node" if is_robust else "node0")
+        init_mode = str(task_cfg.get("init_state", default_init)).lower().strip()
+        if init_mode not in ("uniform", "node0", "node"):
+            init_mode = default_init
         # --- coin family ---
         coin_cfg = cfg.get("coin", {"family": "su2"}) or {}
         if not isinstance(coin_cfg, dict):
@@ -801,7 +817,8 @@ def run_eval(
         if coin_family in ("exp", "cayley"):
             head_layernorm = False
 
-        in_dim = 3 if is_search else 2
+        use_indicator = bool(task_cfg.get("use_indicator", is_search or is_robust))
+        in_dim = 3 if use_indicator else 2
 
         acpl_cfg = th.ACPLPolicyConfig(
             in_dim=in_dim,
@@ -853,28 +870,73 @@ def run_eval(
         if isinstance(ema_shadow, Mapping):
             _try_apply_ema_shadow(model, ema_shadow)
 
-        # --- targets / payload / dataloader_factory ---
-        payload = {
-            "X": X,
-            "edge_index": g.edge_index,
-            "T": int(T),
-            "targets": None,
-        }
 
         if is_search:
             marks_per_episode = int(data_cfg.get("marks_per_episode", task_cfg.get("marks_per_episode", 1)))
+            payload = {
+                "X": X,  # base (N,2); dataset appends mark channel -> (N,3)
+                "edge_index": g.edge_index,
+                "T": int(T),
+                "targets": None,
+            }
+
             def _make_eval_iter(seed_i: int):
                 ds = th.MarkedGraphEpisodeDataset(
                     payload,
                     num_episodes=int(episodes),
                     N=g.N,
                     marks_per_episode=marks_per_episode,
-                    base_seed=seed_base + 1337 * int(seed_i),
+                    manifest_hex=manifest_hex,
+                    split="test",
                 )
-                ds.set_epoch(0)
+                ds.set_epoch(int(seed_i))  # disjoint deterministic episodes per CI seed
                 return (ds[i] for i in range(len(ds)))
+
+        elif is_robust:
+            targets_per_episode = int(task_cfg.get("targets_per_episode", 1))
+            random_start = bool(task_cfg.get("random_start", True))
+            append_indicator = bool(task_cfg.get("use_indicator", True))
+            payload = {
+                "X": X,  # base (N,2); dataset may append target indicator -> (N,3)
+                "edge_index": g.edge_index,
+                "T": int(T),
+                "targets": None,
+                "start_node": 0,
+            }
+
+            def _make_eval_iter(seed_i: int):
+                ds = th.RobustTargetEpisodeDataset(
+                    payload,
+                    num_episodes=int(episodes),
+                    N=g.N,
+                    targets_per_episode=targets_per_episode,
+                    manifest_hex=manifest_hex,
+                    split="test",
+                    append_target_indicator=append_indicator,
+                    random_start=random_start,
+                )
+                ds.set_epoch(int(seed_i))
+                return (ds[i] for i in range(len(ds)))
+
+        elif is_mixing:
+            payload = {
+                "X": X,
+                "edge_index": g.edge_index,
+                "T": int(T),
+            }
+
+            def _make_eval_iter(seed_i: int):
+                ds = th.SingleGraphEpisodeDataset(payload, num_episodes=int(episodes))
+                return (ds[i] for i in range(len(ds)))
+
         else:
-            # only set targets if config provides target_index (transfer-like experiments)
+            # transfer: fixed target window (only if config provides target_index)
+            payload = {
+                "X": X,
+                "edge_index": g.edge_index,
+                "T": int(T),
+                "targets": None,
+            }
             if "target_index" in task_cfg:
                 target_index = int(task_cfg.get("target_index", g.N - 1)) % int(g.N)
                 target_radius = int(task_cfg.get("target_radius", 0))
@@ -885,7 +947,6 @@ def run_eval(
             def _make_eval_iter(seed_i: int):
                 ds = th.SingleGraphEpisodeDataset(payload, num_episodes=int(episodes))
                 return (ds[i] for i in range(len(ds)))
-
         # --- rollout_fn (same as train.py) ---
         if coin_family == "su2":
             rollout_fn = th.make_rollout_su2_dv2(pm, shift, cdtype=cdtype, init_mode=init_mode)
@@ -927,7 +988,7 @@ def run_eval(
             log_every=0,
             grad_clip=None,
             cvar_alpha=float(task_cfg.get("cvar_alpha", 0.1)),
-            primary_on_targets=True,
+            primary_on_targets=(not is_mixing),
             progress_bar=True,
             amp=False,
         )
