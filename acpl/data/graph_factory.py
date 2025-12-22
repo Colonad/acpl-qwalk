@@ -1,9 +1,9 @@
 # acpl/data/graph_factory.py
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Callable
 
+from typing import Any, Callable
+import inspect
 import torch
 
 from acpl.data.graphs import (
@@ -34,20 +34,72 @@ def _get(cfg: Any, key: str, default: Any = None) -> Any:
         return default
 
 
-def _is_connected(edge_index: torch.Tensor, N: int) -> bool:
-    """Connectivity check on an undirected graph represented as oriented arcs (2, A)."""
+
+
+
+
+def _call_optional(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    """
+    Call `fn(*args, **kwargs)` but drop kwargs that `fn` doesn't accept.
+    This keeps graph_factory compatible even if graphs.py signatures evolve.
+    """
+    try:
+        sig = inspect.signature(fn)
+        allowed = {k: v for k, v in kwargs.items() if k in sig.parameters}
+        return fn(*args, **allowed)
+    except Exception:
+        return fn(*args, **kwargs)
+
+
+
+
+
+
+
+
+
+
+def _is_connected(edge_index: torch.Tensor, N: int, arc_slices: torch.Tensor | None = None) -> bool:
+    """
+    Connectivity check on an undirected graph represented as oriented arcs (2, A).
+
+    IMPORTANT:
+    - If `arc_slices` is provided (shape [N+1]), we use it (correct regardless of edge order).
+    - Otherwise we fall back to sorting by src to build CSR safely.
+    """
+
+    
+    
     if N <= 1:
         return True
     if edge_index.numel() == 0:
         return False
 
-    src = edge_index[0].to(torch.long)
     dst = edge_index[1].to(torch.long)
 
-    # Build adjacency lists via CSR using counts on src
-    counts = torch.bincount(src, minlength=N)
-    ptr = torch.zeros(N + 1, dtype=torch.long)
-    ptr[1:] = torch.cumsum(counts, dim=0)
+    if arc_slices is not None and arc_slices.numel() == N + 1:
+        ptr = arc_slices.to(torch.long)
+    else:
+        # Safe CSR build even if edge_index is not grouped by src
+        src = edge_index[0].to(torch.long)
+        order = torch.argsort(src)
+        src = src[order]
+        dst = dst[order]
+        
+        
+        # IMPORTANT: CSR slicing assumes arcs are grouped by src.
+        # Sort by src so this works regardless of edge_index ordering.
+        perm = torch.argsort(src)
+        src = src[perm]
+        dst = dst[perm]
+
+        # Build adjacency lists via CSR using counts on src (now sorted)        
+            
+        
+        
+        counts = torch.bincount(src, minlength=N)
+        ptr = torch.zeros(N + 1, dtype=torch.long)
+        ptr[1:] = torch.cumsum(counts, dim=0)
 
     # BFS
     seen = torch.zeros(N, dtype=torch.bool)
@@ -72,21 +124,37 @@ def _retry_until_connected(
     max_tries: int,
     seed: int | None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    if not keep_connected:
-        return build_once(seed)
+
 
     if seed is None:
-        raise ValueError("keep_connected=true requires an explicit seed for determinism.")
+        if keep_connected:
+            raise ValueError("keep_connected=true requires an explicit seed for determinism.")
 
     last = None
+    last_exc: Exception | None = None
     for t in range(max_tries):
         # deterministic retry schedule
-        edge_index, degrees, coords, arc_slices = build_once(seed + t)
+        s = None if seed is None else (seed + t)
+        try:
+            edge_index, degrees, coords, arc_slices = build_once(s)
+        except Exception as e:
+            last_exc = e
+            continue
+
         last = (edge_index, degrees, coords, arc_slices)
+
+        if not keep_connected:
+            return last
+
         if _is_connected(edge_index, int(degrees.numel())):
             return last
-    assert last is not None
-    return last
+
+    if last is not None:
+        return last
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Graph construction failed without returning a candidate.")
+
 
 
 def build_graph_tuple_from_cfg(cfg: Any) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -102,9 +170,35 @@ def build_graph_tuple_from_cfg(cfg: Any) -> tuple[torch.Tensor, torch.Tensor, to
     if data is not None and _get(data, "family", None) is not None:
         cfg = data
 
-    family = str(_get(cfg, "family"))
+    fam_raw = _get(cfg, "family", None)
+    if fam_raw is None:
+        raise ValueError("data.family must be set (e.g., line/cycle/grid-2d/hypercube/regular/er/ws).")
+
+    family = str(fam_raw).strip().lower()
+    # Aliases for consistency across configs
+    if family in ("grid-2d", "grid2d", "grid_2d"):
+        family = "grid"
+    if family in ("hypercube",):
+        family = "cube"
+    if family in ("erdos_renyi", "erdos-renyi", "er-graph"):
+        family = "er"
+    
+    
+    
+    
+    
     seed = _get(cfg, "seed", None)
     seed = int(seed) if seed is not None else None
+
+
+
+    coalesce = bool(_get(cfg, "coalesce", True))
+    if not coalesce:
+        raise ValueError("coalesce=false is not supported (DTQW expects a simple undirected graph).")
+
+
+
+
 
     directed = bool(_get(cfg, "directed", False))
     self_loops = bool(_get(cfg, "self_loops", False))
@@ -130,24 +224,27 @@ def build_graph_tuple_from_cfg(cfg: Any) -> tuple[torch.Tensor, torch.Tensor, to
         Lx = int(_get(block, "Lx", 1))
         Ly = _get(block, "Ly", None)
         Ly = int(Ly) if Ly is not None else None
-        return grid_graph(Lx, Ly, seed=seed)
+        make_coords = bool(_get(block, "make_coords", True))
+        return _call_optional(grid_graph, Lx, Ly, seed=seed, make_coords=make_coords)
 
     if family == "cube":
         block = _get(cfg, "cube", cfg)
         d = int(_get(block, "d", 0))
-        return hypercube_graph(d, seed=seed)
+        emit_bitstrings = bool(_get(block, "emit_bitstrings", False))
+        return _call_optional(hypercube_graph, d, seed=seed, emit_bitstrings=emit_bitstrings)
 
     if family == "regular":
         block = _get(cfg, "regular", cfg)
         N = int(_get(block, "N", N_top))
         d = int(_get(block, "d", 0))
-        max_retries = int(_get(block, "max_retries", 50))
+        keep_connected = bool(_get(block, "keep_connected", False))
+        max_tries = int(_get(block, "max_tries", _get(block, "max_retries", 50)))
+ 
 
         def _once(s: int | None):
             return d_regular_random_graph(N, d, seed=s)
 
-        # configuration-model retries are already inside graphs.py, but this respects YAML’s knob too.
-        return _retry_until_connected(_once, keep_connected=False, max_tries=max_retries, seed=seed)
+        return _retry_until_connected(_once, keep_connected=keep_connected, max_tries=max_tries, seed=seed)
 
     if family == "er":
         block = _get(cfg, "er", cfg)
@@ -157,7 +254,7 @@ def build_graph_tuple_from_cfg(cfg: Any) -> tuple[torch.Tensor, torch.Tensor, to
         max_tries = int(_get(block, "max_tries", 2000))
 
         def _once(s: int | None):
-            return erdos_renyi_graph(N, p, seed=s, ensure_simple=True)
+            return _call_optional(erdos_renyi_graph, N, p, seed=s, ensure_simple=True)
 
         return _retry_until_connected(_once, keep_connected=keep_connected, max_tries=max_tries, seed=seed)
 
@@ -173,7 +270,7 @@ def build_graph_tuple_from_cfg(cfg: Any) -> tuple[torch.Tensor, torch.Tensor, to
             max_tries = int(_get(block, "max_tries", 2000))
 
             def _once(s: int | None):
-                return watts_strogatz_graph(N, k, beta, seed=s)
+                return _call_optional(watts_strogatz_graph, N, k, beta, seed=s)
 
             return _retry_until_connected(_once, keep_connected=keep_connected, max_tries=max_tries, seed=seed)
 
@@ -186,20 +283,24 @@ def build_graph_tuple_from_cfg(cfg: Any) -> tuple[torch.Tensor, torch.Tensor, to
             beta = float(_get(block, "beta_grid", _get(block, "beta", 0.0)))
             torus = bool(_get(block, "torus", False))
             degree_preserving = bool(_get(block, "degree_preserving", False))
+            sanitize = bool(_get(block, "sanitize", True))
+
+
 
             # optional “keep connected” for grid variant
-            keep_connected = bool(_get(block, "keep_connected_grid", False))
-            max_tries = int(_get(block, "max_tries_grid", 200))
+            keep_connected = bool(_get(block, "keep_connected_grid", _get(block, "keep_connected", False)))
+            max_tries = int(_get(block, "max_tries_grid", _get(block, "max_tries", 200)))
 
             def _once(s: int | None):
                 if degree_preserving:
-                    return watts_strogatz_grid_graph_degree_preserving(
+                    return _call_optional(
+                        watts_strogatz_grid_graph_degree_preserving,
                         Lx, Ly, kx=kx, ky=ky, beta=beta, seed=s
                     )
-                return watts_strogatz_grid_graph(
-                    Lx, Ly, kx=kx, ky=ky, beta=beta, seed=s, torus=torus
+                return _call_optional(
+                    watts_strogatz_grid_graph,
+                    Lx, Ly, kx=kx, ky=ky, beta=beta, seed=s, torus=torus, sanitize=sanitize
                 )
-
             return _retry_until_connected(_once, keep_connected=keep_connected, max_tries=max_tries, seed=seed)
 
         raise ValueError(f"Unknown ws.variant={variant!r} (expected 'ring' or 'grid').")
@@ -217,8 +318,9 @@ def build_graph_tuple_from_cfg(cfg: Any) -> tuple[torch.Tensor, torch.Tensor, to
         max_tries = int(_get(block, "max_tries", 200))
 
         def _once(s: int | None):
-            return watts_strogatz_grid_graph(
-                Lx, Ly, kx=kx, ky=ky, beta=beta, seed=s, torus=torus
+            return _call_optional(
+                watts_strogatz_grid_graph,
+                Lx, Ly, kx=kx, ky=ky, beta=beta, seed=s, torus=torus, sanitize=sanitize
             )
 
         return _retry_until_connected(_once, keep_connected=keep_connected, max_tries=max_tries, seed=seed)
