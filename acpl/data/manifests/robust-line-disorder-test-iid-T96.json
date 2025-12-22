@@ -1,0 +1,7726 @@
+{
+  "build": {
+    "episode_seed_base": 920000,
+    "horizon_policy": "per_horizon_manifest",
+    "horizons": [
+      64,
+      96,
+      128
+    ],
+    "seed": 1447
+  },
+  "counts": {
+    "n_episodes": 120
+  },
+  "created_at_utc": "2025-12-22T02:23:44+00:00",
+  "episodes": [
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "04fbee1edc03c592a987cb9be8287d7c",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 10300234437981515292
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "0501f964631f8371f4b33d2fc2daeacb",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3955744646302581915
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "11b9916e30917e9b7491b5539be6d4e8",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 91047490209611297
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "155aea78302892fd4ed63d37e2c7033d",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 8048634942211767396
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "17486a3c9775c3f36c7c599387a20b92",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12617172034981958628
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "20e284d5a5b2ec9f553cb1cd7c05a510",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 7654277462559768114
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "213e34c28f07a5b67545ee36dcb5b53f",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11803217575664490659
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "223d11c257c65493a2264fd238abde64",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 6622167955051300096
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "243f7f5514b08e691cce7a226702e409",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 4348062687012483797
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "268213399f4e3d3a3bd1bb45e08c3e77",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 5739525854208237000
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "29921186d85d402397eb2968d3da6d43",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 806603748342612929
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "29c77130c2681ba5674f3da16cd25e06",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 15321283329212552237
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "29eee3606c4f064e9cf2eb81da88702e",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11020343317185077057
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "2a2886dbd330e78abe775f541b78b6e3",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 3887313413417441662
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "2b4bd0f82339d5bea27ca11e00ccd423",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11825317720485403217
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "2c0b1be6e7dcb201bc90c4be2b0df857",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 6185957558232903695
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "2c748bbe24562f30cc67352e77802f9d",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 1998603501715485499
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "2dd10587efdf5906aed79190f4f7a5de",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 14330054721970077539
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "2f188eb68796bb1178fa1a89a51f3a4e",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 5671658807750957507
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "32492b29c4d918b7d86ffee8380c61a2",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 8748362059540720953
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "349a806a50c3e8f3e1ce6895af2f97db",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 15348791355271921654
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "37307dd0bef57203d8f43640c53d109b",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 13486408021947702874
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "38041036d37f320c51abd7990cd1d171",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3410318096036117693
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "380b93ff21135159f99950e1d954f28c",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11642586014454593990
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "398bdab4b1704724e7544aef16282b3e",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 15283071036789113201
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "3e865b3031cacdef2be3a4100952ca8c",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 4104652015693675015
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "3e9253ccc0188b91fb810a57d6da7a08",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 15462803988484378456
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "4194959e52ac723e7e6de7da19019905",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 518278425752780640
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "443303cc7ce429dfd3b9ef8fcb111735",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 616651468851216653
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "48686c7868447fecaa092ed306599dae",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3901261230430155901
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "4959a469834903098085aa6a076931f5",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3974870902883717586
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "4caec9b638920737864b248c6e27814b",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 15933789980031695818
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "4cdbd11d468a8b8b3761daf2cc942746",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 618731654524148563
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "4d7c37aa8cbcb139ecbd827d9e010485",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 7753856044263470545
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "4e295860dd0b254da38e7be9791f5b73",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 14480864289635731216
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "4fd11f13c3b9de0990c9e69ac0a43e8c",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 7528241400775920869
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "507e722c322b01b22d2379a8a07a88b8",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10468756476094444509
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "50f126db00d9265d982d135692df4769",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 1531997696702251210
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "543209ad919ccd3a2060c925bdf98967",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 876450657230073806
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "54fb92616a7a9687d16f7fdb7951a69d",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 5253877486639119505
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "574bf3c1027abab856d7dd7f6222632e",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 16376946842568339697
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "58c22f79da9d160133ce142c156d8536",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 15008649257469639847
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "590ab4af77cc234c63046ab4bf67a949",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 14660222944743405118
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "59732c085d95c4e6a9627a36b89f8794",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 12886325131806324696
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "5c13a6e85839ae6407f716d5a0d93d68",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 17351951396233650770
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "5e089b5faf19cee80c51d2432fa02d0b",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 6052400664488110878
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "5e7d2839327a0160f07d42d1003e2e08",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 18408932470260491553
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "610723efd1d664b59b7e70884872acda",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 16439015530978407910
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "61e3bf37df112b8408d0aa2611047df7",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 13963524957980365018
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "62df5d6b4266de5bfc5a0cdd9f93dd97",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 5930331347054987152
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "667b5bcc772373844d77fff06f274f4a",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12055740154401828580
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "680673ec531e629e509c38469faebfe7",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 579145069822664102
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "69e1d4d2187c97619a2418b591e48a5d",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 11909466036464648510
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "724729c35f98cc5cee083a6bd8f6be39",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 1605125827206897183
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "733d148cf2859a93d8882948c5fb2f56",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3986968852528339404
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "747232a9fa757b5a2e48e918db8ed6aa",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 11143747918876645634
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "785a87f51c0288107470515a1c29cc41",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 167846287911279863
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "7aad9b7c23caa762141b62c7cae8a05a",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 9645327044041569464
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "7dd7ae87a8a1564801f201172650b314",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 17717077279084643558
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "7ff09e79a5d22f1b0d4ba5cfd65c2d17",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 17695959737521847283
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "82ab696cf79ed57077e0d09cde1582ab",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2446207897393386664
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "8742d8792984add2f523c83be38dfb60",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 12895361748721830187
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "88596916f3efe69377130e3c3ac6dc2f",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 11008704382318947215
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "8e58dc8ac1d614c3edbe6baad35e107f",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 3150710883023565690
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "8f5794c5f5cc88aaf995992dc3225cbb",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 13128531601254956061
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "91db54910750032778a0415815f024b4",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 17920497418504742301
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "91fafed4cef6f48749d9b0da9ddc7861",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 1988108683991957078
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "92daebfb4fa402999bf2e16a9e001351",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 16162961593933038183
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "933d9459ccef8c4771c2e9e9ab6dfc1e",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 2347498641099935049
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "93716ae5d27823565bf337b199f68959",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12103542395834817244
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "956db0e7df408622c2da4a9399ff28cd",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 14411458368540449525
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "9572ea9186113ff3ed39de7a9867c201",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 11063300891428883528
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "95cbc58b2076fdd12bde45030b226836",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 541058296595589971
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "9bc28a4b887ddb652c6841132962ba6d",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13872009852187107757
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "9db26e4fe05a03ea4043ad931ed8b3e6",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 5786300478093075126
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "9e4254f4ce6bc21a040738438bf84377",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 17066163340539150654
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "9f7acc20a30580d074474e99d5cc26a8",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 8687718249895928114
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "adbb8034bd9c67374c9ba67dbc8da668",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10005051865786837329
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "aecdb4aea778b9ca8485129ed263011d",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 16992378584653290215
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "b01ff51792cc33bdfbe17652a5d981bd",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 17583522264694503017
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "b0b0e16cb17efa1a01da51424fc64483",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 749724685117581549
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "b2e9ead5e1e353788ca459901ead3d8e",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3688120367482506069
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "baabc99f1ac50fdaa69fcfa770fdc6d7",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 17015435735327593005
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "bda73f2434f341e7d8638c787df07b56",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13238149087709707791
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "c2c53ad5113d7d74bbb57919c55bf729",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 17603048591565143625
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "c6e3776ed58e1e56c698f1561cbe8f1a",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3011169715838122559
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "c79b244778c75c2094932217b387c9a7",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11928901200597552442
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "ca2733572b058606b6be79490e46c5c7",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 15100628772695579791
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "ca85ebef3b9668e7daa37e4c3ed12505",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 10568281740274879710
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "cb37474f6321c324a71853efb18f82f3",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 11240607565242010252
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "ce70a62adf34f1bed6300ea4831133e5",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 13012885799287416438
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "ce7431f87f342f79c42f0e995f4f33d8",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 15031755019738675383
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "ce82004b25ade1e31be6ae29d14a6a01",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 5198796347707371681
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "d09d4c5c4577226a7ad557ffb134256d",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2724395481233387056
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "d252662eb7564beddc5f8cb33afdb8a9",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 15102977296408794627
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "d633b4f050191e1b0ed784203d3bb045",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 13269942899091183607
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "d64f84adcff8bca178bb5f56afea2a28",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 10862329472441209586
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "d93e9dd1228767915413de596434df7f",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 16466052288597190540
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "db34a8a331708f28537839be2b9aa00f",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10597972058447551916
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "db5d764286863681a8cb9f292aca8e4f",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 612638739024090316
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "df920def31d118c5184503865b757473",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 76261735188087942
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "e000139eb5e8200e426034510662da51",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 7218524041366553875
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "e0bc045e4c384948e1d75a96ada6dc6f",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 8512790007826091693
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "e0e5c9c620656c8101dcd8898fdfd685",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11420158181108395809
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "e1f9d7ea3cbd4582053fbf3f70cb4707",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 4955595798703615291
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "e3e251d17bb9ea35c429cf7b73bff39b",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 6077828026900648429
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "e4c30bc43261673f405c0c6888e50399",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 16240714816660632671
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "e9cf7da729962dc0f5a683ec01f16c44",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 3272532835867371486
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "eea7550364d8ee3febe28ebb3518108e",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 10990082727989461779
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "efa87d0842bf3f7248c20698f14ac828",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 10078011147601051156
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "f120dda955bcd933a0e0f0a2edb21cb9",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 3695927419404279359
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "f3851ae8bc864ffdee6c9ab4ee9f2bfc",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 16436112317851201554
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "f698460ba7382faa9e9ccb616e78a292",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 16817035790305887008
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "f6b2329c8ff4a8fd0c43c1cb3c8da99e",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 18437140254008093678
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "fa403db9ff58907b02b2088edfa3b38e",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 11048959396293392010
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "fa457e1bfc01486193179952b7fcb7de",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 5555281927287895744
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "fbb48c55ab610926a92c6612537e3969",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 9045230173817501873
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "fbf6d48579a7522439d1eb4ed7151807",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12487201929694536746
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "fef748ba9a69747da7c0ed70065e2c87",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3561253534228798504
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "disorder": {
+        "eval": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1
+            ],
+            "trials": 6
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma_grid": [
+              0.0,
+              0.05,
+              0.1,
+              0.15,
+              0.2
+            ],
+            "trials": 8
+          }
+        },
+        "train": {
+          "coin_dephase": {
+            "enabled": false,
+            "sigma": 0.0
+          },
+          "edge_dropout": {
+            "enabled": false,
+            "p": 0.0
+          },
+          "edge_phase": {
+            "enabled": true,
+            "sigma": 0.1,
+            "trials_per_episode": 1,
+            "wrap": true
+          }
+        }
+      },
+      "episode_id": "ff93bb13f96af0795c47dbd2938a4eef",
+      "family": "line",
+      "graph": {
+        "N": 128
+      },
+      "rng": {
+        "episode_seed": 1200715584846261253
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-09,
+          "cvar_alpha": 0.1,
+          "kind": "robust_combo",
+          "reduction": "mean"
+        },
+        "name": "robust",
+        "source_index": 0,
+        "target_index": 127
+      }
+    }
+  ],
+  "experiment_name": "robust-line-disorder",
+  "fingerprint_sha16": "d2103ebbb017f0354f8b1f424292c021",
+  "horizon_T": 96,
+  "meta": {
+    "build": {
+      "episode_seed_base": 920000,
+      "horizon_policy": "per_horizon_manifest",
+      "horizons": [
+        64,
+        96,
+        128
+      ],
+      "seed": 1447
+    },
+    "experiment_name": "robust-line-disorder",
+    "family": "line",
+    "generated_at_utc": "2025-12-22T02:23:44+00:00",
+    "schema_version": "acpl.manifest.v1",
+    "source_config_path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/robust-line-disorder.yaml",
+    "source_config_sha16": "143910813296a8204cb2c48d00226026",
+    "task_name": "robust"
+  },
+  "schema_version": "acpl.manifest.v1",
+  "source_config": {
+    "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/robust-line-disorder.yaml",
+    "sha16": "143910813296a8204cb2c48d00226026"
+  },
+  "split": "test_iid"
+}

@@ -1,0 +1,4096 @@
+{
+  "build": {
+    "episode_seed_base": 910000,
+    "horizon_policy": "per_horizon_manifest",
+    "horizons": [
+      64,
+      96,
+      128
+    ],
+    "seed": 1338
+  },
+  "counts": {
+    "n_episodes": 150
+  },
+  "created_at_utc": "2025-12-22T02:23:44+00:00",
+  "episodes": [
+    {
+      "episode_id": "01f229e30d9cd887cbc79f346967101e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 12457501102293188780
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "02252aff8bbeb943847e1189e20cc039",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 17497974093017232532
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "02a2adccf136a49ed3189699225b7310",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 662444286195796282
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "045140abda301732ddc72f21171ad2eb",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 10041857818473586388
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "046c5dcd30048f71e266e594678fc46b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 753808852655665623
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "05bae46ffb680a43c87cb69225f0acca",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 7949726834709258394
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "0678f54e10b58ed7eaa762cc66e998e8",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15669646804902902561
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "09732fb2bc3acc5e545724098648e334",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 638567138509581796
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "0cdf5140e2f2dfd551ba2485865e5278",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 125049287737766729
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "0ecf14cca2b34a9f7ed9b84fc7a08d1b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 8907365128385268208
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "0ffc78895b7947c4881b4962ff7fe5fd",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15354564854284179256
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "1087c55c0389e6e49621b2c6b005ba8e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 8864734433451457517
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "112b4fb30a24baa04816ca3fcf267442",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3778265780841674068
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "11c7f2f08a07a36ffe603e5b7d58cd86",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 17269805357096301413
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "120f6b75c0510a2c378d2735517f152b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 2885748444241287328
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "13c6ae5d3b96b07217a6d06296debd6c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 2771480765280531968
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "13c88f4831c453660e22f20e35ab416b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 12232507325822614256
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "146d4a5b82424c49a20e666b130539ac",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 5636814596391116702
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "1886ceb5540d2faff1ef8e80d6328d93",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 1711733434759028952
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "18e68cdecc0469b13c5e5a4753717629",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 6309184008129746552
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "19083a8d5562c1fa5fae01cfb520077c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 13130167392228787842
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "1a0c0f39fa6a0bf221cfb1da2c72a984",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 2854684696563928351
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "1d972872f83880a1398b9100a0c212ec",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 14140257004295658146
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "1ed3223fb82e529e70b0b08ca1d07ed2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 9800476500985160433
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "1ed70a473601ff68488e2547c06acce3",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 11110541113497958158
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "1ee09d0db695507209285c734cf14e51",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15819143402488505681
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "1ff1a55adaf182962a5a59a252a331e5",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 14305833693484201213
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "20848d0f7016c6d40cd7f9dd1faa2a93",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 8227880037099800246
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "214d0c7e3047e1e07ab3dd7f1dcabed4",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 17747567905616724740
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "25200fc955f451c80a7f0c4e8872c0a9",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 10705211738963601257
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "26869a53b28195f1113ff4e17b535ccb",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 114847886945014595
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "27587ffeb653fb50f6ebbc187a288adb",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3806737897945909837
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "28ceadd72f1c95cb8761086d65b07494",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15649631474020234310
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "299695443cd471979d23f45a04831d78",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 7888011296913330327
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "2b4fe0ea919b96f59c41be089eef48c7",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 12170129742535585834
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "2c32a5424266ed27c9243c31645959d2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 18003107046456646286
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "2eea9e1e19a98ff1e8cc143c14b10442",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 11664745606267811335
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "2fd712ff5059e2b5b2a54e1ad912e172",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 11074973675326246789
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "311980ff41e37de50f8bfad2a6afe1ad",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 16774975251344143878
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "3565d7a313c86b755e66d97670488c79",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15746081409093705515
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "382c33270387bdb1c25a56e8ef9ea4ce",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 5899530787125876255
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "3b874e323ab7e3df244004594c5d588b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 4909659760160547753
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "3c19bb04b066aaab564b3ab69dbfaf1a",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 12603602087514815745
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "3d360329b137699121490144b79d08fe",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 13007054287207175683
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "40537577f25f3098c391e2ac5ffb9a02",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15018403351874276928
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "4168db04f88ce92c28eff9650eab7665",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 1439707118047253452
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "4606aa524bddfa44ee9785a604c355bc",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3980222135008367280
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "49df3412041135f7073cdfbd9a600e57",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 10270897355799932720
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "4b7d23de8ce3545dfd161e7acf66380f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 2904497017992339292
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "4cfcec509de196170f92baf97b8fd84d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 11846038613738982117
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "4f0c1564f902e6348669537c6c160467",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 17475146468690070078
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "50611e0fb2c0ec5919903bd56de1934f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 11669221838865923985
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "552cacf256f5bbe04daf833a42fe1ec0",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 6092967846018830588
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "55895eb97a6fc88f5d0dbc2953889685",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 4738926451051951527
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "55c9b3d9e9582070be8d046a5e3a32e2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 12635608123813823343
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "55e5b60cba40964037b6519a7132d3ad",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 13695770684517065960
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "5a549a5a3e370b048813c94909267b85",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 1605978325663953490
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "5a6c75371b78f81a08d93d3bada471df",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3371898500658176417
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "5ae566e530af3fcae9d9d855850a167e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 17748407685318450643
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "5b66b7167aa568a48d9279ee5e1c499c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 9623093984854511726
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "5bc5bf52828d6f7dd60e49fb820e51c9",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 14906976225165254400
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "5cbdcfd1ae06eb146d1a4c2c5b569034",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 10050140224429720533
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "5dcbcef0fcd26ba76ff61ac54a8e4136",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 2388800544103985169
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "5df6e16c51b4c2ab0e1859d9edb14ec6",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 17963088543841021554
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "6039daabc0b8a191c1fa3ea9fa3a5089",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15363037487464244838
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "60f77053c6345adc9ae57babff771dd9",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 7129774440349681599
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "61dfa2ccf9287306f3a98c09e5af493c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 9556702720740325296
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "61e3d4632009a21f7670528b7c4226a7",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 1430480698881076837
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "6269da972f36716bf35aeef6dcf063ea",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 14430820079394690354
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "633c96ca573fabd7f7cfe6611c14800d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 4928273330550223291
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "6528682d5d48f5e463bf0420b3f5ca9e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 1965573068821543710
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "674dc3cb1054df6dc262a20c7ffd204d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 12536986307626952754
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "6b0283aed508dce7a956ec050179baac",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 9636263559169779117
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "6e2c52eb78e5ceeb7fa8d1b20a6cea40",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 9634385720427669368
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "70a75cfceb546240a12b854daf4a9613",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 11338376031828434155
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "7417a45dddfb26867f7213e01f13f46e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 9746027528974797984
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "76ed1c8ef51284d45c23b4bc566d5620",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 18204387023544468723
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "77694426ab268073677f56ef8f684a21",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3109263600486810749
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "77dd3bc34314ef143dfca70979b879fc",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 9443345112293366256
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "7f575701f5c02fa1b08beaa95043db86",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 17660657666532555649
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "81445ac2d799472de8447241265b2fba",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 6151944075397103137
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "82995c850947057da900b2d49ee9ffb1",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 14597211424103265265
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "842ba1c0e71673f11bd55e5626b1ef59",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 17327185480334388984
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "850eb41dda5aeee07c867452428b6381",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 7227068630587030186
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "863a55c9316d654317459c6203f0dcfc",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 14996506598918151298
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "864e895f69409c2493132208fcd1c123",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15885818309357280004
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "86f980700bdd9358b893785e2429a98e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 569830557231562339
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "87fd9850e0a5f8bc89535e650fff8847",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3418619656567942801
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "8a85ed3f22b8354d03dfe3fb8ba42afb",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 16028504927656497825
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "8c2b275f01173cc6030d1e36ae146b08",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 12635730928919663458
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "8c660fd84ac304f87544977eb379f459",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3860567823396781263
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "916278e2b784fba83ac84e370467099e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15852534549706129652
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "9919c10790cb101186a4b9d0d40e0336",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 16090581800272034566
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "99381f407c3e710c30b57172c595093b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 14585548261567563014
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "997ec2429f4e9197525dee963b3fff2f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3557358720319941542
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "99f9abe3fb7b6b27930f2b94f181c73a",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 6348658393652513117
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "9a1cd181d39fc627a627a84bf8752d5e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 8407334441482248807
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "9ab7aab3d63016096e3af20b9f31dbd6",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3579995319704888733
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "9c2a41e2794dcad29ee8145decaafe7d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 16069896610251182768
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "9d3074a95c76889f9510da41c6085225",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 16014223186601875505
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "a282215a1ed8b0d9d426b4dea84f9ac2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15001168598905845237
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "a4b13f98f3c69d42b9acca4e28f00abe",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 12476335718271406137
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "a697a059ed143ee9a7498c6d5e0d3709",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 12377621691257038585
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "aaf4fc59917d438748cbadb5ee41da8f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15213151572965135633
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "ac6532315a0b7f557ff607c5d4f6f8dd",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 7363223277046572312
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "ad6c17cb48bb321e9137e7617b700018",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 9922074914356529220
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "ae0f48c31cd22f4599fd78b3a1f7935d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 10533653220482452561
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "aeb6bca26c3c9b172ae8546df545d29d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15823816637709823661
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "af5e8c47d3de3db231116abd61483c7f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 11079830821263945461
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "b093a40c1aca512b593da3d86b02622b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15788910716845305750
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "b1c85df8124a691f5fec3aaf6b4464f4",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 7808578105605323562
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "b4097c962721805d30fc0270ddb0c936",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 16987795739344212629
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "b5f5f6aca2ad9d767604ee829f46c40c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 773823636500398311
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "b9e7534dd5dfc78e33438c82018ad6d8",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 16547316361783294580
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "ba90246eb0df6c32bef843944fa6c618",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 8355961796208260994
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "c0dc5f4e12fa47a2f5b05683d8910b4a",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 4716396227459241140
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "c204ea688a531290c8af5e4417737592",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 5552966357720035132
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "ca09ba5ba3fcca5940a76714c5c1cb10",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 8817772116108870508
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "cbf15cb35d9077352f8b9878db543690",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 2794955194631166026
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "cfd7bd81c43912b949bab7ca9dee953c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 13399476705377304569
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "cffef960052b38efcabdf5601ad143a4",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 13537448168292398121
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "d23fba0c33d45e0fc34830477ca1da5e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 8722444622820356115
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "d245e5d2fef204531a3a3235da2aefe9",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 14013766724819183370
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "d371fb4c2a6748afda4d141eabbf0aa3",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 2370477327197325668
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "d505e774841627b04e490d87ff0b5e46",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 16280732962690184238
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "d56f26945f364fe6f2129f8f72b8b83a",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 16202466897095769313
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "d8f13235f0d7899b22a4c0cfba9dc986",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 2381830342945113765
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "d9f58011f86aab501fc2071018319648",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 6303566045721337878
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "dc894aefcc7b5102a4a0ff02419990db",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 16621656859673633618
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "e0c33bd2475bebbe2fc290ce1468f2be",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 8986598898294359380
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "e0fce9dfe76451942c77ffe88ab1bc2d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 11097344280805113763
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "e1be8b4fa782eda96ff9b0eb6a834500",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 11936187749809834748
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "e28e23bc163195254f5ef1544e357dc4",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15603584809981559581
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "e4a8d59cf42bd5d884818eaf7aec8638",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 1705590791979368656
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "e752e9df70df991c637febe51376066d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 4965011879666672655
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "e7b5f149aae5abbc027ee2e944f72c76",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 14925287778801657691
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "e898856dffa1aaefa446d913dcff2a06",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3218001704384996058
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "e8de36317e6484b4207b560ecc9edb71",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 3710121094596938901
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "e8fa2aac961281d871083c97e752ede0",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 8191133910722524278
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "ed168b6affb5877672aacdbe6d9c4b8c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 6749073374185016305
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "efa3729a11871f1074e7148636ab9778",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 1202188977340060320
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "f2e849a4e378de10b122f7a16da0a6e2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 1574281168901550895
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "f30b2e0efd3521b3c4aaef6380240816",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 1481871154521869394
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "f41ede7e939d3d8d8e59c16fbff5a90d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 1761996982481607152
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "f50ca554726c5fb16c15f121655a171f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 12603196022854590744
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "f8869e62a2ede98153bb70675c5a5b33",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 8643975876869353656
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "f8938ed0bbd66d63553c485452f22b53",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 5504841257135887913
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "f926b80757ac78abc5940eb85cfe34be",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 15233224760691206349
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "fa74a3f5b5f1f0b95196efceb6c9770f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 2432645013500873579
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    },
+    {
+      "episode_id": "ffd083d6e085b710a6392994de69b881",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "periodic"
+      },
+      "rng": {
+        "episode_seed": 6289929866135317091
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "grid": {
+          "boundary": "periodic"
+        },
+        "loss": {
+          "kind": "tv_to_uniform",
+          "reduction": "mean",
+          "uniform_target": "per-graph"
+        },
+        "name": "mixing",
+        "normalized_time_feature": true,
+        "objective": "minimize TV(P_T, Uniform)"
+      }
+    }
+  ],
+  "experiment_name": "mixing-grid",
+  "fingerprint_sha16": "1d7f7f15ffe97334c886813ddbe4c2f9",
+  "horizon_T": 128,
+  "meta": {
+    "build": {
+      "episode_seed_base": 910000,
+      "horizon_policy": "per_horizon_manifest",
+      "horizons": [
+        64,
+        96,
+        128
+      ],
+      "seed": 1338
+    },
+    "experiment_name": "mixing-grid",
+    "family": "grid-2d",
+    "generated_at_utc": "2025-12-22T02:23:44+00:00",
+    "schema_version": "acpl.manifest.v1",
+    "source_config_path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/mixing-grid.yaml",
+    "source_config_sha16": "0f229145f046f1adbb5db519779c35ae",
+    "task_name": "mixing"
+  },
+  "schema_version": "acpl.manifest.v1",
+  "source_config": {
+    "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/mixing-grid.yaml",
+    "sha16": "0f229145f046f1adbb5db519779c35ae"
+  },
+  "split": "test_ood"
+}

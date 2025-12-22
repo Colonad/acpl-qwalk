@@ -1,0 +1,3886 @@
+{
+  "build": {
+    "episode_seed_base": 910000,
+    "horizon_policy": "per_horizon_manifest",
+    "horizons": [
+      64,
+      96,
+      128
+    ],
+    "seed": 1234
+  },
+  "counts": {
+    "n_episodes": 120
+  },
+  "created_at_utc": "2025-12-22T02:23:46+00:00",
+  "episodes": [
+    {
+      "episode_id": "01aa25b68c47cfc1977f638b4d277024",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 16338366904576329786
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "01b8248f069c81eefac0f91d09757018",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 2423639440309070660
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "0332e9759221b1c36f356949c1e15ca6",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 15943144175838508295
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "053718c9623530863c26a0fe4b19bb27",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 8778064122022694601
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "094a1f29a192bab64a539cb398b05d41",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 7050975535393940374
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "09d8230be3f990ef999b763f090c1b38",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 5914478395035268962
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "0b9c4462cc5856d6099188ff4cec7cb5",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 10692371125346066988
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "0ef888a0766d761c45c6c3fcd17eeac4",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 7468356138641954460
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "0f7ea0e18a904606bed248350be5d851",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 10761205193855536513
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "150883c635409f90a2cadab9f8ae5e8e",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 12948251954695907600
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "161abc8d93105623da4c91c2cb45b4cd",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 3622904147900242182
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "173be70e85d97a599d23f88465296386",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 14982561581219342614
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "1892d630412bb38ab70598e9160e6bb3",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 15362401204240576771
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "189dd45445f2674a3f5ab547ebe67382",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 2445095765817347820
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "192acd70da02b0047345935410760f42",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 14365106080684347554
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "1c9ac8ce0f7d1740e4d1dd861095d238",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 14795649028496723804
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "20b8e297400a530fe8a1bc00976d62a0",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 13270893609153707832
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "20db82cf35176f5f5b5790ebe749c503",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 10470055584078514226
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "21446aece4fde3562067ed89aebe5ece",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 4700609497655954086
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "23e495c725353765c17ffc00ccb2bfaa",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 6236309591845057800
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "2930cafad861f28290cd5a2d5bfbda16",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 7349270796744388192
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "2a7ccc57cfea73223433a92c77b9f4eb",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 13704146533947148314
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "2d5d97d80e55dcbf3f1c43910a279094",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 17813781383756037986
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "2d6053a7ab7495d101fe93a291bbd879",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 2391292869643766661
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "2d99904d73536db13ece050f8ff60eff",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 10895586522962828243
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "2f454494a252aca97640f9042e05c13c",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 6004830845290663025
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "2f66d49455326efef6beda13e185ec08",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 4339144150899805432
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "2fd692ba4c1549d4fd3174916e70f0a2",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 4025063638196648390
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "3082808a91bbd30d0f99e6145e280c7c",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 5124315559657275016
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "311edc2f456ebc45f07ad718761f9384",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 17314875343838490018
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "32b1e3dbaddd46aa360b66a35b947003",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 12338457466613304424
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "33f2f32c484cf62b8a94586932202f9c",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 13549346682236006080
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "35f502d2c82b2bfac967bf0dcf2007b5",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 4687167100860704164
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "37e574bdd3218fd8dc8a9e315201e0e4",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 17285740478572126149
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "3983407e08345145938daa2dd56ccc42",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 2643471800212413296
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "3dd77838da05d04690ba5764858bf0ff",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 13654298453286379901
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "3f2ce828262688b5cc05cddb976592d5",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 11234386057809816299
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "42bfa58ca4910b9625baf232bd88ca9b",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 6169141078223609688
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "4d950deae0e1df9b9e4a3d7965ebd42d",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 11089976840784143721
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "52af0a1f929a45b2daef52e937b3b0e2",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 9012540411205089834
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "54824d0458189c9d334d8feedf3f31bd",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 18138231514654452708
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "59bb9efa86894c9f0e86df646de26cad",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 5829571536617399348
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "5b5c289028bc43ca8e3912172126a015",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 9930106020985519405
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "5ba25eb32add8f852de219f85644aaab",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 8668687626080652219
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "5c912f8976da2d8ce04c136434b82884",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 8288691886224389003
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "5fa60d296211e88a20cafbab98096037",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 10112481207192227635
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "60679808477a5375df5c91a6939d75a5",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 4517590345291383958
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "63679fd5c65ca94f5771010705e0c455",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 5329351167036867467
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "64d03ae780853b5420b78d6457e2461c",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 6745558999331893081
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "660b8600fdcbf03dc52de76bd8a8e5c4",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 15840129632853876758
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "66c2f62cbd1e6f977f2996ed528ec430",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 3168024804497247008
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "72e9f30d71e73aa50156d2d9b1441a36",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 295422713662313589
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "75a3ceacba336af3efcc3e97ef1c9845",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 16512692435958166467
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "778b98c6cbc02aea108d2e19ae1d6cbc",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 11675783345155460045
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "7bc5d8476b40ab0a6c19fe8602e5b918",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 10108425848293184961
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "7d55c4e203e9c150fba8d92ada5b5a98",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 2832176125480769508
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "7f994c879800513d4b740f7f5c19bf40",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 10985181574275199778
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "80adc7e89b607a5940879dc4e220a1fb",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 2527495281354079813
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "8cbf92240d7cabece33d501421bc446e",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 7101582864315293602
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "8ec69b3c4d813fb9d84134b5ccd75502",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 8647690718280841953
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "8f926372ce77399afe074e25d70fc10d",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 14617486003141969160
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "91671f6d49e8cc7b83f387f1a9d98fb0",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 2083708623377426084
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "922d18ff7629702707b4dfb7d3abddd3",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 6237546055463693187
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "9729c8a257322f964f992ed9160fe497",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 2657914388307804642
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "9893020aad55f4ba2d5606d81bbfbc1c",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 12407775883862214052
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "996bc7a0b25faded8857663ca532ef8c",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 3510757287719085454
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "9c279771817a51d93c07a2075247f9a9",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 3071924326513422020
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "9d066838023bb12772bd5ebd5502e62e",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 14422398952606037213
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "9df2ee4552e286f661cd9ca292bded74",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 15127786169880378156
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "a046a42724a7bb2a1c4f6b691ea14004",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 1668414085122999009
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "a16e40c44a487b2bf7662ce22f8c3322",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 12665315165086618037
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "a2fe67decef6a6ec199a9bb48de54235",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 4398807330575791272
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "a81961d6426a542b7bfbcd5cf2e1113d",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 17570532184069598025
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "a99865d3231e72c9974193bb5ec72f3a",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 7257664410030296144
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "ab59324fa125123323a8a84cf3a3e4c5",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 4506485237798770602
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "abcfeb1223e38fe75d76131f55fed051",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 16502053339985357243
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "ae238e7587f40b7f3061dd1ae1cd01b7",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 15851041129011816702
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "b137a4ec00c81a5303e0525b5430432f",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 12323281356808141681
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "b22ecbfea91009b9e522495f774a0582",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 11302590596893593339
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "b3042050d57cdc043a9f1958bc7784f3",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 1637069763855219321
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "b74821fc5f6b62d3a296b47bf3871ec6",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 2913299353035920945
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "bc312d88576dfaa48993f676345e9882",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 952595991887849743
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "bd1702520aa19b67cb3233ded951cd18",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 5691444037414419064
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "bf4c2b958b7571f06c04fb423a640165",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 2698712991559327681
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "c135c3fbb2264973d75900850c267671",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 10785805075305975099
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "c1b95217c4dcf794dff2c49a48ff97f0",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 7701989007322453342
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "c3891df600acc2d1a3eb6d18e9b0294b",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 15292929988274521140
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "c43f8f341e7d7c40fc9718335d76b52c",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 3877483252427811644
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "c45d7cdc3244ab5fc6a1864eb4dca9c9",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 16849798211876585676
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "c871a09adeb8306981962e8c71336ec2",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 3711373965982275029
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "c99e4411a457425fea864c994f7a6aac",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 9784636271629157239
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "ccb2f6db952da4eade8ded985f2044cc",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 3541074269860641767
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "cd0a97d29edbecbe211bd9123bcc31df",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 16350550734084268282
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "ce7636e596243a1c24b029ad9fded69a",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 4211901411316951901
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "d00deaeac3b26880e2564026650f7c8d",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 12325753693833640821
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "d628e95fe3b004fad14680dad64a7781",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 12465172651400383219
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "d74402a6b37775d44ffc1989cf5f8f52",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 17979982448256165452
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "da87a6bf4e27cbe17e667bcc7f3c2251",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 5631990326950564071
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "daa998f40e4c1fdbe7a8e306317d5971",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 17761574960409383965
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "dd9172c1ce9989c990a4ef4d48d3c148",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 16026145027923897705
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e01439f0d77f47a7efbdeed05105e8c1",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 14910698271149554455
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e0d738ea9f5ceebebce5d56ddf0d9772",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 17764884203664480601
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e105a1f2fbd8d3c6066c97d4f5af4d7d",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 8326934126370141927
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e28fb56c4abf9f51ba2152b402dab400",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 9846685133384360837
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e611be85c101524356218145e89fe9aa",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 6527299838035155261
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e7982534c370056901252f359e021919",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 7411874337936939631
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e7fdb84fe3147487c45fd81cf1be26f9",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 5225582867265539770
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e8100efea27f3deb9d7347dc032c4445",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 12301769407003934805
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e86028ef67078ff78652a16ef3a895a5",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 675557058442473902
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e8775bff1cc77607b4fe58523a2399cd",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 12773516579443793239
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e947b16e11808f7d2c7da194f691400a",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 10913296892374016072
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "e98227808e1f8c22609d71365bcaf659",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 8562127834938350975
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "f229a10784a316177b990a49f8c91dec",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 7319280040926656105
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "f24f3e0e6abfbba6d4f3c7b22c28b992",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 3081645830153319841
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "f333a9b351f6301e9c48a904f9c65184",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 10099272954827340003
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "f4f7732b857e810453e982b4b19302f3",
+      "family": "regular",
+      "graph": {
+        "N": 184,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 13428465611751454869
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "f883751c55100e1a4f9f32cbde1a2e01",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 8261771102652263120
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "f98f02b6ce31a3a383fe0e63525bdd60",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 18367335505472309869
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "fa5e75dca2e13236bfc70f05078c3325",
+      "family": "regular",
+      "graph": {
+        "N": 72,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 8395521869826249766
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    },
+    {
+      "episode_id": "ffb2ec85671e6225d0a8e129949e5069",
+      "family": "regular",
+      "graph": {
+        "N": 136,
+        "d": 3
+      },
+      "rng": {
+        "episode_seed": 6972524737146609348
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "normalize_prob": true,
+          "reduction": "mean",
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "normalized_time_feature": true,
+        "objective": "maximize P_T(target)",
+        "source": "custom_index",
+        "source_index": 0,
+        "target": "custom_index",
+        "target_index": -1
+      }
+    }
+  ],
+  "experiment_name": "transfer-regular",
+  "fingerprint_sha16": "5423d323f08c2b6144587ef29958bebb",
+  "horizon_T": 128,
+  "meta": {
+    "build": {
+      "episode_seed_base": 910000,
+      "horizon_policy": "per_horizon_manifest",
+      "horizons": [
+        64,
+        96,
+        128
+      ],
+      "seed": 1234
+    },
+    "experiment_name": "transfer-regular",
+    "family": "regular",
+    "generated_at_utc": "2025-12-22T02:23:46+00:00",
+    "schema_version": "acpl.manifest.v1",
+    "source_config_path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/transfer-regular.yaml",
+    "source_config_sha16": "b3dacb646ef7b6090e8ee4d0c8424aff",
+    "task_name": "transfer"
+  },
+  "schema_version": "acpl.manifest.v1",
+  "source_config": {
+    "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/transfer-regular.yaml",
+    "sha16": "b3dacb646ef7b6090e8ee4d0c8424aff"
+  },
+  "split": "val"
+}

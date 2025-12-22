@@ -229,6 +229,7 @@ class ManifestCounts:
 class ExperimentManifestSpec:
     name: str
     family: str
+    data_block: JSONDict
     # sizes for leakage checks + to define episode generation for evaluation
     train_sizes: Optional[SizeSpec]
     val_sizes: Optional[SizeSpec]
@@ -367,10 +368,29 @@ def _infer_task_name(exp: dict[str, Any]) -> Optional[str]:
     tn = deep_get(exp, "task.name")
     if tn:
         return str(tn)
+    
+    # common schema: task: { name: ... }
+    t = exp.get("task")
+    if isinstance(t, dict) and t.get("name"):
+        return str(t["name"])
+    
+    
     # legacy
     goal = exp.get("goal")
     if goal:
         return str(goal)
+    
+
+    # fallback: infer from experiment name
+    en = deep_get(exp, "experiment.name") or deep_get(exp, "log.run_name") or ""
+    if isinstance(en, str):
+        low = en.lower()
+        for k in ("transfer", "search", "mixing", "robust"):
+            if k in low:
+                return k
+
+
+
     return None
 
 
@@ -475,6 +495,12 @@ def parse_experiment_manifest(config_path: Path) -> ExperimentManifestSpec:
     task_block = exp.get("task", {})
     if not isinstance(task_block, dict):
         task_block = {}
+
+
+    
+    data_block = exp.get("data", {})
+    if not isinstance(data_block, dict):
+        data_block = {}
     # legacy puts task params at top-level "task:" too; ok.
 
     disorder_block = exp.get("disorder")
@@ -496,6 +522,7 @@ def parse_experiment_manifest(config_path: Path) -> ExperimentManifestSpec:
     return ExperimentManifestSpec(
         name=exp_name,
         family=family,
+        data_block=data_block,
         train_sizes=train_sizes,
         val_sizes=val_sizes,
         test_iid_sizes=test_iid_sizes,
@@ -515,6 +542,38 @@ def parse_experiment_manifest(config_path: Path) -> ExperimentManifestSpec:
 # =============================================================================
 # Episode generation per family
 # =============================================================================
+
+
+
+def _deterministic_order(values: Sequence[Any], *, salt: JSONDict) -> List[Any]:
+    """
+    Deterministically shuffle `values` given a salt dict.
+    (Used to avoid always starting cycling from the same size.)
+    """
+    salt_s = stable_json_dumps(salt)
+    keyed: List[Tuple[str, Any]] = []
+    for v in values:
+        h = blake2b_hex(
+            stable_json_dumps({"salt": salt_s, "v": v}).encode("utf-8"),
+            digest_size=8,
+        )
+        keyed.append((h, v))
+    keyed.sort(key=lambda t: t[0])
+    return [v for _, v in keyed]
+
+
+def _cycle_pick(values: Sequence[int], n: int, *, salt: JSONDict) -> List[int]:
+    """
+    Return a length-n list by cycling through deterministically ordered values.
+    """
+    vals = [int(v) for v in values]
+    if not vals or n <= 0:
+        return []
+    ordered = _deterministic_order(vals, salt=salt)
+    return [ordered[i % len(ordered)] for i in range(n)]
+
+
+
 
 def _expand_sizes(spec: Optional[SizeSpec]) -> List[int]:
     if spec is None:
@@ -587,8 +646,13 @@ def generate_episodes_line(
     if not sizes:
         return episodes
 
-    # Deterministic mapping from (split,horizon,N,i) -> seed
-    for N in sizes:
+    # Deterministic mapping from (split,horizon,episode_index) -> (N, seed)
+    picked_sizes = _cycle_pick(
+        [int(x) for x in sizes],
+        int(n_episodes),
+        salt={"family": "line", "split": split, "horizon_T": int(horizon_T), "build_seed": int(build.seed)},
+    )
+    for i, N in enumerate(picked_sizes):
         src = _resolve_source_index(task_block, N)
         tgt = _resolve_target_index(task_block, N)
         # We keep indices in the episode (even if None) to ensure downstream builder can use them.
@@ -602,29 +666,27 @@ def generate_episodes_line(
             if k in task_block:
                 task_payload[k] = task_block[k]
 
-        for i in range(n_episodes):
-            seed_material = {
-                "split": split,
-                "horizon_T": horizon_T,
-                "family": "line",
-                "N": int(N),
-                "i": int(i),
-                "build_seed": int(build.seed),
-            }
-            seed_hex = blake2b_hex(stable_json_dumps(seed_material).encode("utf-8"), digest_size=8)
-            # int from hex, stable
-            seed_int = int(seed_hex, 16)
-            episode_seed = int(build.episode_seed_base) + seed_int
+        seed_material = {
+            "split": split,
+            "horizon_T": int(horizon_T),
+            "family": "line",
+            "N": int(N),
+            "i": int(i),
+            "build_seed": int(build.seed),
+        }
+        seed_hex = blake2b_hex(stable_json_dumps(seed_material).encode("utf-8"), digest_size=8)
+        seed_int = int(seed_hex, 16)
+        episode_seed = (int(build.episode_seed_base) + seed_int) % (2**64)
 
-            ep = EpisodeSpec(
-                family="line",
-                graph={"N": int(N)},
-                task=task_payload,
-                sim={"horizon_T": int(horizon_T)},
-                rng={"episode_seed": int(episode_seed)},
-                disorder=None,
-            )
-            episodes.append(ep)
+        ep = EpisodeSpec(
+            family="line",
+            graph={"N": int(N)},
+            task=task_payload,
+            sim={"horizon_T": int(horizon_T)},
+            rng={"episode_seed": int(episode_seed)},
+            disorder=disorder_block,
+        )
+        episodes.append(ep)
 
     # Shuffle deterministically by episode_id to avoid size-order bias while staying stable
     episodes.sort(key=lambda e: e.episode_id())
@@ -652,8 +714,12 @@ def generate_episodes_grid2d(
     if not L_values:
         return episodes
 
-    for L in L_values:
-        for i in range(n_episodes):
+    picked_L = _cycle_pick(
+        [int(x) for x in L_values],
+        int(n_episodes),
+        salt={"family": "grid-2d", "split": split, "horizon_T": int(horizon_T), "build_seed": int(build.seed), "boundary": boundary},
+    )
+    for i, L in enumerate(picked_L):
             seed_material = {
                 "split": split,
                 "horizon_T": horizon_T,
@@ -665,15 +731,15 @@ def generate_episodes_grid2d(
             }
             seed_hex = blake2b_hex(stable_json_dumps(seed_material).encode("utf-8"), digest_size=8)
             seed_int = int(seed_hex, 16)
-            episode_seed = int(build.episode_seed_base) + seed_int
+            episode_seed = (int(build.episode_seed_base) + seed_int) % (2**64)
 
             ep = EpisodeSpec(
                 family="grid-2d",
                 graph={"L": int(L), "boundary": boundary},
-                task={"name": task_block.get("name", task_block.get("task", {}).get("name", "grid_task"))},
+                task=dict(task_block),
                 sim={"horizon_T": int(horizon_T)},
                 rng={"episode_seed": int(episode_seed)},
-                disorder=None,
+                disorder=disorder_block,
             )
             episodes.append(ep)
 
@@ -698,8 +764,12 @@ def generate_episodes_hypercube(
     if not n_values:
         return episodes
 
-    for n in n_values:
-        for i in range(n_episodes):
+    picked_n = _cycle_pick(
+        [int(x) for x in n_values],
+        int(n_episodes),
+        salt={"family": "hypercube", "split": split, "horizon_T": int(horizon_T), "build_seed": int(build.seed)},
+    )
+    for i, n in enumerate(picked_n):
             seed_material = {
                 "split": split,
                 "horizon_T": horizon_T,
@@ -710,12 +780,12 @@ def generate_episodes_hypercube(
             }
             seed_hex = blake2b_hex(stable_json_dumps(seed_material).encode("utf-8"), digest_size=8)
             seed_int = int(seed_hex, 16)
-            episode_seed = int(build.episode_seed_base) + seed_int
+            episode_seed = (int(build.episode_seed_base) + seed_int) % (2**64)
 
             ep = EpisodeSpec(
                 family="hypercube",
                 graph={"n": int(n)},
-                task={"name": task_block.get("name", task_block.get("task", {}).get("name", "search"))},
+                task=dict(task_block),
                 sim={"horizon_T": int(horizon_T)},
                 rng={"episode_seed": int(episode_seed)},
                 disorder=disorder_block,
@@ -743,43 +813,150 @@ def generate_episodes_irregular_stub(
     NOTE:
     This is intentionally conservative: without a unified YAML schema for irregular params
     (ER p grid, d-regular d grid, WS k/beta grid), we generate episodes over n_values and
-    store 'kind' placeholders. Once mixing/robust experiment YAMLs are converted, you should
-    expand this to cover full param grids.
+    store 'kind' placeholders.
     """
     episodes: List[EpisodeSpec] = []
     if not n_values:
         return episodes
-    kinds = list(kinds) if kinds else ["er"]
 
-    for n in n_values:
-        for kind in kinds:
-            for i in range(n_episodes):
-                seed_material = {
-                    "split": split,
-                    "horizon_T": horizon_T,
-                    "family": "irregular",
-                    "kind": kind,
-                    "n": int(n),
-                    "i": int(i),
-                    "build_seed": int(build.seed),
-                }
-                seed_hex = blake2b_hex(stable_json_dumps(seed_material).encode("utf-8"), digest_size=8)
-                seed_int = int(seed_hex, 16)
-                episode_seed = int(build.episode_seed_base) + seed_int
+    kinds_list = list(kinds) if kinds else ["er"]
 
-                ep = EpisodeSpec(
-                    family="irregular",
-                    graph={"n": int(n), "kind": kind},
-                    task={"name": task_block.get("name", task_block.get("task", {}).get("name", "mixing"))},
-                    sim={"horizon_T": int(horizon_T)},
-                    rng={"episode_seed": int(episode_seed)},
-                    disorder=disorder_block,
-                )
-                episodes.append(ep)
+    pairs: List[Tuple[int, str]] = [(int(n), str(kind)) for n in n_values for kind in kinds_list]
+    if not pairs:
+        return episodes
+
+    ordered_pairs = _deterministic_order(
+        pairs,
+        salt={
+            "family": "irregular",
+            "split": split,
+            "horizon_T": int(horizon_T),
+            "build_seed": int(build.seed),
+        },
+    )
+
+    for i in range(int(n_episodes)):
+        
+        n, kind = ordered_pairs[i % len(ordered_pairs)]
+
+        seed_material = {
+            "split": split,
+            "horizon_T": int(horizon_T),
+            "family": "irregular",
+            "kind": kind,
+            "n": int(n),
+            "i": int(i),
+            "build_seed": int(build.seed),
+        }
+        seed_hex = blake2b_hex(stable_json_dumps(seed_material).encode("utf-8"), digest_size=8)
+        seed_int = int(seed_hex, 16)
+        episode_seed = (int(build.episode_seed_base) + seed_int) % (2**64)
+
+        ep = EpisodeSpec(
+            family="irregular",
+            graph={"n": int(n), "kind": kind},
+            task=dict(task_block),
+            sim={"horizon_T": int(horizon_T)},
+            rng={"episode_seed": int(episode_seed)},
+            disorder=disorder_block,
+        )
+        episodes.append(ep)
 
     episodes.sort(key=lambda e: e.episode_id())
     return episodes
 
+
+def _infer_regular_degree(spec: ExperimentManifestSpec) -> int:
+    """
+    Extract d for d-regular graphs from the experiment YAML.
+
+    Expected schema (your YAML):
+      data:
+        family: "regular"
+        regular:
+          d: 3
+    """
+    # Most direct: your exact key
+    reg = spec.data_block.get("regular", {})
+    if isinstance(reg, dict) and "d" in reg:
+        d = reg["d"]
+    else:
+        # Back-compat fallbacks (if you ever rename keys)
+        d = (
+            deep_get({"data": spec.data_block}, "data.regular.d", None)
+            or deep_get({"data": spec.data_block}, "data.regular.degree", None)
+            or spec.data_block.get("d", None)
+            or spec.data_block.get("degree", None)
+        )
+
+    # Handle list-valued configs like d: [3,4,6] (pick first deterministically)
+    if isinstance(d, list):
+        d = d[0] if d else None
+
+    if d is None:
+        raise ValueError(
+            "family=regular but no degree found. Expected one of:\n"
+            "  data.regular.d (preferred)\n"
+            "  data.regular.degree\n"
+            "  data.d / data.degree\n"
+        )
+
+    d_int = int(d)
+    if d_int < 0:
+        raise ValueError(f"regular degree d must be non-negative (got {d_int}).")
+    return d_int
+
+
+
+def generate_episodes_regular(
+    *,
+    split: SplitName,
+    sizes: Sequence[int],
+    degree_d: int,
+    horizon_T: int,
+    n_episodes: int,
+    task_block: JSONDict,
+    build: ManifestBuildSpec,
+    disorder_block: Optional[JSONDict] = None,
+) -> List[EpisodeSpec]:
+    """
+    d-regular graph episode generation.
+    Graph is represented by (N, d).
+    """
+    episodes: List[EpisodeSpec] = []
+    if not sizes:
+        return episodes
+    picked_sizes = _cycle_pick(
+        [int(x) for x in sizes],
+        int(n_episodes),
+        salt={"family": "regular", "split": split, "horizon_T": int(horizon_T), "build_seed": int(build.seed), "d": int(degree_d)},
+    )
+    for i, N in enumerate(picked_sizes):
+        seed_material = {
+            "split": split,
+            "horizon_T": int(horizon_T),
+            "family": "regular",
+            "N": int(N),
+            "d": int(degree_d),
+            "i": int(i),
+            "build_seed": int(build.seed),
+        }
+        seed_hex = blake2b_hex(stable_json_dumps(seed_material).encode("utf-8"), digest_size=8)
+        seed_int = int(seed_hex, 16)
+        episode_seed = (int(build.episode_seed_base) + seed_int) % (2**64)
+
+        ep = EpisodeSpec(
+            family="regular",
+            graph={"N": int(N), "d": int(degree_d)},
+            task=dict(task_block),
+            sim={"horizon_T": int(horizon_T)},
+            rng={"episode_seed": int(episode_seed)},
+            disorder=disorder_block,
+        )
+        episodes.append(ep)
+
+    episodes.sort(key=lambda e: e.episode_id())
+    return episodes
 
 # =============================================================================
 # Leakage and sanity checks
@@ -917,12 +1094,24 @@ def generate_for_split(
             n_episodes=n_episodes,
             task_block=spec.task_block,
             build=spec.build,
-            disorder_block=spec.disorder_block,   # <-- ADD THIS
+            disorder_block=spec.disorder_block,
+        )
+    
+    if fam == "regular":
+        d = _infer_regular_degree(spec)
+        return generate_episodes_regular(
+            split=split,
+            sizes=sizes,
+            degree_d=d,
+            horizon_T=horizon_T,
+            n_episodes=n_episodes,
+            task_block=spec.task_block,
+            build=spec.build,
+            disorder_block=spec.disorder_block,
         )
 
 
     if fam == "grid-2d":
-        # Sizes represent L values (we reuse 'sizes' list)
         boundary = deep_get({"task": spec.task_block}, "task.grid.boundary", None) or spec.task_block.get("boundary", "open")
         return generate_episodes_grid2d(
             split=split,
@@ -932,6 +1121,7 @@ def generate_for_split(
             task_block=spec.task_block,
             build=spec.build,
             boundary=str(boundary),
+            disorder_block=spec.disorder_block,   # <-- ADD
         )
 
     if fam == "hypercube":
@@ -942,13 +1132,17 @@ def generate_for_split(
             n_episodes=n_episodes,
             task_block=spec.task_block,
             build=spec.build,
+            disorder_block=spec.disorder_block,   # <-- ADD (recommended)
         )
 
     if fam == "irregular":
-        # Placeholder support
-        kinds = deep_get({"data": spec.task_block}, "data.irregular.kind", None)
+        kinds = (
+            deep_get({"data": spec.data_block}, "data.irregular.kinds", None)
+            or deep_get({"data": spec.data_block}, "data.irregular.kind", None)
+        )
         if not isinstance(kinds, list):
             kinds = ["er", "d-regular", "ws"]
+
         return generate_episodes_irregular_stub(
             split=split,
             n_values=sizes,
@@ -956,10 +1150,12 @@ def generate_for_split(
             n_episodes=n_episodes,
             task_block=spec.task_block,
             build=spec.build,
+            disorder_block=spec.disorder_block,   # <-- ADD
             kinds=[str(k) for k in kinds],
         )
 
-    raise ValueError(f"Unsupported family '{fam}'. Supported: line, grid-2d, hypercube, irregular.")
+
+    raise ValueError(f"Unsupported family '{fam}'. Supported: line, regular, grid-2d, hypercube, irregular.")
 
 
 def main() -> None:
@@ -987,12 +1183,8 @@ def main() -> None:
     iid_vals = _expand_sizes(spec.test_iid_sizes)
     ood_vals = _expand_sizes(spec.test_ood_sizes)
 
-    if train_vals and val_vals:
-        msgs.extend(check_disjoint(train_vals, val_vals, label="VAL"))
-    if train_vals and iid_vals:
-        msgs.extend(check_disjoint(train_vals, iid_vals, label="TEST_IID"))
-    if train_vals and ood_vals:
-        msgs.extend(check_disjoint(train_vals, ood_vals, label="TEST_OOD"))
+    # NOTE: Overlap in *sizes* between train and IID/VAL is expected (procedural training).
+    # Real leakage is overlap in frozen episode lists between evaluation splits (checked later).
     msgs.extend(check_ood_outside_train_band(spec.train_sizes, ood_vals))
 
     if not spec.val_sizes:
@@ -1060,6 +1252,25 @@ def main() -> None:
         ood_eps = generate_for_split(spec=spec, split="test_ood", horizon_T=T, sizes=ood_sizes, n_episodes=spec.counts.test_ood)
         ood_file = derive_per_horizon_filename(base_ood, T) if per_horizon else base_ood
         _write_one("test_ood", T, ood_eps, ood_file)
+        
+        
+        
+        
+        # Real eval leakage check: episode_id overlap among eval splits for this horizon
+        ids_val = {e.episode_id() for e in val_eps}
+        ids_iid = {e.episode_id() for e in (iid_eps if (not args.no_test_iid and base_iid is not None) else [])}
+        ids_ood = {e.episode_id() for e in ood_eps}
+        if ids_val.intersection(ids_ood):
+            msgs.append(f"[leakage] VAL overlaps TEST_OOD for T={T}: {len(ids_val.intersection(ids_ood))} episodes")
+        if ids_iid and ids_iid.intersection(ids_ood):
+            msgs.append(f"[leakage] TEST_IID overlaps TEST_OOD for T={T}: {len(ids_iid.intersection(ids_ood))} episodes")
+        if ids_iid and ids_val.intersection(ids_iid):
+            msgs.append(f"[leakage] VAL overlaps TEST_IID for T={T}: {len(ids_val.intersection(ids_iid))} episodes")
+
+        
+        
+        
+        
         if per_horizon:
             index_payload["files"]["test_ood"][str(T)] = ood_file
 
@@ -1067,8 +1278,23 @@ def main() -> None:
     if per_horizon:
         index_name = f"{Path(base_val).stem}.index.json"
         out_index = spec.paths.root_dir / index_name
-        # fingerprint of index (helps report citations)
-        index_fingerprint = blake2b_hex(stable_json_dumps(index_payload).encode("utf-8"), digest_size=16)
+
+
+        # fingerprint of index (stable; excludes timestamps)
+        index_fingerprint_material = {
+            "schema_version": SCHEMA_VERSION,
+            "experiment_name": spec.name,
+            "source_config_sha16": spec.source_config_sha,
+            "horizon_policy": spec.build.horizon_policy,
+            "files": index_payload["files"],
+            "build_seed": spec.build.seed,
+        }
+        index_fingerprint = blake2b_hex(stable_json_dumps(index_fingerprint_material).encode("utf-8"), digest_size=16)
+
+
+
+
+
         index_payload["fingerprint_sha16"] = index_fingerprint
 
         if args.dry_run:

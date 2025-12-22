@@ -1,0 +1,28 @@
+{
+  "created_at_utc": "2025-12-22T02:23:44+00:00",
+  "experiment_name": "mixing-grid",
+  "files": {
+    "test_iid": {
+      "128": "mixing-grid-test-iid-T128.json",
+      "64": "mixing-grid-test-iid-T64.json",
+      "96": "mixing-grid-test-iid-T96.json"
+    },
+    "test_ood": {
+      "128": "mixing-grid-test-ood-T128.json",
+      "64": "mixing-grid-test-ood-T64.json",
+      "96": "mixing-grid-test-ood-T96.json"
+    },
+    "val": {
+      "128": "mixing-grid-val-T128.json",
+      "64": "mixing-grid-val-T64.json",
+      "96": "mixing-grid-val-T96.json"
+    }
+  },
+  "fingerprint_sha16": "b833ce154379830163a36da14bf5d79f",
+  "horizon_policy": "per_horizon_manifest",
+  "schema_version": "acpl.manifest.v1",
+  "source_config": {
+    "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/mixing-grid.yaml",
+    "sha16": "0f229145f046f1adbb5db519779c35ae"
+  }
+}

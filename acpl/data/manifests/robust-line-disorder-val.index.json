@@ -1,0 +1,28 @@
+{
+  "created_at_utc": "2025-12-22T02:23:44+00:00",
+  "experiment_name": "robust-line-disorder",
+  "files": {
+    "test_iid": {
+      "128": "robust-line-disorder-test-iid-T128.json",
+      "64": "robust-line-disorder-test-iid-T64.json",
+      "96": "robust-line-disorder-test-iid-T96.json"
+    },
+    "test_ood": {
+      "128": "robust-line-disorder-test-ood-T128.json",
+      "64": "robust-line-disorder-test-ood-T64.json",
+      "96": "robust-line-disorder-test-ood-T96.json"
+    },
+    "val": {
+      "128": "robust-line-disorder-val-T128.json",
+      "64": "robust-line-disorder-val-T64.json",
+      "96": "robust-line-disorder-val-T96.json"
+    }
+  },
+  "fingerprint_sha16": "9af9a6dc76785b2bcfa1225c6e412425",
+  "horizon_policy": "per_horizon_manifest",
+  "schema_version": "acpl.manifest.v1",
+  "source_config": {
+    "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/robust-line-disorder.yaml",
+    "sha16": "143910813296a8204cb2c48d00226026"
+  }
+}

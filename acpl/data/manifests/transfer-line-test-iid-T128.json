@@ -1,0 +1,6046 @@
+{
+  "build": {
+    "episode_seed_base": 900000,
+    "horizon_policy": "per_horizon_manifest",
+    "horizons": [
+      64,
+      96,
+      128
+    ],
+    "seed": 1234
+  },
+  "counts": {
+    "n_episodes": 200
+  },
+  "created_at_utc": "2025-12-22T02:23:45+00:00",
+  "episodes": [
+    {
+      "episode_id": "001440b0bf1fad959ee3e0513a3ce888",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10466132907784481114
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "0024e8d91e2a4b05b071d473d678ecf3",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 17408945444204413699
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "008ca8952d44fd47a9d13a3525742a0a",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 6268704232502360648
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "00b8e03a64c54afe0773ec87370e05c8",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 15157809415073701205
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "01506a702e918baf5db153a009c9b11c",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 11190785918503432358
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "024e34ba004d2b868b75e44d5986fbaf",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 9012508147382618564
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "03315606e72a2002e53174e3426c1e7a",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 14726658349049404153
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "037b03f4476733b4e366928a237d8bce",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13295265139787069563
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "042b02113c66820e600f10f1205a3b9e",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 8585663426862083535
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "04d68c94bf60f6768822b69292019677",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 15392889757341157425
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "05e892784b556817a81ac9eb592d9d2b",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 17878104033475455717
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "065f25c800d51cfa869f744bcaeb2d64",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 1077395397582228244
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "070a9b29e78fc7a09bc3967e54f2af8b",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10517533563978698448
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "07b58a4d780902ada3f03287c1634def",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 5341951019601163895
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "09186edcbb3133c37e9524142b5ab09e",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 15204414432167864820
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "09ec9df1f9ea882754443b5df935cbcf",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 3622293125352979304
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "0b6d2b76fa15ba26d1a0d6db618b5014",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 1227683008685095146
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "0d3373699727c8e386ab7d820bd39ef1",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2197043641452956063
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "0f75ee7b4bc001c74d8ec98fa66ee4b7",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12633202866962215514
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "0fa327fafd67b5dbc77896a1a9faaff9",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 6290373936694774229
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "105bed15788b8849da26a797a29024db",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 17956993031140089196
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "10616dbe27d53538a68c6e4f818f9d6a",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 9198469397642378514
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "175d5d553086c5f1dbff304434e1c7d3",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 34363005389321995
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "18411c0299f774989b0ca7ad74a0968c",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 5428392971562285599
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "187abdae652fb1224f84d7a79536b4e4",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 5712209739806581487
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "19081a9099c58d6f0eb8e6c981d3af51",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 6140758314391867391
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "194e1f1c6ba3cd68b041d9c16297d2fb",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 7514181865523868524
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "1970d8a75ce6a27c55f2e40687fd0366",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 9922317611733510771
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "1a10cb21fb23022ac3b239c0b27f2638",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 6299735254014482521
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "1a15659a69ada6f00a5ec63e152eaa2a",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 11297913598021974731
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "1f85c46cb9e9d3bc7547b68a435f7a1a",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11216051666382613479
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "1fec372686610226df4b4c862a50e5ca",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 1599642375154908593
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "20d33ed6833552543673298428b34587",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 5508725484856836221
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "21955b0ed2618504a2408a328fb5dfd7",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 13992436679931824385
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "246678aa07dabff4cb48d42fee59d4da",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 16341968405140973768
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "265655411937da47f0fd373d48b94052",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13301413184081949704
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "26ae96ed62f16fc60a48e10ce114fb27",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 12860551568885650310
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "26f8b5662ee0c257cf43e453efd64207",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 16289686390737220859
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "2813a47f5af7bfda743b11ca9fefe6a7",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 14890827426792781572
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "291e23b9e9a4dc1288df1dc571c58971",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 10546465721412496460
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "29e975e4c2f405be5c4b9e5b51f77503",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 6281751679428379974
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "2ac25dd80f79aecc85a879cb51614638",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10585117083608272207
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "2aef93b04bd427da95882a51f3496003",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 14646595571738744525
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "2d353e86a2cc98217fd16d0cda4c1c44",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 7522411129905314120
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "2d3a92216370c767097808a22b2f84db",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 7828263497495230919
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "2e478b8bdc82d86a8449f1b661665ef4",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 6005181772086218805
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "2e93b295b38fc47709b0215c4caaebc1",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 4892709198562173469
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "2faf5a6864e7e7cc1edae5b6c467431c",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10714302399661134648
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "30bf1e62c0252a133031bdb148fddde4",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 16920165827704041234
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "31cb66a63ab3bc47fa010c697db404ad",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 8214971670702867719
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "327e25e94fdd2035ca4b1c5425b5c491",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 11199120961221808558
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "375875e814b4877b03730762b1078419",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 5345302409392724612
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "37c2056a87f34787f92e13bc15238f4b",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 14290989863061571913
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "37e5d0bdd030738208558f952f55fabd",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 17051612999661359279
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "3816a5bbbef1a93a5d63519aa531fd15",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 12318485697173419064
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "38e14baed27c80d51dd59c7aa166db68",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13158413548458722578
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "39020abc1c9880debb232e3be3791bf9",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 12363715863968883781
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "398c780e3f61ad11e5996eea99e8f89d",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 8054873907054224900
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "3cdd8d24940a8c61a6fc618cc907fef2",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 61503748942506724
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "3d00f0c511f27a156322ef39a3e54051",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2627538523991895932
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "3d42de6f9ede0d89b2edd10efd0f4bdc",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 14010447789045813188
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "3d602260014c681ebf17b13942d05f1c",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10282515437061581588
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "3f623ad4d46aa19168e256deffa95c44",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2369190993360370109
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "3febbf59ac8ed1b0a783f9019598bfc9",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 10225477300302203585
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "42b5528797ec5198ea33ce727c74796d",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10990858285791513913
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "431ea9c41420a117f86571609a8b46ad",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 14948542605048224243
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "4433c44dede9d09d9eb504598674b68c",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 1558845697330080023
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "4498bee862d1cf2da240337726b6852f",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 18132295024279592784
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "46ce834a405526458236d3cb697c1594",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 4403005430702010935
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "49f1f9dd63d33947eccc3b2eaf70411d",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 18076014261693516478
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "4b23e734efb59b62d8464c1511032938",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 3335265930750076136
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "4c58c2276d615c724f67e18b4131ba95",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 340545013017800392
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "4f076e1a8ce33f7af1a84df3eb3e9ba9",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 8725647190685945766
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "4f6260010fcb497b9b1454f9d28fad8f",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 6375630211291567173
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "53f7921b5fed4144dfe7ad7f72b72767",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 13036082728807557283
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "55449888988fb09bd3c712cc290a66d1",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 10275749561206071486
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "5654f0d26613ede1bba806bf75a9db7e",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 17309529083657441541
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "57dbee8feccfbf1f58103a90b35c53ed",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 16536537170943242674
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "5873f8f64ec72f23c8bbb76ce0fc01b7",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 7478146827950108094
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "5baa0e26971575c20a1a7045534d8530",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 4812022889825958198
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "5c89c3cdb7e8329e76e6d5ea0d710d91",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2061527148589204255
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "5c9dba085d659bb30a85ae5d05275038",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 10664589924958272188
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "5ca1227d9e8ddd8698fa45697f67d0dc",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 6885966210786240949
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "60e5b22402397b230dc895a74b3c8b34",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13349635739103306592
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "635cbfb16ce72d3cf90ace3179fb81fe",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 16202051065751497202
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "63bc1d44cda6aa06b83dbddfbe24d588",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 15150633050210728272
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "63bcda93ffe3161f3787b19e7b1ccf12",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 12819450837568966784
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "664a02d1818c3c132ac263f57f33f051",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 1158640135473003401
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "67bb26c07b4747a9e88ac1bce787f09f",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 7164060107578617432
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "67c8fbe0b87715309d88b03451fdb3bc",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 15698185456680716039
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "67d6430219d07c13281d83924b9d831d",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 9521905007179634963
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "67ea21eb7c09ff3a950cc8f8ba484173",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2453659952438422921
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "6b02037143374ec789a5cd19d4f3078d",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2234884441551748289
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "6b4181e68b0194762c016bf1899444e1",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13234016370558222381
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "6e84c9a9641f8f3ad571c7b0ed55579f",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 9690481187160468494
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "6f9332ac7d52fca443354e7c16f43d41",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 16874217343443948198
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "722279370366445afffcbc7fd8d99bd9",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 16822716033902189817
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "7307db7cd214534deabde6ac6557f78a",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 6965093269856538624
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "73246f251bb408c674ba5a08255f6594",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 16154212091484512849
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "748c5e45bceba9c2973a37741726e86b",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 12886049787121305739
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "760a267558a11906b477e7b7b9fe15f8",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 13047987884097983567
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "77b5eeb1c224ac34ab5cb167f238d7c1",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 6942164374172667611
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "7808dfa0588a8090bd17dc2bc068f992",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 8306973617556072454
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "78ea50de5015fc9ce27721771a66e131",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13784818737227530632
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "78f677ccb28693fff81afd26100df33b",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 12769283693943823114
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "79f199e22698ed437ebe7606a279f5fc",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 17175669288341079358
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "7c3807dabc66db172735ee1a5311a493",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 3914932131458162446
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "7d579f318c83799335700285d3c08398",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12586149254224969071
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "7dc4444d7ef28550c77b9c2cf0010c1f",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2519597505425955875
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "7f2e54fb857b174a9607ef7a171e043c",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 9037553822109374295
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "81bbb73cfd961bafe93531006e6e0b53",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3469387848691060473
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "8314b2084daf492bb28fcef323b100f7",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 17209371253886947885
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "8856e2f2d36d5da5562c1811569dd159",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3027954171867361670
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "88d9535a019b79ac8c46dd9dc93d1608",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3879301474433301105
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "8ac59e30be5edf10d6f80810a7aa4a8f",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 6632664029259370223
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "8aebc58778902264e83a30e54a7040e9",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13743557772778263171
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "8e3a23799c4ef36780e908b34b956339",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12678730856751954244
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "924e42edfc1528da20c398e8811b6a65",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10460854093250519898
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "95ddfb180ae3012e0427f4989739d892",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12093349746842293412
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "97f37277e678dc4ba1c2347823e91b6d",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11078111827887622175
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "9bc9b1a7b5de9d7493219f365825a764",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 12336552297136973177
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "9cebfd9a65271b101c4b1572cc2574d8",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 6365600606250594572
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "9ff92835ff2cf36e1440e0eb980f71e3",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13202481125782357261
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "a1251d9ac21fb5e0f6a6b76012a0d08a",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 1331583666188927871
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "a1bf60e33b17ddad5dc64679ace06d57",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 1118797489762326140
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "a3031356d4ae1f27ba3871e190a3a121",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11636037133899082398
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "a618dbf033c8a37badeebab5e5cc142c",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 16808590929370209929
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "a690c57966296e7b75f6ef265ea11dec",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 1565009120765273900
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "a83a3ebae67db47eb9df3d4ec0d5924e",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 8479059143477881024
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "ab0e0e6e8caffeb7e67a5d4ae0841c6f",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2547756161465978562
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "abab2221aa3eed8e0ec126af5ef1aeac",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 5820009124365776646
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "abe52e64e7f512aa3245ffc14bcc67a1",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 2227402491639643948
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "ac0c5b15174ac35de1e9779514b652b3",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 8440364782938603434
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "ac39595ced33b06e9b85bc96fecef348",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 11110991606874584585
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "acdfecd8324fd4bfe237e9e3914a6563",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 17043829163511456845
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "ad34ef7015b80b0bb609f9209494cf5c",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 14439455583914258241
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "af9abcdce48e977912897e072155346a",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 10732212978243732008
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "b0044530e3c6a8281cf377c43fb1c711",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10365530484500097967
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "b25ec29bbc2f47cdb9470536160e65be",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 15921103578037159676
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "b3d5cffd530ed027fe4f0c7562a6e8aa",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 6965140669018580260
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "b469bbf648152c2c5bf38dc2262d89fd",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 2014506259078191254
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "b4f0ce71d8cb182527097a9b3a75db66",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 11574801930583030918
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "b53d26b7a024f288ae61b52c4672e977",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 9736805776439118852
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "b54388a8a4efa22b53657708ed802e63",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13752747699807235348
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "b562d38b29e6286aa5d9b5502ef258fe",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 6818989288543306245
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "b5f8b29419800b2e0f51ae532b11c9ce",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 15253828098120994482
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "b8753fa0eecc8bf237573e8272a5f3d9",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 7514686055729515113
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "b8a989bf5e5aa095b382bc21d4e578e5",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 1634305177929706944
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "ba5ddce59348ae002836bba450c6687a",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 6352682887568739335
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "badb2ccbef41a62c595a94b4b766594b",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 3881361928493002080
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "bdeb335e03c69822216ebc9873264779",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 18198594458895653532
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "beb19773c82e0effcbf3fa5baf19bbc0",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 4428514312376481258
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "beecdc8c6fccf7148d30c2ea29cc8c46",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 10989067824768406575
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "bef527378c711319cd34068b69af06e2",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 4289936410879546363
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "c1316b1e50f9d506aa8f5714cb34cf24",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10537810052207075637
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "c17fc2936016386a72c910409f5faad0",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 8338568520121306707
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "c2c8fd1e5cc194fe5d91408f0f14a63b",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 4132928070697177999
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "c2f7e379755dc6c92303f098f364bebf",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11885852688915891790
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "c6a4f4b92036e51480afdaa644f5ce10",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11436902550672305689
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "c734558433b0529178df3b49c8d87c6a",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 1400161101434462203
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "c85f1e8e4813e9a0172ffae6797e1c0a",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 3374062771937027282
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "c91d0af00645085b68e45b5d407c5b66",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 9165737700989110770
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "cb075f5d8c761bb6d96149a3945af078",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10425507558474882235
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "cc1dd9f543d2a859a5d5d699dfb132db",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 160062556076326390
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "cd3df5f1ec487b5137eaa5ddb85e2c4c",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 16333177736447446926
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "ce8a6226fcbf35df633d0b90e064f92d",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 1430230504250031802
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "d1b8e868d969674444b848f7de941f73",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 15120488195254678459
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "d56589df65e4a075d4db4cc34026e595",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 9251111258571954931
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "d8a59415ac8192b12e8516e968d1289e",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 4449568147800338545
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "db904d040cbf4af169928df61bc35bf5",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 8688783952196711793
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "dbc1df0b7b06f3073426d030babac7c4",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12497344524758214153
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "dee589dbf9ce4524e73c99fdde3d1647",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 6800678950890825593
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "df6cc4d710d110553e6e3f7e9852f55e",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 4214434235630601597
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "e10f5b14038aaeb2bd7eb5fb06389d26",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 17830377381070885136
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "e40fa56098f4a1d9aa036a8f1ef7b232",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 5115431331403607562
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "e52d6c1d9ab7420d83799b04d51e3577",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 14677389238915851061
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "e614275ee0ae0fd30c9d7b14ac643c66",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 2251887501131545119
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "e8ae627152b5619f027f436066c18a40",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12110748978702926449
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "e8ef4eb1828b31435765ba410dc15f8c",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 15717950079509627786
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "ead58050ded641149bb39414b861fba6",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 14350789370964665506
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "eb161042a7e3c099bd994e1ee4491e6b",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 15235151957850798529
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "eb5dbe9c898f9ca86384459ba67650fb",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 7712238186504284683
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "ec8b10f7b3e51c0a923bbb2e1cdb8363",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10747970955511883718
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "ecf455ec91d9a0036903778cabaa1acb",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 16703076659485441583
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "ed01e3cb2a931199c504593e14b820e7",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 12215895257473684144
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "ee509d4651bbadf418a2de1139820321",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 4546446929163438813
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "f0d98e250bf745e6e076b687f28bb818",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13636683168052701198
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "f1bf7a60d357875af17b6c554ee42e7f",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 7417008798474985197
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "f4b745bb82dd8e08361e5cc777be6c29",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 4448526217827399607
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "f4de92e22807d957acdf874ef5525dfc",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 17083942111138560662
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "f62e288228e45a9751a617e981fc8a15",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 11445072121930539249
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "f66790afd37fbfbd0d6c81f0f1f42cab",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 17365743906632100628
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "f7d09a2f301c64a3eced7a1a62659a3e",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 11915260701276219827
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "f7dc53d6074188bcd8dd30aea4906c24",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 17293652355986392045
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "f7fdf0653f0206aa9a73315919d4dd90",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 13087076787634678432
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "f918136436a44471168144af34244745",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 3672206057981162019
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    },
+    {
+      "episode_id": "fd17337b2216fe0409941c16f1bbc7d1",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 9805007549440847766
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "fe0cf618886d501b85e40e41b6f74eb1",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 10278432831868390615
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "ff5abc924c081ed7d13d0e02a2850be9",
+      "family": "line",
+      "graph": {
+        "N": 96
+      },
+      "rng": {
+        "episode_seed": 7300708296608973762
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 95
+      }
+    },
+    {
+      "episode_id": "ff935e8d0a9cc67663f82e036966a6a3",
+      "family": "line",
+      "graph": {
+        "N": 160
+      },
+      "rng": {
+        "episode_seed": 10498127250844264815
+      },
+      "sim": {
+        "horizon_T": 128
+      },
+      "task": {
+        "loss": {
+          "check_simplex": false,
+          "cvar_alpha": 0.1,
+          "eps": 1e-08,
+          "kind": "nll",
+          "label_smoothing": 0.0,
+          "margin": 0.0,
+          "normalize_prob": true,
+          "reduction": "mean",
+          "tau": 0.2,
+          "time_agg": "last"
+        },
+        "name": "transfer",
+        "source_index": 0,
+        "target_index": 159
+      }
+    }
+  ],
+  "experiment_name": "transfer-line",
+  "fingerprint_sha16": "b465a222649f536f335202509dbac1a7",
+  "horizon_T": 128,
+  "meta": {
+    "build": {
+      "episode_seed_base": 900000,
+      "horizon_policy": "per_horizon_manifest",
+      "horizons": [
+        64,
+        96,
+        128
+      ],
+      "seed": 1234
+    },
+    "experiment_name": "transfer-line",
+    "family": "line",
+    "generated_at_utc": "2025-12-22T02:23:45+00:00",
+    "schema_version": "acpl.manifest.v1",
+    "source_config_path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/transfer-line.yaml",
+    "source_config_sha16": "cf6e9d244ba6be9e80c997f69f63b0e3",
+    "task_name": "transfer"
+  },
+  "schema_version": "acpl.manifest.v1",
+  "source_config": {
+    "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/transfer-line.yaml",
+    "sha16": "cf6e9d244ba6be9e80c997f69f63b0e3"
+  },
+  "split": "test_iid"
+}

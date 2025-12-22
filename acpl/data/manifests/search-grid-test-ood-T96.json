@@ -1,0 +1,4398 @@
+{
+  "build": {
+    "episode_seed_base": 930000,
+    "horizon_policy": "per_horizon_manifest",
+    "horizons": [
+      96,
+      128,
+      160,
+      192
+    ],
+    "seed": 1337
+  },
+  "counts": {
+    "n_episodes": 150
+  },
+  "created_at_utc": "2025-12-22T02:23:45+00:00",
+  "episodes": [
+    {
+      "episode_id": "009faf9ba6826278b6a64573f40ee072",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 10867255820675292509
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "0269f19f49a0477635ad48946c688059",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17891035533512952560
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "070b606a3333c068cfc72c9d4a5c7ef9",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14357638205551330841
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "0721d1658fbb834be07b683b4d234138",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17543507812892547632
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "0a0bcce1abb03f6d098b031390444c74",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14770426565300299973
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "0c676566503432740893a56dd4afaf14",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17224205809994088695
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "0da1fedeb094f9cc6cf9904d0e2f2c84",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16623418685452806419
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "0dfd9f2c051d0845c9edf0e44222a9a4",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 8925741867043592401
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "0fc3b05e288e29a524de278a9cdd24af",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 13157373584236988762
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "11bce997cb2d9e39d5eb5922a14c7830",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 8236776572445637017
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "12d332694f54437e8bbcb1e6be1b9ec2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 15832736977670181468
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "188456e5c8f0b753ea4e5aab10cae904",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 8452373231497404478
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "195b4533aa63b38c7e806b96b5745fdf",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1502967382978561731
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "1a8c297dadaa07632d3422d562689d9f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14587147315417784775
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "1b8265e59bbbba2646410cfd1307d2b4",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 6403591105807803896
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "1bbdef03ea9aa3e31c5d0f88e2943bdf",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16811591222823699362
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "1bdf318fef646e31e02c7847c62442e7",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 10456151680048929979
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "1d31dae6bbe2741ca9b9f81cbb8078ef",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16330107081027799700
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "1ea5033afa42e1db3cc2c75a936e9c42",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 12928967846172563552
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "1ebb5125c02239d1273135c5f3e5cdfb",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 2722379541007950227
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "1f8a1a47bc07a1f90a327a3226cb9ac5",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 132918185487310627
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "2046c14f8113d24934a0b47a0a11ab73",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 639184103237607111
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "22d523d7315757c04da7a1cbd4f61371",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17098161737706228721
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "254967e6a73223389e482c7e7950c589",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17794088042553039112
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "25f2bd41dbdbbed6f4d738bc73a02ce0",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17555330010197734198
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "261774154be5f71b7b704bd52f4cf3d1",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17586727947626898911
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "275847a6a93d670ba39cabc20ea163e6",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 2774316728136866279
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "2839a398aac75aca18556d169e873139",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14447438138264765826
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "28b367059bccd3a74a0610949e4fb11a",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 12262079133055894512
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "2d648150cce1d001a6ef89c1d81146dd",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 5800347898566092624
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "2e5c5d40341443571ff71bfb262c6215",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17355458966352613601
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "2fd361a18a659f02e6ac8c8cc5769f1e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 11966720189389999346
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "3199b63d144a25feef5919b4bf55a163",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 4354757903836006846
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "31ecca906154e65cc1929843eb8842e1",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 18039568537255139305
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "383153a9c82dcb22f9ecc3197b3dac04",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16671478888675645886
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "3837b029e9e80ce67f2a24304a1089d8",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 9927561738709631408
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "390bced17638203a15fe2146a2cfe42e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 2765751127096235369
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "3a839efc50c31cd442fdf3d83ecfce3b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 13296569317692742213
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "3e25bf01871e97a013126f8aee626db8",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1257408573209012715
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "3eaa9f4a26fc916fdc8492d0527d8047",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 9811907166188097118
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "4163c2d10dd51b346b28e6d8ed036f64",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17929545946169561816
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "41b846a7656b148c0d2f341af21ae0dc",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17634148829218580900
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "4370f99988c0e3feceb82922af75de1e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 2955551807028677833
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "4443657f3cfa0c8ac3afbc693d02b5b4",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 10657893988512483565
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "46538dd9f99fd18661ab6dcea7b8ecfa",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16935981073154616741
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "4916564cb175e5b5e3d5a202af08f76c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1302158258395388981
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "493b9475e78e131e71c155f4debb8aae",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 4476999736477007059
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "4cc21411604adf8b615d371144189105",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 10631368178688171341
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "4cc93912b6fd2cb543115c8cd757cf1c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 2234648724325290811
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "4d164ceea5d47aff056a4c29d1bd250a",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1813301256270298325
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "4dc6c66d1ee7259691b91cd636154a66",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 9654267938974498137
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "4dff1189f3e3576f59996589e9bc35cd",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 10480994178322681303
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "4eb57c0bd38eef011879fd0b14b5d884",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14293561377208906244
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "503f0e71a5bf1ec42194092c65fd4bf6",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1360944410578308849
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "512f016d783040538699f51afa093202",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 12224620302951471503
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "539036d7c834af9c42036acba365844b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16015469799744299874
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "566ea76d0f95d38b7bfa4189f70f5ffa",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 4804963695401205448
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "587cce979172d2ee8ae1c4b6edd9a288",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 6381248277445400545
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "5a3b5f06cc85fea89e09cfeddb42778e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 13317649784859632688
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "5bae5058190e5aaf1dbcbda2223a2b9f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 11483400328164316807
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "5e189ebe0b79ade4322aac43f85bf163",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 8954249787000630923
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "5ec24b134de7725f804717af1875b953",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 15985541718321273800
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "5f4b4a925790fdfe0c0c8e885a041a27",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14633315970851564065
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "5fe845487f659774fa9517266866b3da",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 5960413615820276575
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "63f48e7f132ec0a31db404cb60fae03d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 9106661411219667611
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "6d024586cc98307b72581615d63f4439",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16711991508070283699
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "6d21d794b736319e0818caad4de66736",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 9049381640590703902
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "6e9bb7348441f00f6dfcf63fe267c529",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 13715084026064842882
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "6f1c38075990b50c154fc8dfc6f6522e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1347806618054057062
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "714b752fde129b298f2dcf4dd42e9fd5",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 7262914947090556716
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "7191d646147ff39142f2c76a896e7b0e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 10496302801249817392
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "7227b203b77b22be6c910aa3e750ff58",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17008137304202306555
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "72c15e025a9ad4394485e21637d391d6",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16532944209296455248
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "747576772cd913c083e30ecb7c7f15c0",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 15815466735476699314
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "74bd7837fa0817d526a4ab4871e5530b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 11525657097006693802
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "775b17ba4ed281204be5db886703a2b0",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16065201077898240611
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "78fc698097710a116707bae2421e2be0",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16670778007413491274
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "79ea99c703df1f0cb768a215a6012d45",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 15697830679620971017
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "7cf453821628c414c7efdf126092805c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 11857404605818141277
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "7d37e2477997bd2aef4747f65b5289e3",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 5030618463222341633
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "7dfffc80655fe3339722b8d83475c42f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 3276401006025940081
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "7f7d3c60afc78694162f514145c32faf",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 6403571437084955282
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "80f7cea914b4e313ae6b621955aa0ba5",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17188434331062489645
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "81e111398926210dcd6c7f50caf8fbd3",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 10260366941602696702
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "829133c00e6019439937cfd81aee9ae7",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 12052826320842818809
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "84d5e27f4e65f7b04846a6c37e3a1cc0",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 18177052803105091506
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "877d0159e02c6d6047d2d8fd2472e6c8",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 11013204051377793780
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "8c86ecea3f55b5e9e927788115ddd4e4",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 4806131251741537965
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "8e23551604f584f494140bc4b320af98",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 7441277714357646475
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "8e4c872f5fd21b7db14eac05d788b9ff",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 12224081363261501902
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "933b25d628b840d8d86fd929c447a1c2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1540307039596088134
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "955e53998a98eb57836798415c92b2dc",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 5541247442452322386
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "97d541ec1f0f2dd717a1388032bc2d7c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 3968342464625618318
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "9b3867a4c730da14c4c21fad875a51dc",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1380187930594641962
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "9c94b87471ee8efc701b92adb36482f0",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 9171896755666130833
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "9e187ece25bcbd4448822c239720e70a",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 10919996323187577458
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "9e5914fb8131c3d6cbb1f4bb0f97b1ef",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 12821556828233237377
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "9ea123584f950348340f757b26bbc8da",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17609377698431687013
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "a013b1b18309b1273c06267d0ca00081",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 6453315584814552461
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "a472953cc70a2562539691023613a791",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 13717816792973118937
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "a4febb7922b7aefaa9187ebb4bf59e8b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 105782643663420074
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "a93edd147c0b2d88f170e466efe63ac6",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 10894966138902689560
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "ac79466abe4dc2da955966f40426863b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 3635265437485887171
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "ad24294279686b9420c5b084314421b0",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 6527278668449154331
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "ad4ab6c8309ce5928a6e115bcaebbcd2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 3176369059404149289
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "ae5122a8992931711fa5878b089bc8e3",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 3754176228526446816
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "aea4b99746a860eb9a831f58e3eb44c2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 11079148139690521958
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "aef06999b0d264a27d3cd4de7306c1a4",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 4835353717453089707
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "afdaac402b391d71293326c447f776f9",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 12159239079268788819
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "b0366e89a7e7a15919aad7665e400b9d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 8817345185931009010
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "b13832b41645da2bfdab43de8bf5f467",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 676915099006594654
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "b16a03e682f4b1118286f6003efee169",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14964592148159392306
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "b3f04fded06663b98d91e702d915ee5f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14070016669424846378
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "b72cceaf51ee89e871f3166e518e0f2a",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14684966520166161339
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "baaea7395e63f319afa19369c04df814",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 8975526958158349369
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "bc649cabd06415c6a75839b60471e9f6",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1521032564344337599
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "bde39abc98f2a1271eb127d31b4979c9",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 4102713942697322911
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "beecb597b1d105890df283623aae1d62",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 2908591323305671933
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "bff8230868c60ff209b9db1323615fda",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 12519327838483601066
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "bffd9ebf0916317e502ba14933b55e31",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 9141818663296327920
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "c15c202fa1763a333df5ad00daa917e5",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 8684055850022169605
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "c514feb27169f7ae678796c55e82893b",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 5132041535997256307
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "c5358345ca0addbb925b5f54e6e42559",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 8670142426902085030
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "c5ec1868f8d188865f1c435cc343263e",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1267827578541638794
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "cafd13525c5686901bfbf6a9128ae85c",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14431867282025191934
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "ccff283fe7a35a04ddd10142df672445",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 8942790608609138654
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "cd1b45125b655e98a7e68fafbffaec27",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17848612122521475632
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "cf36a025821e78c5ce3a3dd06d7119e6",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 12886296428991514732
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "d95a1788855094a1ceeea887230154a2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 387300020461784662
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "d95aabcf8a82ee0961214d3cd4672e27",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 9477984996928503704
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "da8120152a893e1240e9ef721b4ebfbf",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 2986524782593671499
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "dc6db97cadb5a6b7363d24001646a409",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 3086829177016862120
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "dd39c86f213ee19c1b9384e9d0ddd256",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17316813790035323610
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "deb034da3dffc552d7d5f4f962c45215",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16940266564819418974
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "df8aa2743e9a153a6bee666ae8c3eab2",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 14745306678257746538
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "dfa94ddf800c149bd0ec27572486d0ed",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 16602401998219042259
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "e306673e2e26722b34114a09cc766bba",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17117810531332531029
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "e71ef5cab49ac8fecaa51f68a35725e1",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 3394340302938427776
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "e801d048a934cb02a6055973d37fea11",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 13601657099765143071
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "e990159b74521323ce87d25999f7394a",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 5697091291306919580
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "ece539e66ec97a500a4a69decc170b96",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 2695230982786075271
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "ecff30b18859ba4050b03f02a828cb33",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 6351122512713189635
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "ed4306dfe8983211ce0d41f5ca2d550d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 7001996566658299721
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "eef04b902ed3a2059640630aa1376805",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 15908419808398471066
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "ef05a72436645adb874b86b0cc4f8c8d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 2569345089993195468
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "f1292e7fe658c37548d65efb3fccb71d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 17319474151096472213
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "f3a6cf174f2cdda01c9d7cb0f65acf1f",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 10778261048531056263
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "f5a15caf03e821cdd5802106927ca340",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 8063880568985130105
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "f70be451594fd1d9e3d54d2842324e5d",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 12821939220457459118
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    },
+    {
+      "episode_id": "fda196b744af5ce6945aa892e5040434",
+      "family": "grid-2d",
+      "graph": {
+        "L": 96,
+        "boundary": "open"
+      },
+      "rng": {
+        "episode_seed": 1289935724159516458
+      },
+      "sim": {
+        "horizon_T": 96
+      },
+      "task": {
+        "grid": {
+          "boundary": "open",
+          "k": 1,
+          "mark_scheme": "single"
+        },
+        "loss": {
+          "clamp_min_p": 1e-12,
+          "kind": "neg_success",
+          "reduction": "mean"
+        },
+        "name": "search",
+        "normalized_time_feature": true,
+        "objective": "maximize P_Omega(T)"
+      }
+    }
+  ],
+  "experiment_name": "search-grid",
+  "fingerprint_sha16": "fc3849d45daaf16ecd397928b3029cc1",
+  "horizon_T": 96,
+  "meta": {
+    "build": {
+      "episode_seed_base": 930000,
+      "horizon_policy": "per_horizon_manifest",
+      "horizons": [
+        96,
+        128,
+        160,
+        192
+      ],
+      "seed": 1337
+    },
+    "experiment_name": "search-grid",
+    "family": "grid-2d",
+    "generated_at_utc": "2025-12-22T02:23:45+00:00",
+    "schema_version": "acpl.manifest.v1",
+    "source_config_path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/search-grid.yaml",
+    "source_config_sha16": "76c641d5d647679288bbf623f76dc308",
+    "task_name": "search"
+  },
+  "schema_version": "acpl.manifest.v1",
+  "source_config": {
+    "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/search-grid.yaml",
+    "sha16": "76c641d5d647679288bbf623f76dc308"
+  },
+  "split": "test_ood"
+}

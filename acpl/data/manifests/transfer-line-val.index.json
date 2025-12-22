@@ -1,0 +1,28 @@
+{
+  "created_at_utc": "2025-12-22T02:23:45+00:00",
+  "experiment_name": "transfer-line",
+  "files": {
+    "test_iid": {
+      "128": "transfer-line-test-iid-T128.json",
+      "64": "transfer-line-test-iid-T64.json",
+      "96": "transfer-line-test-iid-T96.json"
+    },
+    "test_ood": {
+      "128": "transfer-line-test-ood-T128.json",
+      "64": "transfer-line-test-ood-T64.json",
+      "96": "transfer-line-test-ood-T96.json"
+    },
+    "val": {
+      "128": "transfer-line-val-T128.json",
+      "64": "transfer-line-val-T64.json",
+      "96": "transfer-line-val-T96.json"
+    }
+  },
+  "fingerprint_sha16": "19e956fc0c7015ac3ef38c7d2f054a99",
+  "horizon_policy": "per_horizon_manifest",
+  "schema_version": "acpl.manifest.v1",
+  "source_config": {
+    "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/transfer-line.yaml",
+    "sha16": "cf6e9d244ba6be9e80c997f69f63b0e3"
+  }
+}
