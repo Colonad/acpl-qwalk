@@ -1025,7 +1025,170 @@ def _call_plot_best_effort(fn, payload: dict[str, Any], figdir: Path):
 
 
 
+def _sanitize_filename(s: str) -> str:
+    s = (s or "").strip()
+    out = []
+    for ch in s:
+        if ch.isalnum() or ch in ("-", "_", "."):
+            out.append(ch)
+        else:
+            out.append("_")
+    x = "".join(out)
+    while "__" in x:
+        x = x.replace("__", "_")
+    return x.strip("_") or "cond"
 
+
+def _make_rollout_timeline_fn(
+    th: Any,
+    *,
+    pm: Any,
+    shift: Any,
+    family: str,
+    adaptor: Any | None,
+    cdtype: Any,
+    device: Any,
+    init_mode: str,
+    theta_scale: float = 1.0,
+    theta_noise_std: float = 0.0,
+):
+    """
+    Return a rollout(model, batch) -> Pt tensor with shape (T+1, N).
+    This is ONLY used for plotting, so it is allowed to be slower.
+    """
+    from acpl.sim.utils import partial_trace_coin
+    from acpl.sim.step import step as _step_su2
+
+    fam = (family or "su2").lower().strip()
+
+    def _init_state(batch: Mapping[str, Any]) -> torch.Tensor:
+
+        # mirror scripts/train.py initialization behavior, but be robust to
+        # helpers that may/may not accept `device=...`.
+        if init_mode == "uniform":
+            return _call_positional_with_accepted_kwargs(
+                th.init_state_uniform_arcs, pm, cdtype=cdtype, device=device
+            )
+        if init_mode == "node":
+            start = int(batch.get("start_node", 0))
+            return _call_positional_with_accepted_kwargs(
+                th.init_state_node_uniform_ports, pm, start, cdtype=cdtype, device=device
+            )
+        # default: node0
+        return _call_positional_with_accepted_kwargs(
+            th.init_state_node0_uniform_ports, pm, cdtype=cdtype, device=device
+        )
+
+    def _rollout_su2(model: torch.nn.Module, batch: Mapping[str, Any]) -> torch.Tensor:
+        X = batch["X"]
+        edge_index = batch["edge_index"]
+        T = int(batch["T"])
+        psi = _init_state(batch)
+
+        # coins: prefer coins_su2 if present; else theta->(U) via helper
+        if hasattr(model, "coins_su2"):
+            coins = model.coins_su2(X, edge_index, T=T)
+        else:
+            theta = model(X, edge_index, T=T)
+            if not hasattr(model, "_su2_from_euler_batch"):
+                raise RuntimeError("SU2 plotting needs model.coins_su2 or model._su2_from_euler_batch.")
+            coins = model._su2_from_euler_batch(theta)
+
+        Pt = torch.empty((T + 1, pm.num_nodes), device=psi.device, dtype=torch.float32)
+        Pt[0] = partial_trace_coin(psi, pm).to(torch.float32)
+        for t in range(T):
+            psi = _step_su2(psi, pm, coins[t], shift=shift)
+            Pt[t + 1] = partial_trace_coin(psi, pm).to(torch.float32)
+        return Pt
+
+    def _rollout_anydeg(model: torch.nn.Module, batch: Mapping[str, Any]) -> torch.Tensor:
+        from acpl.sim.utils import partial_trace_coin
+        X = batch["X"]
+        edge_index = batch["edge_index"]
+        T = int(batch["T"])
+        psi = _init_state(batch)
+
+        theta = model(X, edge_index, T=T)
+        if theta_scale != 1.0:
+            theta = theta * float(theta_scale)
+        if model.training and float(theta_noise_std) > 0.0:
+            theta = theta + float(theta_noise_std) * torch.randn_like(theta)
+
+        Pt = torch.empty((T + 1, pm.num_nodes), device=psi.device, dtype=torch.float32)
+        Pt[0] = partial_trace_coin(psi, pm).to(torch.float32)
+
+        perm = shift.perm
+        d0 = int(pm.degree) if getattr(pm, "is_regular", False) else None
+        fast_regular = bool(getattr(pm, "is_regular", False)) and bool(getattr(shift, "is_perm", False)) and d0 is not None
+
+        for t in range(T):
+            tht = theta[t]  # (N, out_dim)
+            if adaptor is None:
+                raise RuntimeError("Any-degree plotting requires adaptor (ThetaToHermitianAdaptor).")
+            H = adaptor(tht)  # (N, d, d)
+            if fam == "exp":
+                U = th.unitary_exp_iH(H)
+            else:
+                U = th.unitary_cayley(H)
+
+            if fast_regular:
+                Nn = pm.num_nodes
+                psi2 = psi.view(Nn, d0)
+                psi2 = torch.bmm(U, psi2.unsqueeze(-1)).squeeze(-1)
+                psi = psi2.reshape(-1)[perm]
+            else:
+                # variable degree: build per-node blocks
+                coins_v: list[torch.Tensor | None] = []
+                start = pm.node_ptr[:-1]
+                end = pm.node_ptr[1:]
+                for v in range(pm.num_nodes):
+                    s, e = int(start[v]), int(end[v])
+                    d = e - s
+                    if d <= 0:
+                        coins_v.append(None)
+                    else:
+                        coins_v.append(U[v, :d, :d])
+                psi = th.apply_blockdiag_coins_anydeg(psi, pm, coins_v)[perm]
+
+            Pt[t + 1] = partial_trace_coin(psi, pm).to(torch.float32)
+
+        return Pt
+
+    if fam == "su2":
+        return _rollout_su2
+    return _rollout_anydeg
+
+
+def _collect_mean_Pt_over_episodes(
+    *,
+    model: torch.nn.Module,
+    dataloader_factory: Any,
+    rollout_timeline_fn: Any,
+    seeds: list[int],
+    episodes: int,
+) -> np.ndarray:
+    """
+    Returns Pt with shape (S, T+1, N): per-seed average over episodes.
+    """
+    model.eval()
+    out: list[np.ndarray] = []
+    with torch.no_grad():
+        for s in seeds:
+            it = dataloader_factory(int(s))
+            acc = None
+            n = 0
+            for batch in it:
+                Pt = rollout_timeline_fn(model, batch)  # (T+1, N)
+                acc = Pt if acc is None else (acc + Pt)
+                n += 1
+                if n >= int(episodes):
+                    break
+            if acc is None or n == 0:
+                continue
+            out.append((acc / float(n)).detach().cpu().numpy())
+    if not out:
+        raise RuntimeError("No Pt data collected for plotting.")
+    return np.stack(out, axis=0)
 
 
 
@@ -1588,21 +1751,39 @@ def run_eval(
                 return (ds[i] for i in range(len(ds)))
         # --- rollout_fn (same as train.py) ---
         if coin_family == "su2":
-            rollout_fn = th.make_rollout_su2_dv2(pm, shift, cdtype=cdtype, init_mode=init_mode)
+            
+            
+            rollout_fn = _call_positional_with_accepted_kwargs(
+                th.make_rollout_su2_dv2,
+                pm,
+                shift,
+                cdtype=cdtype,
+                device=torch_device,   # filtered out if helper doesn’t accept it
+                init_mode=init_mode,
+            )            
+            
+            
             title_suffix = "SU2 (deg=2)"
         else:
             theta_scale = float(coin_cfg.get("theta_scale", 1.0))
             theta_noise_std = float(coin_cfg.get("theta_noise_std", 0.0))
-            rollout_fn = th.make_rollout_anydeg_exp_or_cayley(
+            
+            
+            
+            rollout_fn = _call_positional_with_accepted_kwargs(
+                th.make_rollout_anydeg_exp_or_cayley,
                 pm,
                 shift,
                 adaptor=adaptor,
                 family=coin_family,
                 cdtype=cdtype,
+                device=torch_device,   # <-- this was crashing before; now it’s filtered if unsupported
                 init_mode=init_mode,
                 theta_scale=theta_scale,
                 theta_noise_std=theta_noise_std,
             )
+            
+            
             title_suffix = f"{coin_family.upper()} (any degree)"
 
         # --- protocol configs ---
@@ -1813,8 +1994,16 @@ def run_eval(
     summaries_for_csv: list[Mapping[str, Any]] = []
     structured_out: dict[str, Any] = {"conditions": {}}
 
+    plot_runners: dict[str, dict[str, Any]] = {}
+
     base_tag = "ckpt_policy" if policy != "baseline" else f"baseline_{baseline_kind}"
     base_res = run_one_condition(base_tag)
+
+
+    if trainer_native_ok:
+        plot_runners[base_tag] = {"model": model, "dataloader_factory": _make_eval_iter}
+
+
 
     base_summary = (base_res or {}).get("summary", {})
     structured_out["conditions"][base_tag] = base_res or {}
@@ -1844,12 +2033,7 @@ def run_eval(
                 except Exception as e:
                     
                     # --- FIX: NoPE fallback if ablations module can't infer pe_dim ---
-                    msg = str(e)
-                    if (
-                        trainer_native_ok
-                        and canon == "NoPE"
-                        and ("pe_dim" in msg or "pe dim" in msg.lower() or "posenc" in msg.lower())
-                    ):
+                    if trainer_native_ok and canon == "NoPE":
                         try:
                             bundle = _fallback_nope_bundle(
                                 base_tag=base_tag,
@@ -1868,13 +2052,7 @@ def run_eval(
                             bundle = None
                     else:
                         print(f"[warn] ablation '{abl}' failed to build: {e}", file=sys.stderr)
-                   
-                    
-                    
-                    
-                    
-                    
-                    bundle = None
+                        bundle = None
             
             
             
@@ -1889,10 +2067,6 @@ def run_eval(
             
             
             else:
-                print("[warn] acpl.eval.ablations not found; skipping ablations.", file=sys.stderr)
-
-            
-            
                 # Optional: still allow NoPE in trainer-native mode even if ablations module is missing
                 if trainer_native_ok and canon == "NoPE":
                     bundle = _fallback_nope_bundle(
@@ -1901,7 +2075,13 @@ def run_eval(
                         dataloader_factory=_make_eval_iter,
                         rollout_fn=rollout_fn,
                         cfg=cfg,
-                    )            
+                    )
+                    print(
+                        "[warn] acpl.eval.ablations missing; using eval.py NoPE fallback (zero positional-like channels).",
+                        file=sys.stderr,
+                    )
+                else:
+                    print("[warn] acpl.eval.ablations not found; skipping ablations.", file=sys.stderr)       
             
             
             
@@ -1920,6 +2100,12 @@ def run_eval(
                 )
                 cond_tag = bundle.tag
 
+                if trainer_native_ok:
+                    plot_runners[cond_tag] = {
+                        "model": bundle.model,
+                        "dataloader_factory": bundle.dataloader_factory,
+                    }                
+
             structured_out["conditions"][cond_tag] = res or {}
 
             summ = (res or {}).get("summary", {})
@@ -1931,27 +2117,54 @@ def run_eval(
     _write_csv(summaries_for_csv, outdir / "summary.csv")
     (outdir / "summary.json").write_text(_json_dump(structured_out))
 
-    # Optional plots
     if plots and plot_mod is not None:
-        try:
-            figdir = _ensure_dir(outdir / "figs")
-            # We try a few common plotting helpers; each helper should be no-op safe
-            if hasattr(plot_mod, "plot_tv_curves"):
+        if not trainer_native_ok:
+            print("[warn] plots requested, but trainer-native eval path is unavailable; skipping plots.", file=sys.stderr)
+        else:
+            try:
+                figdir = _ensure_dir(outdir / "figs")
 
-                _call_plot_best_effort(getattr(plot_mod, "plot_tv_curves"), structured_out, figdir)          
-          
-          
-          
-          
-            if hasattr(plot_mod, "plot_Pt_timelines"):
-                _call_plot_best_effort(getattr(plot_mod, "plot_Pt_timelines"), structured_out, figdir)
-            if hasattr(plot_mod, "plot_robustness_sweeps"):
-                _call_plot_best_effort(getattr(plot_mod, "plot_robustness_sweeps"), structured_out, figdir)
-        except Exception as e:
-            print(f"[warn] plot generation failed: {e}", file=sys.stderr)
+                # Build a timeline rollout strictly for plotting.
+                theta_scale = float((cfg.get("coin", {}) or {}).get("theta_scale", 1.0)) if "cfg" in locals() else 1.0
+                theta_noise_std = float((cfg.get("coin", {}) or {}).get("theta_noise_std", 0.0)) if "cfg" in locals() else 0.0
+                rollout_tl = _make_rollout_timeline_fn(
+                    th,
+                    pm=pm,
+                    shift=shift,
+                    family=coin_family,
+                    adaptor=adaptor,
+                    cdtype=cdtype,
+                    init_mode=init_mode,
+                    theta_scale=theta_scale,
+                    theta_noise_std=theta_noise_std,
+                )
 
-    print(f"[OK] Evaluation complete. Artifacts at: {outdir}")
+                for cond_tag, rr in plot_runners.items():
+                    m = rr["model"]
+                    dl = rr["dataloader_factory"]
+                    Pt = _collect_mean_Pt_over_episodes(
+                        model=m,
+                        dataloader_factory=dl,
+                        rollout_timeline_fn=rollout_tl,
+                        seeds=seed_list,
+                        episodes=int(episodes),
+                    )  # (S, T+1, N)
 
+                    safe = _sanitize_filename(cond_tag)
+                    if hasattr(plot_mod, "plot_tv_curves"):
+                        plot_mod.plot_tv_curves(
+                            Pt,
+                            savepath=(figdir / f"tv__{safe}.png"),
+                            title=f"{suite} — {cond_tag} — TV-to-uniform",
+                        )
+                    if hasattr(plot_mod, "plot_position_timelines"):
+                        plot_mod.plot_position_timelines(
+                            Pt,
+                            savepath=(figdir / f"Pt__{safe}.png"),
+                            title=f"{suite} — {cond_tag} — mean Pt",
+                        )
+            except Exception as e:
+                print(f"[warn] plot generation failed: {e}", file=sys.stderr)
 
 # --------------------------------- CLI ----------------------------------------
 
