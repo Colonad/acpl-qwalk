@@ -875,6 +875,82 @@ _ABLATION_ALIASES = {
 }
 
 
+
+
+
+def _zero_positional_like_channels(X: torch.Tensor, *, keep_last_indicator: bool) -> torch.Tensor:
+    """
+    Heuristic NoPE implementation that works with your current feature layout.
+
+    Assumptions (matches scripts/train.py + scripts/eval.py payloads):
+      - X[..., 0] is degree (keep)
+      - X[..., 1] is coordinate / positional proxy (zero)
+      - if indicator is used (search/robust), it is appended as the LAST channel (keep)
+      - any "middle" channels are treated as positional-like and zeroed
+
+    Works for X shape (N,F) or (B,N,F).
+    """
+    if not isinstance(X, torch.Tensor):
+        return X
+    if X.ndim not in (2, 3):
+        return X
+    F = int(X.shape[-1])
+    if F < 2:
+        return X
+
+    Y = X.clone()
+    if keep_last_indicator and F >= 3:
+        # keep col0 (degree) and last col (indicator); zero middle cols
+        Y[..., 1:-1] = 0
+    else:
+        # keep col0 (degree); zero everything else
+        Y[..., 1:] = 0
+    return Y
+
+def _fallback_nope_bundle(
+    *,
+    base_tag: str,
+    model: torch.nn.Module,
+    dataloader_factory: Any,
+    rollout_fn: Any,
+    cfg: dict[str, Any] | None,
+) -> AblationBundle:
+    """
+    If acpl.eval.ablations.NoPE cannot infer pe_dim, we still run a meaningful NoPE:
+    remove positional signal by zeroing positional-like channels in X.
+    """
+    task = (cfg or {}).get("task", {}) if isinstance(cfg, dict) else {}
+    tname = str((task or {}).get("name", "")).lower()
+    keep_indicator = bool((task or {}).get("use_indicator", ("search" in tname) or ("robust" in tname)))
+
+    def wrapped_factory(seed_i: int):
+        it = dataloader_factory(seed_i)
+        for batch in it:
+            if not isinstance(batch, Mapping):
+                yield batch
+                continue
+            b = dict(batch)
+            X = b.get("X", None)
+            if isinstance(X, torch.Tensor):
+                b["X"] = _zero_positional_like_channels(X, keep_last_indicator=keep_indicator)
+            yield b
+
+    return AblationBundle(
+        name="NoPE",
+        tag=f"{base_tag}__abl_NoPE",
+        model=model,
+        dataloader_factory=wrapped_factory,
+        rollout_fn=rollout_fn,
+        meta={
+            "ablation": "NoPE",
+            "impl": "eval.py:fallback_zero_positional_like_channels",
+            "keep_last_indicator": keep_indicator,
+        },
+    )
+
+
+
+
 def _normalize_ablation_name(x: str) -> str:
     s = (x or "").strip()
     if not s:
@@ -898,6 +974,61 @@ def _call_with_accepted_kwargs(fn, /, **kwargs):
         return fn(**kwargs)
     filtered = {k: v for k, v in kwargs.items() if k in params}
     return fn(**filtered)
+
+
+
+
+
+
+
+
+
+def _call_positional_with_accepted_kwargs(fn, /, *args, **kwargs):
+    """
+    Call `fn(*args, **kwargs)` but only pass kwargs that the function accepts.
+    Supports functions with **kwargs.
+    """
+    sig = inspect.signature(fn)
+    params = sig.parameters
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return fn(*args, **kwargs)
+    filtered = {k: v for k, v in kwargs.items() if k in params}
+    return fn(*args, **filtered)
+
+def _call_plot_best_effort(fn, payload: dict[str, Any], figdir: Path):
+    """
+    Plot-call adapter:
+      - supports plot fns that take (payload, save_dir=...), (payload, outdir=...), (payload, figdir=...)
+      - supports plot fns that take (payload, figdir) positionally
+      - avoids passing unexpected kwargs (fixes 'unexpected keyword argument save_dir')
+    """
+    attempts = [
+        ((payload,), {"save_dir": figdir}),
+        ((payload,), {"outdir": figdir}),
+        ((payload,), {"figdir": figdir}),
+        ((payload,), {"savepath": figdir}),
+        ((payload,), {"save_path": figdir}),
+        ((payload, figdir), {}),
+        ((payload,), {}),
+    ]
+    last_err = None
+    for args, kwargs in attempts:
+        try:
+            return _call_positional_with_accepted_kwargs(fn, *args, **kwargs)
+        except TypeError as e:
+            last_err = e
+            continue
+    if last_err is not None:
+        raise last_err
+
+
+
+
+
+
+
+
+
 
 def _build_ablation_bundle(
     abl_mod: Any,
@@ -1711,11 +1842,70 @@ def run_eval(
                         device=torch_device if trainer_native_ok else device,
                     )
                 except Exception as e:
-                    print(f"[warn] ablation '{abl}' failed to build: {e}", file=sys.stderr)
+                    
+                    # --- FIX: NoPE fallback if ablations module can't infer pe_dim ---
+                    msg = str(e)
+                    if (
+                        trainer_native_ok
+                        and canon == "NoPE"
+                        and ("pe_dim" in msg or "pe dim" in msg.lower() or "posenc" in msg.lower())
+                    ):
+                        try:
+                            bundle = _fallback_nope_bundle(
+                                base_tag=base_tag,
+                                model=model,
+                                dataloader_factory=_make_eval_iter,
+                                rollout_fn=rollout_fn,
+                                cfg=cfg,
+                            )
+                            print(
+                                "[warn] ablation 'NoPE' failed to build in acpl.eval.ablations; "
+                                "using eval.py fallback (zero positional-like channels).",
+                                file=sys.stderr,
+                            )
+                        except Exception as e2:
+                            print(f"[warn] ablation '{abl}' failed to build: {e2}", file=sys.stderr)
+                            bundle = None
+                    else:
+                        print(f"[warn] ablation '{abl}' failed to build: {e}", file=sys.stderr)
+                   
+                    
+                    
+                    
+                    
+                    
                     bundle = None
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
             else:
                 print("[warn] acpl.eval.ablations not found; skipping ablations.", file=sys.stderr)
 
+            
+            
+                # Optional: still allow NoPE in trainer-native mode even if ablations module is missing
+                if trainer_native_ok and canon == "NoPE":
+                    bundle = _fallback_nope_bundle(
+                        base_tag=base_tag,
+                        model=model,
+                        dataloader_factory=_make_eval_iter,
+                        rollout_fn=rollout_fn,
+                        cfg=cfg,
+                    )            
+            
+            
+            
+            
             if bundle is None:
                 # still record a “skipped” entry so your thesis tables don’t silently omit it
                 cond_tag = f"{base_tag}__abl_{canon}__SKIPPED"
@@ -1747,11 +1937,16 @@ def run_eval(
             figdir = _ensure_dir(outdir / "figs")
             # We try a few common plotting helpers; each helper should be no-op safe
             if hasattr(plot_mod, "plot_tv_curves"):
-                plot_mod.plot_tv_curves(structured_out, save_dir=figdir)
+
+                _call_plot_best_effort(getattr(plot_mod, "plot_tv_curves"), structured_out, figdir)          
+          
+          
+          
+          
             if hasattr(plot_mod, "plot_Pt_timelines"):
-                plot_mod.plot_Pt_timelines(structured_out, save_dir=figdir)
+                _call_plot_best_effort(getattr(plot_mod, "plot_Pt_timelines"), structured_out, figdir)
             if hasattr(plot_mod, "plot_robustness_sweeps"):
-                plot_mod.plot_robustness_sweeps(structured_out, save_dir=figdir)
+                _call_plot_best_effort(getattr(plot_mod, "plot_robustness_sweeps"), structured_out, figdir)
         except Exception as e:
             print(f"[warn] plot generation failed: {e}", file=sys.stderr)
 
