@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
-
+from acpl.eval.stats import explained_variance
 import numpy as np
 import torch
 import torch.nn as nn
@@ -513,7 +513,8 @@ def compute_embedding_statistics(emb: torch.Tensor) -> dict[str, Any]:
             "max": max_d.detach().cpu().tolist(),
         },
     }
-    return stats
+    stats["spectrum"] = explained_variance(emb_f, center=True, eps=1e-12)
+     return stats
 
 
 # =============================================================================

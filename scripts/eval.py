@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scripts/eval.py — Phase B7
+scripts/eval.py
 Run evaluation suites from saved checkpoints with CI-style aggregation,
 optional ablations, and plot/report export.
 
@@ -639,7 +639,7 @@ def _write_csv(rows: list[Mapping[str, Any]], out_csv: Path) -> None:
 
 
 def run_eval(
-    ckpt_path: Path,
+    ckpt_path: Path | None,
     outdir: Path,
     suite: str,
     device: str = "cuda",
@@ -648,7 +648,13 @@ def run_eval(
     ablations: list[str] | None = None,
     plots: bool = False,
     extra_overrides: dict[str, Any] | None = None,
+    *,
+    policy: str = "ckpt",
+    baseline_kind: str = "hadamard",
+    baseline_coins_kwargs: dict[str, Any] | None = None,
+    baseline_policy_kwargs: dict[str, Any] | None = None,
 ) -> None:
+
     """
     High-level evaluation orchestrator.
 
@@ -695,15 +701,19 @@ def run_eval(
 
 
 
-    # Load checkpoint
+    # Load checkpoint (always recommended, even for baselines, to reuse config)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+
+    if ckpt_path is None:
+        raise ValueError("ckpt_path is None (unexpected).")
+
     ckpt = _load_any_ckpt(ckpt_path)
 
-    # Try the ACPL-trainer-native path first (your checkpoints contain 'config')
     trainer_native_ok = (
         (run_ci_eval is not None)
         and isinstance(ckpt.get("config", None), dict)
     )
+
 
     abl_mod = _maybe_get_ablations()
     plot_mod = _maybe_get_plots()
@@ -843,10 +853,59 @@ def run_eval(
             head_dropout=float(head_cfg.get("dropout", 0.0)),
         )
 
-        model = th.ACPLPolicy(acpl_cfg).to(device=torch_device).eval()
+        # --------------------------- build policy (ckpt vs baseline) ---------------------------
+        policy = (policy or "ckpt").lower().strip()
+        baseline_coins_kwargs = dict(baseline_coins_kwargs or {})
+        baseline_policy_kwargs = dict(baseline_policy_kwargs or {})
 
-        # load weights (supports module./_orig_mod.)
-        sd = ckpt.get("state_dict", None) or ckpt.get("model", None)
+        if policy == "baseline":
+            try:
+                from acpl.baselines.policies import build_baseline_policy as _build_baseline_policy
+            except Exception as e:
+                raise ImportError(
+                    "Could not import acpl.baselines.policies.build_baseline_policy. "
+                    "Implement baselines first (acpl/baselines/coins.py + policies.py)."
+                ) from e
+
+            model = _build_baseline_policy(
+                baseline_kind,
+                name=f"baseline:{baseline_kind}",
+                coins_kwargs=baseline_coins_kwargs,
+                policy_kwargs=baseline_policy_kwargs,
+            ).to(device=torch_device).eval()
+
+        else:
+            # default: use trained model from ckpt
+            model = th.ACPLPolicy(acpl_cfg).to(device=torch_device).eval()
+
+            # load weights (supports module./_orig_mod.)
+            sd = ckpt.get("state_dict", None) or ckpt.get("model", None)
+            if isinstance(sd, Mapping):
+                sd2 = _normalize_state_dict_keys(sd)
+                try:
+                    model.load_state_dict(sd2, strict=False)
+                except Exception:
+                    model.load_state_dict(sd2, strict=False)
+
+            # optional EMA shadow (use if it matches enough params)
+            ema_shadow = ckpt.get("ema_shadow", None)
+            if isinstance(ema_shadow, Mapping):
+                _try_apply_ema_shadow(model, ema_shadow)
+        # --------------------------------------------------------------------------------------
+
+                
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         if isinstance(sd, Mapping):
             sd2 = _normalize_state_dict_keys(sd)
             try:
@@ -854,11 +913,33 @@ def run_eval(
             except Exception:
                 model.load_state_dict(sd2, strict=False)
 
+        
+        
+        
+        
+        
         # optional adaptor for exp/cayley
         adaptor = None
         if coin_family in ("exp", "cayley"):
             adaptor = th.ThetaToHermitianAdaptor(Kfreq=int(coin_cfg.get("Kfreq", 2))).to(device=torch_device).eval()
-            ad_sd = ckpt.get("adaptor", None)
+
+            # Only load adaptor weights from ckpt when policy is the trained checkpoint policy
+            if policy != "baseline":
+                ad_sd = ckpt.get("adaptor", None)
+                if isinstance(ad_sd, Mapping):
+                    try:
+                        adaptor.load_state_dict(ad_sd, strict=False)
+                    except Exception:
+                        pass
+
+            
+            
+            
+            
+            
+            
+            
+            
             if isinstance(ad_sd, Mapping):
                 try:
                     adaptor.load_state_dict(ad_sd, strict=False)
@@ -1022,6 +1103,16 @@ def run_eval(
     # Write meta
     meta = {
         "checkpoint": str(ckpt_path),
+
+        "policy": policy,
+        "baseline_kind": baseline_kind if policy == "baseline" else None,
+        "baseline_coins_kwargs": baseline_coins_kwargs if policy == "baseline" else None,
+        "baseline_policy_kwargs": {k: str(v) for k, v in (baseline_policy_kwargs or {}).items()} if policy == "baseline" else None,
+
+
+
+
+
         "device": device,
         "suite": suite,
         "episodes": episodes,
@@ -1144,16 +1235,19 @@ def run_eval(
         # Return summary and results for aggregation
         return results
 
-    # Evaluate baseline (no ablation)
+    # Evaluate main condition (ckpt policy OR selected baseline) — no ablation
     summaries_for_csv: list[Mapping[str, Any]] = []
     structured_out: dict[str, Any] = {"conditions": {}}
 
-    base_res = run_one_condition("baseline")
+    base_tag = "ckpt_policy" if policy != "baseline" else f"baseline_{baseline_kind}"
+    base_res = run_one_condition(base_tag)
+
     base_summary = (base_res or {}).get("summary", {})
-    structured_out["conditions"]["baseline"] = base_res or {}
-    row = {"cond": "baseline"}
+    structured_out["conditions"][base_tag] = base_res or {}
+    row = {"cond": base_tag}
     row.update({f"metric.{k}": v for k, v in base_summary.items()})
     summaries_for_csv.append(row)
+
 
     # Ablations
     if ablations:
@@ -1211,7 +1305,51 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Run evaluation suites from saved checkpoints (Phase B7).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--ckpt", type=str, required=True, help="Path to checkpoint file or directory.")
+    
+    
+    
+    
+    p.add_argument("--ckpt", type=str, required=False, help="Path to checkpoint file or directory (recommended).")
+
+    p.add_argument(
+        "--policy",
+        type=str,
+        default="ckpt",
+        choices=("ckpt", "baseline"),
+        help="Which policy to evaluate: 'ckpt' loads the trained model; 'baseline' builds a baseline policy.",
+    )
+
+    p.add_argument(
+        "--baseline",
+        type=str,
+        default="hadamard",
+        help="Baseline kind (e.g., hadamard, grover, random, global_schedule).",
+    )
+
+    p.add_argument(
+        "--baseline_coins",
+        type=str,
+        nargs="*",
+        default=[],
+        help="Baseline coin schedule kwargs as key=val (e.g., seed=0 mode=time).",
+    )
+
+    p.add_argument(
+        "--baseline_policy",
+        type=str,
+        nargs="*",
+        default=[],
+        help=(
+            "Baseline policy wrapper kwargs as key=val (e.g., theta_scale=1.0 theta_noise_std=0.0 "
+            "embedding.mode=identity embedding.out_dim=32 embedding.normalize=true)."
+        ),
+    )
+    
+    
+    
+    
+    
+    
     p.add_argument(
         "--outdir", type=str, required=True, help="Directory to write evaluation artifacts."
     )
@@ -1262,6 +1400,114 @@ def _parse_seeds(s: str) -> list[int]:
         return [int(x) for x in parts]
 
 
+
+
+
+
+
+
+
+
+
+
+
+def _as_torch_dtype(x: Any) -> Any:
+    # Accept torch.float32, "float32", "torch.float32"
+    if isinstance(x, torch.dtype):
+        return x
+    if isinstance(x, str):
+        s = x.strip()
+        if s.startswith("torch."):
+            s = s[len("torch.") :]
+        if hasattr(torch, s):
+            dt = getattr(torch, s)
+            if isinstance(dt, torch.dtype):
+                return dt
+    return x
+
+
+def _split_prefixed(flat: dict[str, Any], prefix: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Split keys with prefix 'prefix.' into a separate dict without the prefix."""
+    a: dict[str, Any] = {}
+    b: dict[str, Any] = {}
+    pre = prefix + "."
+    for k, v in flat.items():
+        if k.startswith(pre):
+            a[k[len(pre) :]] = v
+        else:
+            b[k] = v
+    return a, b
+
+
+def _parse_baseline_policy_kwargs(tokens: list[str]) -> dict[str, Any]:
+    """
+    Supports:
+      theta_scale=..., theta_noise_std=..., theta_clip=..., strict_theta_shape=...
+      theta_dtype=float32
+      embedding.mode=identity|linear_fixed|mlp_fixed
+      embedding.out_dim=...
+      embedding.seed=...
+      embedding.normalize=true
+      embedding.dtype=float32
+    """
+    flat = _kv_overrides(tokens)
+
+    # dtype normalization if provided
+    if "theta_dtype" in flat:
+        flat["theta_dtype"] = _as_torch_dtype(flat["theta_dtype"])
+
+    emb_flat, rest = _split_prefixed(flat, "embedding")
+    if emb_flat:
+        try:
+            from acpl.baselines.policies import NodeEmbeddingConfig
+        except Exception as e:
+            raise ImportError(
+                "Baseline embedding overrides require acpl.baselines.policies.NodeEmbeddingConfig"
+            ) from e
+
+        if "dtype" in emb_flat:
+            emb_flat["dtype"] = _as_torch_dtype(emb_flat["dtype"])
+
+        emb_cfg = NodeEmbeddingConfig(
+            mode=str(emb_flat.get("mode", "identity")),
+            out_dim=emb_flat.get("out_dim", None),
+            seed=int(emb_flat.get("seed", 0)),
+            normalize=bool(emb_flat.get("normalize", False)),
+            dtype=emb_flat.get("dtype", torch.float32),
+        )
+        rest["embedding"] = emb_cfg
+
+    return rest
+
+
+def _parse_baseline_coins_kwargs(tokens: list[str]) -> dict[str, Any]:
+    # Coins kwargs are schedule-specific; just parse key=val with numbers/bools/json support.
+    return _kv_overrides(tokens)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def _kv_overrides(pairs: list[str]) -> dict[str, Any]:
     out = {}
     for token in pairs:
@@ -1294,10 +1540,26 @@ def _kv_overrides(pairs: list[str]) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
-    ckpt_path = _as_path(args.ckpt)
+
+    if args.policy == "ckpt":
+        if not args.ckpt:
+            raise SystemExit("--ckpt is required when --policy=ckpt")
+    else:
+        # baseline mode: strongly recommended to pass --ckpt so we can reuse its config,
+        # but we allow running without a ckpt only if your acpl.eval.protocol fallback
+        # can construct everything without config (rare).
+        if not args.ckpt:
+            raise SystemExit(
+                "--ckpt is required when --policy=baseline (we reuse ckpt['config'] for graph/task/T)."
+            )
+
+    ckpt_path = _as_path(args.ckpt) if args.ckpt else None
     outdir = _as_path(args.outdir)
     seeds = _parse_seeds(args.seeds)
     overrides = _kv_overrides(args.override)
+
+    baseline_coins_kwargs = _parse_baseline_coins_kwargs(args.baseline_coins or [])
+    baseline_policy_kwargs = _parse_baseline_policy_kwargs(args.baseline_policy or [])
 
     run_eval(
         ckpt_path=ckpt_path,
@@ -1309,7 +1571,12 @@ def main(argv: list[str] | None = None) -> None:
         ablations=args.ablations or [],
         plots=bool(args.plots),
         extra_overrides=overrides,
+        policy=str(args.policy),
+        baseline_kind=str(args.baseline),
+        baseline_coins_kwargs=baseline_coins_kwargs,
+        baseline_policy_kwargs=baseline_policy_kwargs,
     )
+
 
 
 if __name__ == "__main__":

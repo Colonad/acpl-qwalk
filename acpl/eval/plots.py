@@ -20,6 +20,18 @@ __all__ = [
 ]
 
 
+
+
+def _import_matplotlib_pyplot():
+    # Headless-safe backend selection (important on CI/servers/WSL)
+    try:
+        matplotlib.use("Agg", force=False)
+    except Exception:
+        pass
+    import matplotlib.pyplot as plt  # noqa: WPS433 (local import by design)
+    return plt
+
+
 # --------------------------------------------------------------------------------------
 #                                   Utilities
 # --------------------------------------------------------------------------------------
@@ -108,13 +120,17 @@ def mean_ci(
 
     # z for normal approx
     # 0.95 -> 1.96, 0.90 -> 1.645, 0.99 -> 2.576
-    from scipy_stats_fallback import z_value  # local lightweight fallback below
 
     m = np.nanmean(x, axis=axis)
-    s = np.nanstd(x, axis=axis, ddof=1)
-    n = np.sum(np.isfinite(x), axis=axis)
-    se = np.divide(s, np.maximum(1, np.sqrt(n)), out=np.zeros_like(s), where=n > 0)
 
+    n = np.sum(np.isfinite(x), axis=axis)
+
+    # If n<=1 along an entry, ddof=1 would yield NaN; collapse CI to mean instead.
+    # We approximate by using ddof=0 in that regime.
+    s = np.nanstd(x, axis=axis, ddof=0)
+    
+    se = np.divide(s, np.maximum(1, np.sqrt(n)), out=np.zeros_like(s), where=n > 0)    
+    
     z = z_value(conf)
     lo = m - z * se
     hi = m + z * se
@@ -180,6 +196,7 @@ def plot_position_timelines(
     -------
     fig, axs
     """
+    plt = _import_matplotlib_pyplot()
     st = style or PlotStyle()
     P = ensure_numpy(Pt).astype(np.float64)
 
@@ -276,6 +293,7 @@ def plot_tv_curves(
     -------
     fig, ax
     """
+    plt = _import_matplotlib_pyplot()
     st = style or PlotStyle()
     P = ensure_numpy(Pt).astype(np.float64)
     tv = tv_curve(P)  # (T,) or (S,T)
@@ -349,6 +367,7 @@ def plot_robustness_sweep(
     -------
     fig, ax
     """
+    plt = _import_matplotlib_pyplot()
     st = style or PlotStyle()
     x = np.asarray(list(xgrid), dtype=np.float64)
     M = x.shape[0]

@@ -499,6 +499,23 @@ class EpisodeGenerator:
         # Cache for CI eval index lists (keyed by (split, count, base_offset)).
         self._eval_index_cache: dict[tuple[SplitName, int, int], list[tuple[int, int]]] = {}
  
+        # Split-local indexing support:
+        # tests expect episode(i) to mean "the i-th episode of this split",
+        # not "global episode index i".
+        self._local_index_lock = threading.RLock()
+        self._local_to_global: dict[SplitName, list[int]] = {
+            "train": [],
+            "val": [],
+            "test": [],
+        }
+        self._local_scan_cursor: dict[SplitName, int] = {
+            "train": 0,
+            "val": 0,
+            "test": 0,
+        }
+
+
+
     # ---------------- Public API ----------------
 
     @property
@@ -509,22 +526,106 @@ class EpisodeGenerator:
     def split(self) -> SplitName:
         return self._split
 
-    def episode(self, index: int, *, use_cache: bool = True) -> EpisodeNP:
-        key = (self._manifest_hex, self._split, int(index))
+    def _global_index_from_local(self, split: SplitName, local_index: int) -> int:
+        """
+        Deterministically map a split-local index to a global episode index that
+        routes to `split`, by scanning global indices in increasing order.
+
+        This is required because routing is defined on global indices, but our public
+        API (and tests) treat episode(i) as split-local.
+        """
+        li = int(local_index)
+        if li < 0:
+            raise ValueError("local_index must be >= 0")
+
+        with self._local_index_lock:
+            buf = self._local_to_global[split]
+            g = int(self._local_scan_cursor[split])
+
+            # Safety bound: if someone sets router ratios to 0 for a split, we’d loop forever.
+            max_scan = max(10_000, (li + 1) * 1_000)
+            scanned = 0
+
+            while len(buf) <= li:
+                routed_split, _ep_seed, _cfg, _task, _base_seed = self._route_triplet_for_global(g)
+                if routed_split == split:
+                    buf.append(g)
+                g += 1
+                scanned += 1
+                if scanned > max_scan:
+                    raise RuntimeError(
+                        f"Unable to materialize split-local index {li} for split={split!r} "
+                        f"after scanning {scanned} global indices. "
+                        "Check router rules/ratios (a split may effectively have probability 0)."
+                    )
+
+            self._local_scan_cursor[split] = g
+            return int(buf[li])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def episode(
+        self,
+        index: int,
+        *,
+        use_cache: bool = True,
+        index_space: Literal["local", "global", "auto"] = "local",
+    ) -> EpisodeNP:
+        """
+        Build a deterministic EpisodeNP.
+
+        index_space:
+          - "local" (default): `index` is split-local (0..), i.e. the i-th episode in this split.
+          - "global": `index` is a global episode index routed via Phase B2 router.
+          - "auto": treat as global if it routes to this split; otherwise treat as local.
+        """
+        idx = int(index)
+        if idx < 0:
+            raise ValueError("index must be >= 0")
+
+        # Resolve index to a *global* episode id for routing + seed derivation.
+        if index_space == "global":
+            gidx = idx
+        elif index_space == "local":
+            gidx = self._global_index_from_local(self._split, idx)
+        elif index_space == "auto":
+            routed_split, _ep_seed, _cfg, _task, _base_seed = self._route_triplet_for_global(idx)
+            if routed_split == self._split:
+                gidx = idx
+            else:
+                gidx = self._global_index_from_local(self._split, idx)
+        else:
+            raise ValueError("index_space must be one of {'local','global','auto'}")
+
+        key = (self._manifest_hex, self._split, int(gidx))
         if use_cache:
             hit = self._cache.get(key)
             if hit is not None:
                 return hit
 
-        gidx = int(index)
-
         # Canonical routing (global index -> split, ep_seed, cfg/task)
-        routed_split, ep_seed, g_cfg, task, _base_seed = self._route_triplet_for_global(gidx)
+        routed_split, ep_seed, g_cfg, task, _base_seed = self._route_triplet_for_global(int(gidx))
         if routed_split != self._split:
+            # This should only happen if the user forced index_space="global"
             raise ValueError(
                 f"Global episode index {gidx} routes to split={routed_split!r}, "
                 f"but this generator is split={self._split!r}. "
-                f"Use export_eval_index(split=..., ...) (or your sampler) to pick indices for a split."
+                f"Use episode(..., index_space='local') for split-local indexing."
             )
 
         # Episode RNG: drive graph realization, ψ0 randomization, noise sampling, etc.
@@ -541,7 +642,7 @@ class EpisodeGenerator:
         # PortMap (portable)
         pm = _portable_portmap_from_oriented(edge_index, arc_ptr, N)
 
-        # Node features (same as before)
+        # Node features
         spec = _spec_from_manifest(self._manifest_raw)
         if torch is None:
             raise RuntimeError("Torch is required for building features in this project.")
@@ -579,6 +680,12 @@ class EpisodeGenerator:
         if use_cache:
             self._cache.put(key, ep)
         return ep
+
+    def episode_global(self, global_index: int, *, use_cache: bool = True) -> EpisodeNP:
+        return self.episode(global_index, use_cache=use_cache, index_space="global")
+
+
+
 
     def get(self, index: int) -> EpisodeNP:
         return self.episode(index)
@@ -937,7 +1044,7 @@ class EpisodeGenerator:
         """
         seed = self._canonical_seed_for_global(gidx)
         rng = np.random.Generator(np.random.PCG64(seed))
-        cfg = self._materialize_graph_config(self._manifest_raw, rng=rng)
+        cfg = self._materialize_graph_config_global(self._manifest_raw, rng=rng)
         # Create a task consistent with the chosen size (N) using the same RNG stream.
         # We only need the *shape* of the task for metadata, not ψ0.
         # Use a small proxy N if not inferable (e.g., pure 'grid' with only L).
@@ -956,7 +1063,7 @@ class EpisodeGenerator:
         else:
             N = 64  # harmless, only for metadata if size can’t be inferred
 
-        task = self._materialize_task(N=N, rng=rng)
+        task = self._materialize_task_global(N=N, rng=rng)
         return dict(cfg), dict(task)
 
     def _family_and_size_kv(self, cfg: Mapping[str, Any]) -> tuple[str, dict]:

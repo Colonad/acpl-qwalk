@@ -6,6 +6,9 @@ import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Literal, Mapping, Sequence
+from acpl.eval.stats import explained_variance
+
+
 
 import numpy as np
 import torch
@@ -112,6 +115,19 @@ class ProbStatsConfig:
 
     eps: float = 1e-12
     renormalize: bool = True
+
+
+
+    # How to interpret a 2D tensor P with shape (A, N):
+    # - "BN": treat as (B, N) batch of distributions (default for evaluation episodes)
+    # - "TN": treat as (T, N) time-series for a single episode (will become (1, T, N))
+    # - "auto": heuristic (safe default; ambiguous cases should be overridden explicitly)
+    interpret_2d_as: Literal["BN", "TN", "auto"] = "auto"
+
+
+
+
+
 
     # Compare to uniform baseline U over nodes
     compare_to_uniform: bool = True
@@ -538,8 +554,27 @@ def compute_prob_stats(
     if P0.ndim == 1:
         P0 = P0.unsqueeze(0)  # (1,N)
     elif P0.ndim == 2:
-        # could be (B,N) or (T,N). We assume (B,N) by default.
-        pass
+        # could be (B,N) or (T,N); make it explicit / robust.
+        mode = cfg.interpret_2d_as
+        if mode == "auto":
+            # Heuristic:
+            # - In suite eval, (B,N) is common with B=episodes (often >> 64).
+            # - Time-series (T,N) tends to have small T (<=128) and N usually >= T.
+            A, N = int(P0.shape[0]), int(P0.shape[1])
+            if (A <= 128) and (N >= A) and (A != N):
+                mode = "TN"
+            else:
+                mode = "BN"
+        if mode == "TN":
+            P0 = P0.unsqueeze(0)  # (1,T,N)
+    
+    
+    
+    
+    
+    
+    
+    
     elif P0.ndim == 3:
         # (B,T,N) expected
         pass

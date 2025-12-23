@@ -244,9 +244,20 @@ def permute_graph(
         p = _make_perm(N, seed=seed, device=device)
         inv = _invert_perm(p)
         Xp = X[p]
-        # Remap edge indices
-        edge_index_p = p[edge_index]
-        t_out = None if targets is None else p[targets] if targets.dim() == 1 else targets
+
+        # IMPORTANT:
+        # p is "new -> old" because we do Xp = X[p].
+        # To express edges in the NEW labeling, map old indices via inv (old -> new).
+        edge_index_p = inv[edge_index]
+        t_out = None if targets is None else (inv[targets] if targets.dim() == 1 else targets)
+        # IMPORTANT:
+        # p is "new -> old" because we do Xp = X[p].
+        # To express edges in the NEW labeling, map old indices via inv (old -> new).
+        edge_index_p = inv[edge_index]
+        t_out = None if targets is None else (inv[targets] if targets.dim() == 1 else targets)
+
+
+
         perm_batch = {"X": Xp, "edge_index": edge_index_p}
         if targets is not None:
             perm_batch["targets"] = t_out  # type: ignore[index]
@@ -261,22 +272,31 @@ def permute_graph(
         inv_global = torch.empty(N, dtype=torch.long, device=device)
 
         # Build per-graph permutations and stitch them
-        start = 0
+
         index_lists = [torch.nonzero(batch == gid, as_tuple=False).flatten() for gid in range(B)]
         for gid, idx in enumerate(index_lists):
             n_g = idx.numel()
             p_g = _make_perm(n_g, seed=seed + gid, device=device)
+            # p_global is still "new -> old" in the global indexing space
+
+            # p_global is still "new -> old" in the global indexing space
             p_global[idx] = idx[p_g]
+
+
+
         inv_global[p_global] = torch.arange(N, device=device)
 
         Xp = X[p_global]
-        edge_index_p = p_global[edge_index]
+        # Map old endpoints via inv_global (old -> new)
+        edge_index_p = inv_global[edge_index]
+
         perm_batch = {"X": Xp, "edge_index": edge_index_p, "batch": batch[p_global]}
 
         if targets is not None:
             if targets.dim() == 1:
                 # Node indices as targets
-                perm_batch["targets"] = p_global[targets]
+                perm_batch["targets"] = inv_global[targets]
+
             else:
                 perm_batch["targets"] = targets
 
@@ -368,8 +388,19 @@ def rollout_with_ablation(
 
     # 5) If permuted, unpermute outputs/targets back to original node order for logging & metrics
     if cfg.node_permute and meta is not None:
-        inv = meta["invperm"]  # (N,)
-        # Single-graph or multi-graph unpermute along node axis
+
+
+
+        inv = meta["invperm"]  # old -> new
+        p = meta["perm"]       # new -> old
+
+        # Unpermute probabilities: produce P over ORIGINAL node order.
+        # P_old[old] = P_new[ inv[old] ]  => gather with inv in old-order.
+        
+        
+        
+        
+        
         if P.ndim == 2:
             P = P[:, inv]
         elif P.ndim == 3:
@@ -380,10 +411,8 @@ def rollout_with_ablation(
 
         # Restore targets if they are node indices
         if "targets" in aux and isinstance(aux["targets"], Tensor) and aux["targets"].dim() == 1:
-            # Note: aux["targets"] were permuted in the ablated batch seen by the model;
-            # to align with original graph labeling in metrics, invert that permutation.
-            # If multiple targets: map each index through inv-perm.
-            t = aux["targets"]
-            aux["targets"] = inv[t]
+            # aux["targets"] are in NEW labeling; map NEW -> OLD using p.
+            t_new = aux["targets"]
+            aux["targets"] = p[t_new]
 
     return P, aux
