@@ -1047,7 +1047,7 @@ def _make_rollout_timeline_fn(
     family: str,
     adaptor: Any | None,
     cdtype: Any,
-    device: Any,
+    device: Any = None,
     init_mode: str,
     theta_scale: float = 1.0,
     theta_noise_std: float = 0.0,
@@ -1058,6 +1058,12 @@ def _make_rollout_timeline_fn(
     """
     from acpl.sim.utils import partial_trace_coin
     from acpl.sim.step import step as _step_su2
+
+
+    if device is None:
+        device = torch.device("cpu")
+
+
 
     fam = (family or "su2").lower().strip()
 
@@ -1777,7 +1783,7 @@ def run_eval(
                 adaptor=adaptor,
                 family=coin_family,
                 cdtype=cdtype,
-                device=torch_device,   # <-- this was crashing before; now it’s filtered if unsupported
+                device=torch_device,  
                 init_mode=init_mode,
                 theta_scale=theta_scale,
                 theta_noise_std=theta_noise_std,
@@ -2134,6 +2140,7 @@ def run_eval(
                     family=coin_family,
                     adaptor=adaptor,
                     cdtype=cdtype,
+                    device=torch_device,
                     init_mode=init_mode,
                     theta_scale=theta_scale,
                     theta_noise_std=theta_noise_std,
