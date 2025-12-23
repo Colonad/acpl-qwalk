@@ -33,10 +33,16 @@ import importlib
 import io
 import json
 import hashlib
+from dataclasses import dataclass
 import os
 from pathlib import Path
 import sys
 from typing import Any
+
+import pickle
+import re
+
+
 
 import numpy as np
 
@@ -207,6 +213,178 @@ def _try_parse_text_pointer_file(path: Path) -> Path | None:
     return p if p.exists() else None
 
 
+
+
+
+
+
+
+
+# ----------------------- Pickle pointer / blob resolving -----------------------
+
+_HEX_RE = re.compile(r"^[0-9a-fA-F]{16,128}$")
+
+
+def _looks_like_pickle_bytes(b: bytes) -> bool:
+    # pickle protocol header is typically: 0x80 <protocol>
+    return len(b) >= 2 and b[0] == 0x80 and b[1] in (2, 3, 4, 5)
+
+
+def _pickle_load_any(path: Path) -> Any | None:
+    try:
+        with path.open("rb") as f:
+            return pickle.load(f)
+    except Exception:
+        return None
+
+
+def _try_read_pickle_pointer_info(path: Path) -> tuple[str, str] | None:
+    """
+    Detect our common binary pointer format:
+      {'codec': 'torch', 'hash': '<hex>'}  (and optionally other fields)
+    Returns (codec, hash) if it matches.
+    """
+    head = _peek_bytes(path, 2)
+    if not _looks_like_pickle_bytes(head):
+        return None
+
+    obj = _pickle_load_any(path)
+    if not isinstance(obj, dict):
+        return None
+
+    codec = obj.get("codec", None)
+    h = obj.get("hash", None)
+    if not (isinstance(codec, str) and isinstance(h, str)):
+        return None
+
+    codec = codec.strip().lower()
+    h = h.strip()
+    if not _HEX_RE.match(h):
+        return None
+
+    return codec, h
+
+
+def _try_resolve_pickle_pointer_file(path: Path) -> Path | None:
+    """
+    If `path` is a pickled pointer dict with a content hash, try to locate
+    the real checkpoint blob nearby and return its Path.
+    """
+    info = _try_read_pickle_pointer_info(path)
+    if info is None:
+        return None
+
+    codec, h = info
+    # Only attempt resolution for torch-ish blobs
+    if codec not in {"torch", "pytorch", "pt", "pth"}:
+        return None
+
+    # Search roots: run dir, its parent (often 'runs/'), and common subdirs.
+    bases: list[Path] = []
+    try:
+        bases.append(path.parent.resolve())
+    except Exception:
+        bases.append(path.parent)
+
+    if path.parent.parent is not None:
+        bases.append(path.parent.parent)
+
+    subdirs = [
+        "", "ckpts", "ckpt", "checkpoints", "checkpoint",
+        "blobs", "blob", "artifacts", "artifact",
+        ".cache", "cache", "objects", "obj", "data",
+    ]
+    exts = (".pt", ".pth", ".bin", ".ckpt")
+
+    search_dirs: list[Path] = []
+    seen: set[str] = set()
+    for base in bases:
+        for sd in subdirs:
+            d = (base / sd) if sd else base
+            if d.exists() and d.is_dir():
+                key = str(d.resolve())
+                if key not in seen:
+                    seen.add(key)
+                    search_dirs.append(d)
+
+    # 1) Direct name matches: <hash>.pt / <hash>.pth / ...
+    for d in search_dirs:
+        for ext in exts:
+            cand = d / f"{h}{ext}"
+            if cand.exists() and cand.is_file():
+                return cand
+
+    # 2) Sharded storage: <dir>/<hh>/<rest> or <dir>/<hh>/<hash>.pt
+    if len(h) >= 4:
+        hh = h[:2]
+        rest = h[2:]
+        for d in search_dirs:
+            cand = d / hh / rest
+            if cand.exists() and cand.is_file():
+                return cand
+            for ext in exts:
+                cand2 = d / hh / f"{h}{ext}"
+                if cand2.exists() and cand2.is_file():
+                    return cand2
+
+    # 3) Any filename containing the hash
+    for d in search_dirs:
+        try:
+            for ext in exts:
+                for cand in d.glob(f"*{h}*{ext}"):
+                    if cand.exists() and cand.is_file():
+                        return cand
+        except Exception:
+            pass
+
+    return None
+
+
+def _try_load_raw_pickle_checkpoint(path: Path) -> dict[str, Any] | None:
+    """
+    Last-resort: if a file is a raw pickle of a state_dict (or a dict that contains one),
+    load it and wrap into our normalized checkpoint shape.
+    """
+    head = _peek_bytes(path, 2)
+    if not _looks_like_pickle_bytes(head):
+        return None
+
+    obj = _pickle_load_any(path)
+    if obj is None:
+        return None
+
+    # Don't treat codec/hash pointer dicts as checkpoints
+    if isinstance(obj, dict) and isinstance(obj.get("codec", None), str) and isinstance(obj.get("hash", None), str):
+        return None
+
+    # If they pickled a dict with a state_dict inside
+    if isinstance(obj, dict):
+        if "state_dict" in obj and isinstance(obj["state_dict"], Mapping):
+            return obj
+        if "model_state_dict" in obj and isinstance(obj["model_state_dict"], Mapping):
+            out = dict(obj)
+            out["state_dict"] = out.pop("model_state_dict")
+            return out
+
+    # If they pickled the state_dict mapping directly
+    if isinstance(obj, Mapping):
+        return {"state_dict": obj}
+
+    return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def _discover_ckpt_candidates(run_dir: Path) -> list[Path]:
     """
     Return ordered candidate checkpoint paths under a run directory.
@@ -287,6 +465,11 @@ def _load_any_ckpt(ckpt_path: Path) -> dict[str, Any]:
         if resolved is not None and resolved != ckpt_path:
             ckpt_path = resolved
 
+        resolved2 = _try_resolve_pickle_pointer_file(ckpt_path)
+        if resolved2 is not None and resolved2 != ckpt_path:
+            ckpt_path = resolved2
+
+
     if not ckpt_path.exists():
         raise FileNotFoundError(f"Checkpoint path does not exist: {ckpt_path}")
 
@@ -319,29 +502,59 @@ def _load_any_ckpt(ckpt_path: Path) -> dict[str, Any]:
     try:
         obj = _torch_load_cpu(ckpt_path)
     except Exception as e:
-        # If it fails, give a more actionable error with file hints + nearby candidates
-        parent = ckpt_path.parent
-        nearby = _discover_ckpt_candidates(parent) if parent.exists() else []
-        nearby_rel = [p.name for p in nearby[:10]]
+        # ---- NEW: handle pickled pointer/state_dict fallbacks ----
+        obj2 = None
 
-        # Show a tiny preview (safe) to help diagnose corruption/pointer
-        preview = b[:64]
-        msg = [
-            f"Tried to torch.load '{ckpt_path}', but it does not look like a torch checkpoint.",
-            f"Original error: {type(e).__name__}: {e}",
-            "",
-            f"File size: {size} bytes" if size is not None else "File size: (unknown)",
-            f"First 64 bytes: {preview!r}",
-            "",
-            "If this is a pointer file (like latest.ckpt), point eval to a real binary checkpoint",
-            "such as model_last.pt / model_best.pt AFTER Git LFS pull, or re-run training to regenerate checkpoints.",
-        ]
-        if nearby_rel:
-            msg.append("")
-            msg.append("Nearby candidates:")
-            for nm in nearby_rel:
-                msg.append(f"  - {nm}")
-        raise RuntimeError("\n".join(msg)) from e
+        # If this is a pickled pointer file, try to resolve to the real blob and load that.
+        resolved2 = _try_resolve_pickle_pointer_file(ckpt_path)
+        if resolved2 is not None and resolved2.exists() and resolved2.is_file():
+            try:
+                obj2 = _torch_load_cpu(resolved2)
+                ckpt_path = resolved2  # keep internal path consistent after resolution
+            except Exception:
+                obj2 = None
+
+        # If it’s a raw pickle checkpoint/state_dict, load it directly.
+        if obj2 is None:
+            obj2 = _try_load_raw_pickle_checkpoint(ckpt_path)
+
+        if obj2 is not None:
+            obj = obj2
+        else:
+            # If it fails, give a more actionable error with file hints + nearby candidates
+            parent = ckpt_path.parent
+            nearby = _discover_ckpt_candidates(parent) if parent.exists() else []
+            nearby_rel = [p.name for p in nearby[:10]]
+
+            preview = b[:64]
+            ptr = _try_read_pickle_pointer_info(ckpt_path)
+            ptr_note = ""
+            if ptr is not None:
+                codec, h = ptr
+                ptr_note = f"\nDetected pickled pointer dict: codec={codec!r}, hash={h!r}\n"
+
+            msg = [
+                f"Tried to torch.load '{ckpt_path}', but it does not look like a torch checkpoint.",
+                f"Original error: {type(e).__name__}: {e}",
+                "",
+                f"File size: {size} bytes" if size is not None else "File size: (unknown)",
+                f"First 64 bytes: {preview!r}",
+                ptr_note.strip(),
+                "",
+                "If this is a pointer/metadata file, point eval to the real binary checkpoint blob,",
+                "or ensure training saves checkpoints via torch.save(...).",
+                "If this was produced by a blob store, make sure the blob cache is present on this machine.",
+            ]
+            msg = [m for m in msg if m]  # drop empty lines
+
+            if nearby_rel:
+                msg.append("")
+                msg.append("Nearby candidates:")
+                for nm in nearby_rel:
+                    msg.append(f"  - {nm}")
+
+            raise RuntimeError("\n".join(msg)) from e
+
 
     # Normalize return shape
     if isinstance(obj, dict):
@@ -500,14 +713,31 @@ def _load_train_helpers():
     if not train_py.exists():
         raise FileNotFoundError(f"Expected training script at: {train_py}")
 
+    
+    
+    
+    
+    
+    
     spec = importlib.util.spec_from_file_location("_acpl_train_script", train_py)
     if spec is None or spec.loader is None:
         raise RuntimeError("Could not load import spec for scripts/train.py")
 
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+
+    # IMPORTANT: register the module before executing it.
+    # dataclasses (and some typing machinery) expects sys.modules[mod.__name__] to exist.
+    sys.modules[spec.name] = mod
+    try:
+        spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+    except Exception:
+        # Avoid leaving a partially-imported module around
+        sys.modules.pop(spec.name, None)
+        raise
+
     _TRAIN_HELPERS = mod
     return mod
+
 
 
 def _normalize_state_dict_keys(sd: Mapping[str, Any]) -> dict[str, Any]:
@@ -606,6 +836,224 @@ def _maybe_get_plots():
         return importlib.import_module("acpl.eval.plots")
     except Exception:
         return None
+
+
+
+
+
+# ------------------------------ Ablation wiring --------------------------------
+
+@dataclass(frozen=True)
+class AblationBundle:
+    """
+    A single evaluation condition variant produced by an ablation.
+
+    We support ablations that modify:
+      - model (most common)
+      - dataloader_factory (needed for true PermuteNodes and some NoPE variants)
+      - rollout_fn (needed for GlobalCoin/TimeFrozen variants if implemented at rollout level)
+    """
+    name: str                 # canonical name, e.g., "NoPE"
+    tag: str                  # directory tag, e.g., "ckpt_policy__abl_NoPE"
+    model: torch.nn.Module
+    dataloader_factory: Any
+    rollout_fn: Any
+    meta: dict[str, Any]
+
+
+_ABLATION_ALIASES = {
+    # Plan name -> accepted aliases
+    "NoPE": {"nope", "no_pe", "no-pe", "noposenc", "no_posenc"},
+    "GlobalCoin": {"globalcoin", "global_coin", "global-coin"},
+    "TimeFrozen": {"timefrozen", "time_frozen", "time-frozen", "staticcoin", "static_coin"},
+    # Prefer NodePermute as canonical, but accept older "PermuteNodes" spellings too
+    "NodePermute": {
+        "nodepermute", "node_permute", "node-permute",
+        "permutenodes", "permute_nodes", "permute-nodes",
+        "permutenodes",  # tolerate common typo
+    },
+}
+
+
+def _normalize_ablation_name(x: str) -> str:
+    s = (x or "").strip()
+    if not s:
+        return s
+    low = s.lower().replace(" ", "").replace("/", "_")
+    for canon, aliases in _ABLATION_ALIASES.items():
+        if low == canon.lower() or low in aliases:
+            return canon
+    # Preserve user input (but normalize capitalization a bit)
+    # If they pass "NoPE" already, it stays.
+    return s
+
+def _call_with_accepted_kwargs(fn, /, **kwargs):
+    """
+    Call `fn(**kwargs)` but only pass kwargs that the function accepts.
+    Supports functions with **kwargs.
+    """
+    sig = inspect.signature(fn)
+    params = sig.parameters
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return fn(**kwargs)
+    filtered = {k: v for k, v in kwargs.items() if k in params}
+    return fn(**filtered)
+
+def _build_ablation_bundle(
+    abl_mod: Any,
+    *,
+    ablation: str,
+    base_tag: str,
+    model: torch.nn.Module,
+    dataloader_factory: Any,
+    rollout_fn: Any,
+    cfg: dict[str, Any] | None,
+    device: Any,
+) -> AblationBundle | None:
+    """
+    Best-effort adapter over multiple possible ablation APIs.
+
+    Supported ablations module APIs (any one is enough):
+
+    1) apply_ablation_bundle(...)
+        - returns dict-like with optional keys:
+            model, dataloader_factory, rollout_fn, tag, meta
+    2) apply_ablation(model, name=...) -> model
+        - model-only ablations
+    3) get_ablation(name) -> callable
+        - callable may accept (model) or (model, cfg=..., dataloader_factory=..., rollout_fn=...)
+
+    If an ablation cannot be applied, returns None (caller can warn/skip).
+    """
+    name = _normalize_ablation_name(ablation)
+    cond_tag = f"{base_tag}__abl_{name}"
+
+    # Default bundle = identity (no changes)
+    out_model = model
+    out_dl = dataloader_factory
+    out_rollout = rollout_fn
+    meta: dict[str, Any] = {"ablation": name}
+
+    # (1) apply_ablation_bundle
+    if hasattr(abl_mod, "apply_ablation_bundle"):
+        fn = getattr(abl_mod, "apply_ablation_bundle")
+        payload = _call_with_accepted_kwargs(
+            fn,
+            name=name,
+            model=model,
+            dataloader_factory=dataloader_factory,
+            rollout_fn=rollout_fn,
+            cfg=cfg,
+            device=device,
+        )
+        if isinstance(payload, dict):
+            out_model = payload.get("model", out_model)
+            out_dl = payload.get("dataloader_factory", out_dl)
+            out_rollout = payload.get("rollout_fn", out_rollout)
+            
+            
+            
+            
+            payload_tag = payload.get("tag", None)
+            if isinstance(payload_tag, str) and payload_tag:
+                # If ablations module returns "abl_X", prefix with base_tag to avoid collisions
+                if payload_tag.startswith(base_tag):
+                    cond_tag = payload_tag
+                elif payload_tag.startswith("abl_") or payload_tag.startswith("abl-"):
+                    cond_tag = f"{base_tag}__{payload_tag}"
+                else:
+                    cond_tag = payload_tag
+
+                        
+            
+            m2 = payload.get("meta", None)
+            if isinstance(m2, dict):
+                meta.update(m2)
+        return AblationBundle(
+            name=name, tag=str(cond_tag),
+            model=out_model, dataloader_factory=out_dl, rollout_fn=out_rollout,
+            meta=meta,
+        )
+
+    # (2) apply_ablation (model-only OR richer signature)
+    if hasattr(abl_mod, "apply_ablation"):
+        fn = getattr(abl_mod, "apply_ablation")
+        try:
+            maybe = _call_with_accepted_kwargs(
+                fn,
+                model=model,
+                name=name,
+                cfg=cfg,
+                dataloader_factory=dataloader_factory,
+                rollout_fn=rollout_fn,
+                device=device,
+            )
+        except TypeError:
+            # common alternate: apply_ablation(model, ablation)
+            maybe = fn(model, name)
+        if isinstance(maybe, torch.nn.Module):
+            out_model = maybe
+            return AblationBundle(
+                name=name, tag=cond_tag,
+                model=out_model, dataloader_factory=out_dl, rollout_fn=out_rollout,
+                meta=meta,
+            )
+        if isinstance(maybe, dict):
+            out_model = maybe.get("model", out_model)
+            out_dl = maybe.get("dataloader_factory", out_dl)
+            out_rollout = maybe.get("rollout_fn", out_rollout)
+            m2 = maybe.get("meta", None)
+            if isinstance(m2, dict):
+                meta.update(m2)
+            cond_tag = maybe.get("tag", cond_tag)
+            return AblationBundle(
+                name=name, tag=str(cond_tag),
+                model=out_model, dataloader_factory=out_dl, rollout_fn=out_rollout,
+                meta=meta,
+            )
+
+    # (3) get_ablation(name) -> callable
+    if hasattr(abl_mod, "get_ablation"):
+        get_fn = getattr(abl_mod, "get_ablation")
+        ab_fn = get_fn(name)
+        if callable(ab_fn):
+            maybe = _call_with_accepted_kwargs(
+                ab_fn,
+                model=model,
+                cfg=cfg,
+                dataloader_factory=dataloader_factory,
+                rollout_fn=rollout_fn,
+                device=device,
+            )
+            if isinstance(maybe, torch.nn.Module):
+                out_model = maybe
+                return AblationBundle(
+                    name=name, tag=cond_tag,
+                    model=out_model, dataloader_factory=out_dl, rollout_fn=out_rollout,
+                    meta=meta,
+                )
+            if isinstance(maybe, dict):
+                out_model = maybe.get("model", out_model)
+                out_dl = maybe.get("dataloader_factory", out_dl)
+                out_rollout = maybe.get("rollout_fn", out_rollout)
+                m2 = maybe.get("meta", None)
+                if isinstance(m2, dict):
+                    meta.update(m2)
+                cond_tag = maybe.get("tag", cond_tag)
+                return AblationBundle(
+                    name=name, tag=str(cond_tag),
+                    model=out_model, dataloader_factory=out_dl, rollout_fn=out_rollout,
+                    meta=meta,
+                )
+
+    return None
+
+
+
+
+
+
+
 
 
 # ------------------------------ CSV writer ------------------------------------
@@ -878,20 +1326,23 @@ def run_eval(
             # default: use trained model from ckpt
             model = th.ACPLPolicy(acpl_cfg).to(device=torch_device).eval()
 
-            # load weights (supports module./_orig_mod.)
-            sd = ckpt.get("state_dict", None) or ckpt.get("model", None)
-            if isinstance(sd, Mapping):
-                sd2 = _normalize_state_dict_keys(sd)
-                try:
-                    model.load_state_dict(sd2, strict=False)
-                except Exception:
-                    model.load_state_dict(sd2, strict=False)
+            # ---- load weights (CRITICAL) ----
+            sd = ckpt.get("state_dict", None)
+            if sd is None and isinstance(ckpt.get("model", None), Mapping):
+                # some saves store the raw state_dict under "model"
+                sd = ckpt["model"]
 
-            # optional EMA shadow (use if it matches enough params)
+            if isinstance(sd, Mapping):
+                try:
+                    model.load_state_dict(_normalize_state_dict_keys(sd), strict=False)
+                except Exception:
+                    # last resort: try raw
+                    model.load_state_dict(sd, strict=False)
+
+            # optional EMA shadow (if present)
             ema_shadow = ckpt.get("ema_shadow", None)
             if isinstance(ema_shadow, Mapping):
                 _try_apply_ema_shadow(model, ema_shadow)
-        # --------------------------------------------------------------------------------------
 
                 
         
@@ -905,15 +1356,7 @@ def run_eval(
         
         
         
-        
-        if isinstance(sd, Mapping):
-            sd2 = _normalize_state_dict_keys(sd)
-            try:
-                model.load_state_dict(sd2, strict=False)
-            except Exception:
-                model.load_state_dict(sd2, strict=False)
 
-        
         
         
         
@@ -921,35 +1364,19 @@ def run_eval(
         # optional adaptor for exp/cayley
         adaptor = None
         if coin_family in ("exp", "cayley"):
-            adaptor = th.ThetaToHermitianAdaptor(Kfreq=int(coin_cfg.get("Kfreq", 2))).to(device=torch_device).eval()
+            adaptor = th.ThetaToHermitianAdaptor(
+                Kfreq=int(coin_cfg.get("Kfreq", 2))
+            ).to(device=torch_device).eval()
 
-            # Only load adaptor weights from ckpt when policy is the trained checkpoint policy
+            ad_sd = None
             if policy != "baseline":
                 ad_sd = ckpt.get("adaptor", None)
-                if isinstance(ad_sd, Mapping):
-                    try:
-                        adaptor.load_state_dict(ad_sd, strict=False)
-                    except Exception:
-                        pass
 
-            
-            
-            
-            
-            
-            
-            
-            
             if isinstance(ad_sd, Mapping):
                 try:
                     adaptor.load_state_dict(ad_sd, strict=False)
                 except Exception:
                     pass
-
-        # optional EMA shadow (use if it matches enough params)
-        ema_shadow = ckpt.get("ema_shadow", None)
-        if isinstance(ema_shadow, Mapping):
-            _try_apply_ema_shadow(model, ema_shadow)
 
 
         if is_search:
@@ -1110,6 +1537,7 @@ def run_eval(
         "baseline_policy_kwargs": {k: str(v) for k, v in (baseline_policy_kwargs or {}).items()} if policy == "baseline" else None,
 
 
+        "ablations_canonical": [_normalize_ablation_name(a) for a in (ablations or [])],
 
 
 
@@ -1123,13 +1551,38 @@ def run_eval(
     (outdir / "meta.json").write_text(_json_dump(meta))
 
     # Helper to run a single condition (possibly with an ablation applied)
-    def run_one_condition(condition_tag: str, model_override: torch.nn.Module | None = None):
+    def run_one_condition(
+        condition_tag: str,
+        *,
+        model_override: torch.nn.Module | None = None,
+        dataloader_factory_override: Any | None = None,
+        rollout_fn_override: Any | None = None,
+        extra_meta: dict[str, Any] | None = None,
+    ):
         tag_dir = _ensure_dir(outdir / "raw" / condition_tag)
-        
-        
-        # If trainer-native protocol is active, run_ci_eval returns a results dict keyed by metric.
+
+        # Choose overrides (or base)
+        m_for_eval = model_override if model_override is not None else model
+
+        # These only exist in trainer-native mode; keep safe defaults
+        dl_for_eval = dataloader_factory_override if dataloader_factory_override is not None else (
+            _make_eval_iter if trainer_native_ok else None
+        )
+        ro_for_eval = rollout_fn_override if rollout_fn_override is not None else (
+            rollout_fn if trainer_native_ok else None
+        )
+
+        # Persist condition meta (helps thesis reproducibility)
+        cond_meta = {
+            "cond": condition_tag,
+            "policy": policy,
+            "baseline_kind": baseline_kind if policy == "baseline" else None,
+            "ablation_meta": extra_meta or {},
+        }
+        (tag_dir / "condition_meta.json").write_text(_json_dump(cond_meta), encoding="utf-8")
+
+        # Trainer-native protocol path
         if trainer_native_ok and callable(proto_entry):
-            # Create a logger that writes metrics.jsonl into this condition directory
             logger = None
             if MetricLogger is not None and MetricLoggerConfig is not None:
                 logger = MetricLogger(
@@ -1143,19 +1596,16 @@ def run_eval(
                     )
                 )
 
-            m_for_eval = model_override if model_override is not None else model
-
             results = proto_entry(
                 model=m_for_eval,
-                dataloader_factory=_make_eval_iter,
-                rollout_fn=rollout_fn,
+                dataloader_factory=dl_for_eval,
+                rollout_fn=ro_for_eval,
                 loop_cfg=loop_cfg,
                 eval_cfg=eval_cfg,
                 logger=logger,
                 step=0,
             )
 
-            # summarize + save (match train.py artifact style)
             summary_text = ""
             if summarize_results is not None:
                 summary_text = summarize_results(
@@ -1169,7 +1619,11 @@ def run_eval(
             def _ci_to_dict(ci):
                 return {"mean": ci.mean, "lo": ci.lo, "hi": ci.hi, "stderr": ci.stderr, "n": ci.n}
 
-            json_payload = {k: _ci_to_dict(v["all"]) for k, v in results.items() if isinstance(v, dict) and "all" in v}
+            json_payload = {
+                k: _ci_to_dict(v["all"])
+                for k, v in results.items()
+                if isinstance(v, dict) and "all" in v
+            }
             (tag_dir / "eval_ci.json").write_text(_json_dump(json_payload), encoding="utf-8")
 
             if logger is not None:
@@ -1178,34 +1632,28 @@ def run_eval(
                 except Exception:
                     pass
 
-            # Return in the same "dict-like" structure the rest of eval.py expects.
-            return {"summary": {k: d["mean"] for k, d in json_payload.items()}, "ci": json_payload, "text": summary_text}
-        
-        
-        
-        # call the protocol entry: support several signatures
+            return {
+                "summary": {k: d["mean"] for k, d in json_payload.items()},
+                "ci": json_payload,
+                "text": summary_text,
+            }
+
+        # Fallback (non-trainer-native): keep your existing logic, but model-only
         results = None
         kwargs = dict(common_kwargs)
-        # if the protocol expects 'outdir' or 'logger' it can still log there; we pass tag_dir
         kwargs.setdefault("outdir", tag_dir)
 
-        m_for_eval = model_override if model_override is not None else model
-
         if callable(proto_entry):
-            # Signature variants; we detect by parameters
             try:
                 results = proto_entry(model=m_for_eval, **kwargs)
             except TypeError:
-                # Try a leaner signature
                 try:
                     results = proto_entry(m_for_eval, **kwargs)
                 except TypeError:
-                    # Try without suite param (some versions might encode suite in kwargs)
                     kwargs2 = dict(kwargs)
                     kwargs2.pop("suite", None)
                     results = proto_entry(m_for_eval, **kwargs2)
         else:
-            # Module-style API: prefer 'run_ci_eval' or 'run_eval_protocol' inside
             for name in ("run_ci_eval", "run_eval_protocol", "run_protocol", "evaluate", "run"):
                 if hasattr(proto_entry, name):
                     fn = getattr(proto_entry, name)
@@ -1222,18 +1670,13 @@ def run_eval(
             else:
                 raise RuntimeError("Could not find a runnable entrypoint in acpl.eval.protocol")
 
-        # 'results' contract (best-effort):
-        # - 'logs': list[dict] per-episode JSON objects (optional)
-        # - 'summary': dict of scalar metrics (means, CIs) (required)
-        # - 'per_seed': list[dict] per-seed summaries (optional)
-        # Persist logs if present
         if isinstance(results, dict) and "logs" in results and results["logs"] is not None:
             jsonl = tag_dir / "logs.jsonl"
             with jsonl.open("w") as f:
                 for row in results["logs"]:
                     f.write(_json_dump(row) + "\n")
-        # Return summary and results for aggregation
         return results
+
 
     # Evaluate main condition (ckpt policy OR selected baseline) — no ablation
     summaries_for_csv: list[Mapping[str, Any]] = []
@@ -1249,28 +1692,46 @@ def run_eval(
     summaries_for_csv.append(row)
 
 
-    # Ablations
+    # Ablations (causality checks)
     if ablations:
         for abl in ablations:
-            cond_tag = f"abl_{abl}"
-            model_ab = None
+            canon = _normalize_ablation_name(abl)
+
+            bundle = None
             if abl_mod is not None:
                 try:
-                    # apply_ablation(model, name) -> nn.Module (wrapped / configured)
-                    if hasattr(abl_mod, "apply_ablation"):
-                        model_ab = abl_mod.apply_ablation(model, abl)
-                    elif hasattr(abl_mod, "get_ablation"):
-                        model_ab = abl_mod.get_ablation(abl)(model)
+                    bundle = _build_ablation_bundle(
+                        abl_mod,
+                        ablation=canon,
+                        base_tag=base_tag,
+                        model=model,
+                        dataloader_factory=_make_eval_iter if trainer_native_ok else None,
+                        rollout_fn=rollout_fn if trainer_native_ok else None,
+                        cfg=cfg if trainer_native_ok else None,
+                        device=torch_device if trainer_native_ok else device,
+                    )
                 except Exception as e:
-                    print(f"[warn] ablation '{abl}' could not be applied: {e}", file=sys.stderr)
+                    print(f"[warn] ablation '{abl}' failed to build: {e}", file=sys.stderr)
+                    bundle = None
             else:
-                print(
-                    "[warn] acpl.eval.ablations not found; skipping ablation models.",
-                    file=sys.stderr,
-                )
+                print("[warn] acpl.eval.ablations not found; skipping ablations.", file=sys.stderr)
 
-            res = run_one_condition(cond_tag, model_override=model_ab)
+            if bundle is None:
+                # still record a “skipped” entry so your thesis tables don’t silently omit it
+                cond_tag = f"{base_tag}__abl_{canon}__SKIPPED"
+                res = {"summary": {}, "skipped": True, "reason": "ablation_build_failed_or_missing"}
+            else:
+                res = run_one_condition(
+                    bundle.tag,
+                    model_override=bundle.model,
+                    dataloader_factory_override=bundle.dataloader_factory,
+                    rollout_fn_override=bundle.rollout_fn,
+                    extra_meta=bundle.meta,
+                )
+                cond_tag = bundle.tag
+
             structured_out["conditions"][cond_tag] = res or {}
+
             summ = (res or {}).get("summary", {})
             row = {"cond": cond_tag}
             row.update({f"metric.{k}": v for k, v in summ.items()})
@@ -1572,6 +2033,7 @@ def main(argv: list[str] | None = None) -> None:
         plots=bool(args.plots),
         extra_overrides=overrides,
         policy=str(args.policy),
+        
         baseline_kind=str(args.baseline),
         baseline_coins_kwargs=baseline_coins_kwargs,
         baseline_policy_kwargs=baseline_policy_kwargs,

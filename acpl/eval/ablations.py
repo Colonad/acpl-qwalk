@@ -1,7 +1,9 @@
 # acpl/eval/ablations.py
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from typing import Any
+
 from dataclasses import dataclass
 
 import torch
@@ -15,7 +17,11 @@ __all__ = [
     "wrap_policy_for_ablations",
     "permute_graph",
     "rollout_with_ablation",
+    # eval wiring
+    "normalize_ablation_name",
+    "apply_ablation_bundle",
 ]
+
 
 
 # --------------------------------------------------------------------------------------
@@ -100,8 +106,6 @@ def apply_nope_to_X(X: Tensor, pe_dim: int) -> Tensor:
     F = X.size(1)
     if pe_dim > F:
         raise ValueError(f"pe_dim={pe_dim} exceeds feature dim F={F}.")
-    if pe_dim == 0:
-        return X
 
     if pe_dim > 0:
         X = X.clone()
@@ -124,7 +128,7 @@ class _PolicyWrapper(nn.Module):
     We do *not* alter the policy's unitary lift; that remains exactly as in ACPLPolicy.
     """
 
-    def __init__(self, base: ACPLPolicy):
+    def __init__(self, base: nn.Module):
         super().__init__()
         self.base = base
 
@@ -133,6 +137,12 @@ class _PolicyWrapper(nn.Module):
     ) -> Tensor:
         raise NotImplementedError
 
+    def __getattr__(self, name: str):
+        # Allow rollouts to access attributes/methods on the base policy.
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.base, name)
 
 class GlobalCoinPolicy(_PolicyWrapper):
     """
@@ -174,7 +184,7 @@ class TimeFrozenPolicy(_PolicyWrapper):
         return theta_out
 
 
-def wrap_policy_for_ablations(policy: ACPLPolicy, cfg: AblationConfig) -> ACPLPolicy:
+def wrap_policy_for_ablations(policy: nn.Module, cfg: AblationConfig) -> nn.Module:
     """
     Compose requested policy wrappers. Order: GlobalCoin → TimeFrozen.
 
@@ -203,9 +213,10 @@ def wrap_policy_for_ablations(policy: ACPLPolicy, cfg: AblationConfig) -> ACPLPo
 
 
 def _make_perm(n: int, *, seed: int, device: torch.device) -> Tensor:
-    g = torch.Generator(device=device)
+    g = torch.Generator(device="cpu")
     g.manual_seed(int(seed))
-    return torch.randperm(n, generator=g, device=device)
+    p = torch.randperm(n, generator=g, device="cpu")
+    return p.to(device)
 
 
 def _invert_perm(p: Tensor) -> Tensor:
@@ -241,35 +252,30 @@ def permute_graph(
 
     if batch is None:
         # Single graph case
-        p = _make_perm(N, seed=seed, device=device)
-        inv = _invert_perm(p)
+        p = _make_perm(N, seed=seed, device=device)     # new -> old
+        inv = _invert_perm(p)                           # old -> new
         Xp = X[p]
 
-        # IMPORTANT:
-        # p is "new -> old" because we do Xp = X[p].
-        # To express edges in the NEW labeling, map old indices via inv (old -> new).
+        # Edges: map old endpoints -> new endpoints using inv
         edge_index_p = inv[edge_index]
-        t_out = None if targets is None else (inv[targets] if targets.dim() == 1 else targets)
-        # IMPORTANT:
-        # p is "new -> old" because we do Xp = X[p].
-        # To express edges in the NEW labeling, map old indices via inv (old -> new).
-        edge_index_p = inv[edge_index]
-        t_out = None if targets is None else (inv[targets] if targets.dim() == 1 else targets)
 
-
+        # Targets: if node-index targets (K,), map old -> new
+        t_out = None
+        if targets is not None:
+            t_out = inv[targets] if targets.dim() == 1 else targets
 
         perm_batch = {"X": Xp, "edge_index": edge_index_p}
         if targets is not None:
             perm_batch["targets"] = t_out  # type: ignore[index]
         meta = {"perm": p, "invperm": inv}
         return perm_batch, meta
+
     else:
         # Multi-graph mini-batch; permute within each component independently
         if batch.ndim != 1 or batch.size(0) != N:
             raise ValueError("`batch` must be (N,) and align with X.")
         B = int(batch.max().item()) + 1
         p_global = torch.empty(N, dtype=torch.long, device=device)
-        inv_global = torch.empty(N, dtype=torch.long, device=device)
 
         # Build per-graph permutations and stitch them
 
@@ -284,7 +290,8 @@ def permute_graph(
 
 
 
-        inv_global[p_global] = torch.arange(N, device=device)
+        inv_global = _invert_perm(p_global)
+
 
         Xp = X[p_global]
         # Map old endpoints via inv_global (old -> new)
@@ -308,6 +315,126 @@ def permute_graph(
 #                    Orchestration: run a rollout under ablations
 # --------------------------------------------------------------------------------------
 
+
+# --------------------------------------------------------------------------------------
+#                          Eval wiring: bundle-style API
+# --------------------------------------------------------------------------------------
+
+_ABLATION_ALIASES: dict[str, set[str]] = {
+    "NoPE": {"nope", "no_pe", "no-pe", "noposenc", "no_posenc"},
+    "GlobalCoin": {"globalcoin", "global_coin", "global-coin"},
+    "TimeFrozen": {"timefrozen", "time_frozen", "time-frozen", "staticcoin", "static_coin"},
+    "NodePermute": {"nodepermute", "node_permute", "node-permute", "permutenodes", "permute_nodes", "permute-nodes"},
+}
+
+def normalize_ablation_name(name: str) -> str:
+    s = (name or "").strip()
+    low = s.lower().replace(" ", "")
+    for canon, aliases in _ABLATION_ALIASES.items():
+        if low == canon.lower() or low in aliases:
+            return canon
+    return s  # preserve unknown ablation names
+
+def _infer_pe_dim_from_cfg(cfg: Mapping[str, Any] | None) -> int | None:
+    """
+    Best-effort: find node-PE dimensionality if present in config.
+    You can expand these keys if your YAML schema differs.
+    """
+    if not cfg:
+        return None
+    # common places people store node PE dim
+    candidates = [
+        ("data", "pe_dim"),
+        ("data", "lap_pe_dim"),
+        ("model", "node_pe_dim"),
+        ("model", "pe_dim"),
+        ("encoder", "pe_dim"),
+    ]
+    for a, b in candidates:
+        try:
+            v = (cfg.get(a, {}) or {}).get(b, None)  # type: ignore[union-attr]
+        except Exception:
+            v = None
+        if isinstance(v, int) and v > 0:
+            return v
+    return None
+
+def apply_ablation_bundle(
+    *,
+    name: str,
+    model: nn.Module,
+    dataloader_factory: Any | None = None,
+    rollout_fn: Any | None = None,
+    cfg: Mapping[str, Any] | None = None,
+    device: Any | None = None,
+) -> dict[str, Any]:
+    """
+    Bundle-style entrypoint for eval.py.
+
+    Returns a dict with optional overrides:
+      - "model"
+      - "dataloader_factory"
+      - "rollout_fn"
+      - "tag"
+      - "meta"
+
+    Design choice:
+      - We implement ALL four planned ablations by overriding the *rollout_fn* via rollout_with_ablation(),
+        which can apply NoPE, GlobalCoin, TimeFrozen, and PermuteNodes at rollout-time.
+      - This avoids brittle dataloader rewriting and works for both ckpt and baseline policies as long
+        as they are "policy-like" (forward emits theta).
+    """
+    canon = normalize_ablation_name(name)
+    tag = f"abl_{canon}"
+
+    # Build an AblationConfig from the name
+    pe_dim = _infer_pe_dim_from_cfg(cfg)
+
+    ab = AblationConfig(
+        nope=(canon == "NoPE"),
+        pe_dim=pe_dim,
+        global_coin=(canon == "GlobalCoin"),
+        time_frozen=(canon == "TimeFrozen"),
+        node_permute=(canon == "NodePermute"),
+        perm_seed=int((cfg.get("seed", 0) if isinstance(cfg, Mapping) else 0)),
+        device=str(device) if device is not None else "cpu",
+        strict_shapes=True,
+    )
+
+    # If NoPE requested but pe_dim missing, fail loudly (eval.py can mark skipped)
+    if ab.nope and (ab.pe_dim is None or ab.pe_dim <= 0):
+        raise ValueError(
+            "NoPE ablation requested but pe_dim could not be inferred from cfg. "
+            "Provide it in config (e.g., data.pe_dim=...) or extend _infer_pe_dim_from_cfg."
+        )
+
+    # If we don't have a rollout_fn, we can only do model-only ablations (GlobalCoin/TimeFrozen).
+    if rollout_fn is None:
+        if ab.nope or ab.node_permute:
+            raise ValueError(f"{canon} requires rollout_fn to transform the batch/graph.")
+        wrapped = wrap_policy_for_ablations(model, ab)  # type: ignore[arg-type]
+        return {"model": wrapped, "tag": tag, "meta": {"ablation": canon}}
+
+    def rollout_fn_ab(m: nn.Module, batch: dict) -> tuple[Tensor, dict]:
+        # rollout_with_ablation does the wrapping + batch transforms internally
+        return rollout_with_ablation(
+            base_policy=m,  # policy-like module
+            rollout_fn=rollout_fn,
+            batch=batch,
+            cfg=ab,
+        )
+
+    return {
+        "model": model,
+        "dataloader_factory": dataloader_factory,
+        "rollout_fn": rollout_fn_ab,
+        "tag": tag,
+        "meta": {"ablation": canon, "pe_dim": ab.pe_dim, "perm_seed": ab.perm_seed},
+    }
+
+
+
+
 RolloutFn = Callable[[nn.Module, dict], tuple[Tensor, dict]]  # returns (P, aux)
 
 
@@ -323,7 +450,7 @@ def _clone_batch_shallow(batch: dict) -> dict:
 
 def rollout_with_ablation(
     *,
-    base_policy: ACPLPolicy,
+    base_policy: nn.Module,
     rollout_fn: RolloutFn,
     batch: dict,
     cfg: AblationConfig,
@@ -353,7 +480,7 @@ def rollout_with_ablation(
     P_out, aux_out with the *original* node order and targets re-aligned.
     """
     cfg.validate()
-    device = torch.device(cfg.device)
+
 
     # 1) Prepare batch clone and apply NoPE if requested
     b = _clone_batch_shallow(batch)

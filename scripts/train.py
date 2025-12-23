@@ -186,39 +186,38 @@ class _CheckpointShim:
         self._ok = False
         try:
             from acpl.utils import checkpoint as _ck  # type: ignore
-
             self.ck = _ck
             self._ok = True
         except Exception:
             self.ck = None
 
-
     def atomic_save(self, obj: dict, path: Path) -> None:
+        # If your Phase-B8 checkpointer has a truly-atomic writer, use it.
         if self._ok and hasattr(self.ck, "atomic_save"):
             self.ck.atomic_save(obj, path)  # type: ignore
-        else:
-            # atomic fallback: write temp then rename
-            import os
-            tmp = path.with_suffix(path.suffix + ".tmp")
-            torch.save(obj, tmp)
-            os.replace(tmp, path)
+            return
 
+        # Robust atomic fallback: write temp, flush+fsync, then replace.
+        import os
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        path.parent.mkdir(parents=True, exist_ok=True)
 
+        with tmp.open("wb") as f:
+            # Force the *zip* format (more robust/portable than legacy pickle)
+            torch.save(obj, f, _use_new_zipfile_serialization=True)
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.replace(tmp, path)
 
     def save_train_state(self, path: Path, **state) -> None:
-        # Phase B8 API if present, else plain save
-        if self._ok and hasattr(self.ck, "save_checkpoint"):
-            # Some checkpointer impls concatenate with ".meta.json" using string '+'
-            # so ensure 'path' is a str to avoid PosixPath + str TypeError.
-            self.ck.save_checkpoint(str(path), state)  # type: ignore
-        else:
-            torch.save(state, path)
+        # Always use atomic save for model_last.pt to avoid partial/corrupt checkpoints.
+        self.atomic_save(state, path)
 
     def try_resume(self, path: Path) -> dict | None:
         """
         Return loaded dict if found, else None. Accepts either a file or a directory.
         """
-        # Prefer Phase B8 'load_checkpoint_resume'
         if self._ok and hasattr(self.ck, "load_checkpoint_resume"):
             try:
                 ok, payload = self.ck.load_checkpoint_resume(path)  # type: ignore
@@ -226,7 +225,6 @@ class _CheckpointShim:
             except Exception:
                 return None
 
-        # Fallback: accept directories with 'model_last.pt'
         if path.is_dir():
             for name in ("model_last.pt", "last.pt", "checkpoint.pt"):
                 cand = path / name
@@ -236,7 +234,8 @@ class _CheckpointShim:
 
         if path.exists():
             try:
-                return torch.load(path, map_location="cpu")
+                # IMPORTANT for PyTorch 2.x: be explicit
+                return torch.load(path, map_location="cpu", weights_only=False)
             except Exception:
                 return None
         return None
@@ -2510,9 +2509,10 @@ def main():
                     pt_curve_x, pt_curve_y, out_png=plot_path, title=f"P_T[target] — {title_suffix}"
                 )
 
-        # Save last every epoch; update best if improved
+        
+        raw_model = getattr(model, "_orig_mod", model)  # torch.compile wraps modules
         ckpt_state = {
-            "state_dict": model.state_dict(),
+            "state_dict": raw_model.state_dict(),
             "adaptor": (adaptor.state_dict() if adaptor is not None else None),
             "optimizer": optimizer.state_dict(),
             "epoch": epoch,
@@ -2522,7 +2522,19 @@ def main():
             "ema_shadow": (ema.shadow if ema is not None else None),
         }
 
+
         _CK.save_train_state(ckpt_last, **ckpt_state)
+
+
+        # Optional: fail-fast if a checkpoint ever becomes unreadable.
+        if bool(train_cfg.get("verify_checkpoints", True)):
+            try:
+                _ = torch.load(ckpt_last, map_location="cpu", weights_only=False)
+            except Exception as e:
+                raise RuntimeError(f"Checkpoint verification failed for {ckpt_last}: {e}") from e
+
+
+
 
         if (best_metric is None) or (primary_avg > best_metric):
             best_metric = primary_avg
