@@ -963,6 +963,47 @@ class ThetaToHermitianAdaptor(nn.Module):
         return H
 
 
+
+
+    def forward(self, theta: torch.Tensor, d: int | None = None) -> torch.Tensor:
+        """
+        Make the adaptor callable: H = adaptor(theta[, d]).
+        This prevents 'Module [...] is missing the required "forward" function'.
+        """
+        # Prefer the most explicit method names if they exist in your implementation.
+        if hasattr(self, "hermitian_from_theta") and callable(getattr(self, "hermitian_from_theta")):
+            fn = getattr(self, "hermitian_from_theta")
+            try:
+                return fn(theta, d=d)
+            except TypeError:
+                return fn(theta, d)
+
+        if hasattr(self, "theta_to_hermitian") and callable(getattr(self, "theta_to_hermitian")):
+            fn = getattr(self, "theta_to_hermitian")
+            try:
+                return fn(theta, d=d)
+            except TypeError:
+                return fn(theta, d)
+
+        if hasattr(self, "to_hermitian") and callable(getattr(self, "to_hermitian")):
+            fn = getattr(self, "to_hermitian")
+            try:
+                return fn(theta, d=d)
+            except TypeError:
+                return fn(theta, d)
+
+        raise NotImplementedError(
+            f"{type(self).__name__} has no known theta->Hermitian method to call from forward()."
+        )
+
+
+
+
+
+
+
+
+
 def unitary_exp_iH(H: torch.Tensor, cdtype=torch.complex64) -> torch.Tensor:
     n = H.size(-1)
     Hs = 0.5 * (H + H.transpose(-1, -2))

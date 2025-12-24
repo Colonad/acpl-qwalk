@@ -35,6 +35,7 @@ import json
 import hashlib
 from dataclasses import dataclass
 import os
+from types import MethodType
 from pathlib import Path
 import sys
 from typing import Any
@@ -1022,6 +1023,265 @@ def _call_plot_best_effort(fn, payload: dict[str, Any], figdir: Path):
         raise last_err
 
 
+def _module_has_custom_forward(m: torch.nn.Module) -> bool:
+    """
+    True iff m.forward is not the base nn.Module.forward (which raises:
+    'missing the required forward function').
+    """
+    f = getattr(m, "forward", None)
+    if f is None:
+        return False
+    base = torch.nn.Module.forward
+    func = getattr(f, "__func__", f)  # bound-method -> underlying function
+    return func is not base
+
+
+def _call_theta_method_best_effort(fn, theta_t: torch.Tensor, *, d: int | None = None) -> torch.Tensor:
+    """
+    Call a candidate theta->Hermitian method robustly.
+
+    Some implementations use signatures like:
+        hermitian_from_theta(theta, d)
+    so we try supplying a default degree `d` when available.
+    """
+    dd: int | None = None
+    if d is not None:
+        try:
+            dd = int(d)
+        except Exception:
+            dd = None
+
+    def _unwrap(out: Any) -> torch.Tensor | None:
+        if isinstance(out, torch.Tensor):
+            return out
+        if isinstance(out, (tuple, list)) and out and isinstance(out[0], torch.Tensor):
+            return out[0]
+        return None
+
+    attempts: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    # Positional: fn(theta) and fn(theta, d)
+    attempts.append(((theta_t,), {}))
+    if dd is not None:
+        attempts.append(((theta_t, dd), {}))
+
+    # Keyword: fn(theta=..., d=...)
+    for th_kw in ("theta", "th", "x", "params"):
+        attempts.append(((), {th_kw: theta_t}))
+        if dd is not None:
+            for d_kw in ("d", "deg", "degree", "outdeg"):
+                attempts.append(((), {th_kw: theta_t, d_kw: dd}))
+
+    last_err: Exception | None = None
+    for args, kwargs in attempts:
+        try:
+            out = fn(*args, **kwargs)
+            got = _unwrap(out)
+            if got is not None:
+                return got
+        except TypeError as e:
+            last_err = e
+            continue
+
+    raise TypeError(
+        "Could not call adaptor theta->Hermitian method with supported (theta[, d]) patterns."
+        + (f" Last TypeError: {last_err}" if last_err is not None else "")
+    )
+
+
+def _looks_like_hermitian_blocks(H: Any, theta_t: torch.Tensor) -> bool:
+    if not isinstance(H, torch.Tensor):
+        return False
+    if H.ndim != 3:
+        return False
+    if H.shape[0] != theta_t.shape[0]:
+        return False
+    if H.shape[1] != H.shape[2]:
+        return False
+    if int(H.shape[1]) <= 0:
+        return False
+    return True
+
+def _discover_theta2H_method_name(adaptor: Any) -> list[str]:
+    """
+    Heuristically rank candidate method names on adaptor that may implement theta->Hermitian.
+    """
+    names = []
+    try:
+        names = list(dir(adaptor))
+    except Exception:
+        return []
+
+    scored: list[tuple[int, str]] = []
+    for n in names:
+        if n in ("forward", "__call__"):
+            continue
+        low = n.lower()
+        if not callable(getattr(adaptor, n, None)):
+            continue
+        score = 0
+        # Prefer explicit intent words
+        if "theta" in low:
+            score += 5
+        if "herm" in low or "hermit" in low:
+            score += 8
+        if low in ("theta_to_hermitian", "theta_to_h", "to_hermitian", "to_h"):
+            score += 50
+        # Mild preference for non-private names, but allow private too
+        if not low.startswith("_"):
+            score += 2
+        scored.append((score, n))
+
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    return [n for _, n in scored]
+
+
+
+def _ensure_forward_for_adaptor(m: Any, *, default_d: int | None = None) -> str | None:
+    """
+    Some older ThetaToHermitianAdaptor implementations forget to define forward().
+    Patch the INSTANCE so that m(theta) works, by wiring forward -> best available method.
+    Returns the method name used, or None if no patch applied.
+    """
+    if not isinstance(m, torch.nn.Module):
+        return None
+    if _module_has_custom_forward(m):
+        return None
+
+    # Stash a default degree (used by wrappers for methods that require `d`)
+    try:
+        setattr(m, "_theta2H_default_d", int(default_d) if default_d is not None else getattr(m, "_theta2H_default_d", None))
+    except Exception:
+        pass
+
+    # Prefer known names first, then discover by heuristics.   
+    
+    preferred = [
+        "theta_to_hermitian",
+        "theta_to_H",
+        "theta_to_h",
+        "to_hermitian",
+        "to_H",
+        "to_h",
+        "build_H",
+        "make_H",
+        "lift",
+        "adapt",
+        "compute_H",
+        "compute_hermitian",
+        "hermitian_from_theta",
+    ]
+    discovered = _discover_theta2H_method_name(m)
+    tried = []
+    for name in preferred + discovered:
+        if name in tried:
+            continue
+        tried.append(name)
+        fn = getattr(m, name, None)
+        if not callable(fn):
+            continue
+        
+        
+        
+        
+        # Wire forward to a wrapper that only takes theta, and supplies `d` if needed.
+        def _wrapped_forward(self, theta_t: torch.Tensor, _fn=fn):
+            dd = getattr(self, "_theta2H_default_d", None)
+            return _call_theta_method_best_effort(_fn, theta_t, d=dd)
+
+        setattr(m, "_theta2H_cached_name", name)
+        setattr(m, "forward", MethodType(_wrapped_forward, m))
+        return name
+
+
+
+
+    # Last resort: create a dynamic forward that discovers a callable at first use.
+    def _auto_forward(self, theta_t: torch.Tensor) -> torch.Tensor:
+        cand_names = _discover_theta2H_method_name(self)
+        for nm in cand_names:
+            fn2 = getattr(self, nm, None)
+            if not callable(fn2):
+                continue
+            try:
+                dd = getattr(self, "_theta2H_default_d", None)
+                H = _call_theta_method_best_effort(fn2, theta_t, d=dd)            
+            
+            except Exception:
+                continue
+            if _looks_like_hermitian_blocks(H, theta_t):
+                setattr(self, "_theta2H_cached_name", nm)
+                return H
+        raise RuntimeError(
+            f"Adaptor {type(self).__name__} has no usable theta->Hermitian method; "
+            f"candidates tried: {cand_names[:25]}"
+        )
+
+    setattr(m, "forward", MethodType(_auto_forward, m))
+    return "auto_forward"
+
+def _theta_to_hermitian_best_effort(adaptor: Any, theta_t: torch.Tensor, *, default_d: int | None = None) -> torch.Tensor:
+    """
+    Convert per-node theta parameters to Hermitian blocks. Works even if the adaptor
+    is missing forward() by calling a known method.
+    """
+    if adaptor is None:
+        raise RuntimeError("Any-degree plotting requires adaptor (ThetaToHermitianAdaptor).")
+
+
+
+
+    dd = default_d
+    if dd is None:
+        dd = getattr(adaptor, "_theta2H_default_d", None)
+    try:
+        dd = int(dd) if dd is not None else None
+    except Exception:
+        dd = None
+
+
+
+
+    # If we've already cached a working method name, use it.
+    cached = getattr(adaptor, "_theta2H_cached_name", None)
+    if isinstance(cached, str) and cached:
+        fn = getattr(adaptor, cached, None)
+        if callable(fn):
+            H = _call_theta_method_best_effort(fn, theta_t, d=dd)
+            if _looks_like_hermitian_blocks(H, theta_t):
+                return H
+
+    # If forward exists and is implemented, use adaptor(theta).
+    if isinstance(adaptor, torch.nn.Module) and _module_has_custom_forward(adaptor):
+        for args in ( (theta_t,), (theta_t, dd) ) if dd is not None else ( (theta_t,), ):
+            try:
+                H = adaptor(*args)
+            except TypeError:
+                continue
+            if _looks_like_hermitian_blocks(H, theta_t):
+                return H
+
+
+    # Otherwise: discover a callable theta->H method without relying on forward().
+    cand_names = _discover_theta2H_method_name(adaptor)
+    for nm in cand_names:
+        fn = getattr(adaptor, nm, None)
+        if not callable(fn):
+            continue
+        try:
+            H = _call_theta_method_best_effort(fn, theta_t, d=dd)
+        except Exception:
+            continue
+        if _looks_like_hermitian_blocks(H, theta_t):
+            setattr(adaptor, "_theta2H_cached_name", nm)
+            return H
+
+    # Do NOT fall back to adaptor(theta) here (it will raise the original confusing error).
+    raise RuntimeError(
+        f"Could not compute Hermitian blocks from adaptor={type(adaptor).__name__}. "
+        f"forward implemented? {bool(isinstance(adaptor, torch.nn.Module) and _module_has_custom_forward(adaptor))}. "
+        f"Callable candidates (top): {cand_names[:25]}"
+    )
 
 
 
@@ -1127,11 +1387,25 @@ def _make_rollout_timeline_fn(
         d0 = int(pm.degree) if getattr(pm, "is_regular", False) else None
         fast_regular = bool(getattr(pm, "is_regular", False)) and bool(getattr(shift, "is_perm", False)) and d0 is not None
 
+
+
+        try:
+            _deg = (pm.node_ptr[1:] - pm.node_ptr[:-1])
+            d_default = d0 if d0 is not None else int(_deg.max().item())
+        except Exception:
+            d_default = d0 if d0 is not None else None
+ 
+
+
+
+
+
+
         for t in range(T):
             tht = theta[t]  # (N, out_dim)
             if adaptor is None:
                 raise RuntimeError("Any-degree plotting requires adaptor (ThetaToHermitianAdaptor).")
-            H = adaptor(tht)  # (N, d, d)
+            H = _theta_to_hermitian_best_effort(adaptor, tht, default_d=d_default)  # (N, d, d)
             if fam == "exp":
                 U = th.unitary_exp_iH(H)
             else:
@@ -1541,6 +1815,25 @@ def run_eval(
         pm = th.build_portmap(pairs, num_nodes=g.N, coalesce=True)
         shift = th.build_shift(pm)
 
+
+
+
+        # Default degree for theta->Hermitian lifts (needed by some adaptor APIs)
+        try:
+            _deg = (pm.node_ptr[1:] - pm.node_ptr[:-1])
+            default_d = int(_deg.max().item()) if hasattr(_deg, "max") else int(getattr(pm, "degree", 0) or 0)
+        except Exception:
+            default_d = int(getattr(pm, "degree", 0) or 0)
+
+
+
+
+
+
+
+
+
+
         # --- horizon T (mirror train.py behavior) ---
         sim_cfg = cfg.get("sim", {}) or {}
         steps_val = sim_cfg.get("steps", 64)
@@ -1677,6 +1970,22 @@ def run_eval(
                     adaptor.load_state_dict(ad_sd, strict=False)
                 except Exception:
                     pass
+
+
+            # ---- IMPORTANT: patch missing forward() so adaptor(theta) works for plotting ----
+            patched = _ensure_forward_for_adaptor(adaptor, default_d=default_d)
+            if patched is not None:
+                print(
+                    
+                    
+                    f"[warn] ThetaToHermitianAdaptor missing forward(); patched forward -> {patched}(theta[, d]) "
+                    f"with default_d={default_d} (plotting-safe).",
+                    
+                    
+                    file=sys.stderr,
+                )
+
+
 
 
         if is_search:

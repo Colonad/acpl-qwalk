@@ -1,1 +1,1 @@
-{"cond": "ckpt_policy__abl_NoPE", "policy": "ckpt", "baseline_kind": null, "ablation_meta": {"ablation": "NoPE", "impl": "eval.py:fallback_zero_positional_like_channels", "keep_last_indicator": false}}
+{"cond": "ckpt_policy__abl_NoPE", "policy": "ckpt", "baseline_kind": null, "ablation_meta": {"ablation": "NoPE", "pe_dim": null, "perm_seed": 0}}

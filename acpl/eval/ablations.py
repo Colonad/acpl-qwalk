@@ -44,6 +44,18 @@ class AblationConfig:
     • NoPE assumes PE channels are the *last* `pe_dim` columns in X.
       We *zero* them instead of deleting (keeps shapes and downstream norms stable).
 
+      
+
+
+      Historically we assumed PE channels are the *last* `pe_dim` columns.
+      However, the project’s default X layout is often:
+         [degree, coord1, (optional indicator_last)]
+      In that common layout, the positional-like channels are the “middle”
+      channels (index 1 .. -2) when indicator exists.
+      Therefore NoPE supports an AUTO mode that zeroes positional-like channels
+      while preserving degree and (optionally) the last indicator channel.
+
+
     • GlobalCoin & TimeFrozen are implemented as light policy wrappers that only
       modify the tensor of emitted angles θ (shape (T, N, P)) and remain fully
       differentiable (if used in training). They are strictly for eval in B6.
@@ -58,6 +70,12 @@ class AblationConfig:
     # Input-space ablation
     nope: bool = False
     pe_dim: int | None = None  # number of PE channels at the *end* of X
+
+    # NoPE behavior (needed by apply_ablation_bundle + rollout_with_ablation)
+    nope_keep_last_indicator: bool = False
+    nope_allow_auto: bool = True
+
+
 
     # Policy-output ablations (operate on θ after base forward)
     global_coin: bool = False
@@ -74,10 +92,15 @@ class AblationConfig:
     strict_shapes: bool = True
 
     def validate(self) -> None:
-        if self.nope and (self.pe_dim is None or self.pe_dim <= 0):
-            raise ValueError("NoPE enabled but `pe_dim` is not set > 0.")
+        # Basic sanity
         if self.strict_shapes and self.pe_dim is not None and self.pe_dim < 0:
             raise ValueError("`pe_dim` must be None or >= 0.")
+
+        # NoPE sanity: if user disables auto-mode, pe_dim must be provided
+        if self.nope and (self.pe_dim is None or self.pe_dim <= 0) and not self.nope_allow_auto:
+            raise ValueError(
+                "NoPE enabled but `pe_dim` is not set > 0 (and auto-mode disabled)."
+            )
 
 
 # --------------------------------------------------------------------------------------
@@ -85,32 +108,75 @@ class AblationConfig:
 # --------------------------------------------------------------------------------------
 
 
-def apply_nope_to_X(X: Tensor, pe_dim: int) -> Tensor:
+def apply_nope_to_X(
+    X: Tensor,
+    pe_dim: int | None = None,
+    *,
+    keep_last_indicator: bool = False,
+    allow_auto: bool = True,
+) -> Tensor:
     """
-    Zero out the last `pe_dim` feature channels from X (NoPE ablation).
-    Keeps tensor shape intact.
+    NoPE = remove positional signal from node features while keeping shapes stable.
+
+    Two modes:
+      (A) Trailing-PE mode (legacy): if pe_dim is provided (>0),
+          we zero the last pe_dim columns (optionally preserving the last indicator).
+      (B) Auto heuristic (recommended for this repo’s default X layout):
+          keep X[:,0] (degree), and if keep_last_indicator and X has >=3 cols,
+          preserve X[:,-1] (indicator), while zeroing all “middle” columns.
+
 
     Args
     ----
     X:       (N, F) float tensor
-    pe_dim:  number of trailing channels to zero
-
+    pe_dim:  number of trailing PE channels (legacy). If None/<=0, auto-mode may be used.
+    keep_last_indicator: preserve the last channel (common in search/robust).
+    allow_auto: if True, use auto heuristic when pe_dim is missing/invalid.
     Returns
     -------
-    X_nope: (N, F) float tensor with the last pe_dim columns zeroed.
-    """
-    if pe_dim <= 0:
-        return X
+    X_nope: (N, F) float tensor with positional-like channels zeroed.    """
+
+
     if X.ndim != 2:
         raise ValueError(f"Expected X to be (N,F), got shape {tuple(X.shape)}")
-    F = X.size(1)
-    if pe_dim > F:
-        raise ValueError(f"pe_dim={pe_dim} exceeds feature dim F={F}.")
 
-    if pe_dim > 0:
-        X = X.clone()
-        X[:, F - pe_dim : F] = 0.0
-    return X
+    F = int(X.size(1))
+    if F <= 1:
+        return X
+
+    # Normalize pe_dim
+    pd = None
+    if isinstance(pe_dim, int) and pe_dim > 0:
+        pd = int(pe_dim)
+
+    Y = X.clone()
+
+    # (A) trailing-PE mode
+    if pd is not None:
+        if pd > F:
+            raise ValueError(f"pe_dim={pd} exceeds feature dim F={F}.")
+        if keep_last_indicator and F >= 2:
+            # Preserve last column; zero a trailing block right before it.
+            # Example: [deg, coord1, indicator] with pe_dim=1 -> zero coord1, keep indicator.
+            start = max(1, F - pd - 1)
+            end = F - 1
+            if end > start:
+                Y[:, start:end] = 0.0
+            return Y
+        else:
+            Y[:, F - pd : F] = 0.0
+            return Y
+
+    # (B) auto heuristic mode
+    if not allow_auto:
+        return X
+    if keep_last_indicator and F >= 3:
+        # keep degree (0) and indicator (-1); zero everything in-between
+        Y[:, 1 : F - 1] = 0.0
+    else:
+        # keep degree (0); zero all remaining
+        Y[:, 1:F] = 0.0
+    return Y
 
 
 # --------------------------------------------------------------------------------------
@@ -359,6 +425,39 @@ def _infer_pe_dim_from_cfg(cfg: Mapping[str, Any] | None) -> int | None:
             return v
     return None
 
+
+
+
+
+def _infer_keep_last_indicator_from_cfg(cfg: Mapping[str, Any] | None) -> bool:
+    """
+    Project convention:
+      - search/robust tasks often append an indicator as the LAST feature channel.
+    """
+    if not cfg:
+        return False
+    try:
+        task = cfg.get("task", {})  # type: ignore[union-attr]
+    except Exception:
+        task = {}
+    if not isinstance(task, Mapping):
+        return False
+    name = str(task.get("name", cfg.get("goal", ""))).lower()
+    default = ("search" in name) or ("robust" in name)
+    return bool(task.get("use_indicator", default))
+
+
+
+
+
+
+
+
+
+
+
+
+
 def apply_ablation_bundle(
     *,
     name: str,
@@ -389,10 +488,15 @@ def apply_ablation_bundle(
 
     # Build an AblationConfig from the name
     pe_dim = _infer_pe_dim_from_cfg(cfg)
-
+    keep_last = _infer_keep_last_indicator_from_cfg(cfg)
     ab = AblationConfig(
         nope=(canon == "NoPE"),
         pe_dim=pe_dim,
+
+
+        nope_keep_last_indicator=keep_last,
+        nope_allow_auto=True,
+
         global_coin=(canon == "GlobalCoin"),
         time_frozen=(canon == "TimeFrozen"),
         node_permute=(canon == "NodePermute"),
@@ -401,12 +505,10 @@ def apply_ablation_bundle(
         strict_shapes=True,
     )
 
-    # If NoPE requested but pe_dim missing, fail loudly (eval.py can mark skipped)
-    if ab.nope and (ab.pe_dim is None or ab.pe_dim <= 0):
-        raise ValueError(
-            "NoPE ablation requested but pe_dim could not be inferred from cfg. "
-            "Provide it in config (e.g., data.pe_dim=...) or extend _infer_pe_dim_from_cfg."
-        )
+    # IMPORTANT: we do NOT hard-fail NoPE when pe_dim is missing.
+    # The repo’s default X layout makes trailing-pe_dim brittle; we support auto-mode instead.
+    # If user really wants strict pe_dim, they can set nope_allow_auto=False and provide pe_dim.
+
 
     # If we don't have a rollout_fn, we can only do model-only ablations (GlobalCoin/TimeFrozen).
     if rollout_fn is None:
@@ -488,7 +590,14 @@ def rollout_with_ablation(
     if not isinstance(X, Tensor):
         raise ValueError("batch['X'] must be a torch.Tensor")
     if cfg.nope:
-        b["X"] = apply_nope_to_X(X, pe_dim=int(cfg.pe_dim or 0))
+        b["X"] = apply_nope_to_X(
+            X,
+            pe_dim=(int(cfg.pe_dim) if isinstance(cfg.pe_dim, int) else None),
+            keep_last_indicator=bool(cfg.nope_keep_last_indicator),
+            allow_auto=bool(cfg.nope_allow_auto),
+        )
+     
+
 
     # 2) Wrap the policy for output-space ablations
     model = wrap_policy_for_ablations(base_policy, cfg)
