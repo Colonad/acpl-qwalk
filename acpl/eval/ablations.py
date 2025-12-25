@@ -69,8 +69,11 @@ class AblationConfig:
 
     # Input-space ablation
     nope: bool = False
-    pe_dim: int | None = None  # number of PE channels at the *end* of X
-
+    pe_dim: int | None = None  # number of trailing PE channels (legacy); None => auto-mode allowed
+    nope_keep_last_indicator: bool = False
+    nope_allow_auto: bool = True
+    
+    
     # NoPE behavior (needed by apply_ablation_bundle + rollout_with_ablation)
     nope_keep_last_indicator: bool = False
     nope_allow_auto: bool = True
@@ -92,16 +95,14 @@ class AblationConfig:
     strict_shapes: bool = True
 
     def validate(self) -> None:
-        # Basic sanity
-        if self.strict_shapes and self.pe_dim is not None and self.pe_dim < 0:
+        # NoPE requires either explicit pe_dim>0 OR auto-mode enabled.
+        if self.nope and not self.nope_allow_auto:
+            if self.pe_dim is None or int(self.pe_dim) <= 0:
+                raise ValueError(
+                    "NoPE enabled but `pe_dim` is not set > 0 and `nope_allow_auto` is False."
+                )
+        if self.strict_shapes and self.pe_dim is not None and int(self.pe_dim) < 0:
             raise ValueError("`pe_dim` must be None or >= 0.")
-
-        # NoPE sanity: if user disables auto-mode, pe_dim must be provided
-        if self.nope and (self.pe_dim is None or self.pe_dim <= 0) and not self.nope_allow_auto:
-            raise ValueError(
-                "NoPE enabled but `pe_dim` is not set > 0 (and auto-mode disabled)."
-            )
-
 
 # --------------------------------------------------------------------------------------
 #                                   NoPE (input side)
