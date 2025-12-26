@@ -139,45 +139,36 @@ def tv_curve(Pt: np.ndarray | torch.Tensor) -> np.ndarray:
         raise ValueError(f"Expected (T,N) or (S,T,N), got shape {P.shape}.")
 
 
-def mean_ci(
-    X: np.ndarray | torch.Tensor,
-    axis: int = 0,
-    conf: float = 0.95,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def mean_ci(x, axis=0, alpha=0.05):
     """
-    Mean and symmetric normal-approx confidence interval along `axis`.
-
-    Args
-    ----
-    X    : array (...). Typical case is seeds × time or seeds × xgrid.
-    axis : reduce dimension (defaults to 0 for seeds-first layout)
-    conf : confidence level (0<conf<1). Uses normal z-value approximation.
-
-    Returns
-    -------
-    mean, lo, hi : arrays with `axis` removed.
+    Mean +/- normal-approx CI. Safe for n=0/1 (no RuntimeWarning).
+    Returns: mean, lo, hi
     """
-    x = ensure_numpy(X).astype(np.float64)
-    if not (0.0 < conf < 1.0):
-        raise ValueError("conf must be in (0,1).")
+    x = np.asarray(x, dtype=float)
 
-    # z for normal approx
-    # 0.95 -> 1.96, 0.90 -> 1.645, 0.99 -> 2.576
+    # count non-nan along axis
+    n = np.sum(~np.isnan(x), axis=axis)
+    mean = np.nanmean(x, axis=axis)
 
-    m = np.nanmean(x, axis=axis)
+    # ddof=0 var is always defined; convert to unbiased only where n>1
+    var0 = np.nanvar(x, axis=axis, ddof=0)
+    var = np.where(n > 1, var0 * (n / (n - 1)), 0.0)
 
-    n = np.sum(np.isfinite(x), axis=axis).astype(np.float64)
+    denom = np.where(n > 0, n, 1)
+    stderr = np.sqrt(var / denom)
 
-    # Sample variance where possible (ddof=1); collapse to 0 when n<=1.
-    var = np.nanvar(x, axis=axis, ddof=1)
-    var = np.where(n > 1, var, 0.0)
+    # 95% default (alpha=0.05)
+    z = 1.959963984540054  # norm.ppf(0.975)
+    lo = mean - z * stderr
+    hi = mean + z * stderr
 
-    se = np.sqrt(var) / np.sqrt(np.maximum(n, 1.0))
+    # If n<=1, CI collapses to the mean (defensible: “no uncertainty estimate available”)
+    lo = np.where(n > 1, lo, mean)
+    hi = np.where(n > 1, hi, mean)
 
-    z = z_value(conf)
-    lo = m - z * se
-    hi = m + z * se
-    return m, lo, hi
+    return mean, lo, hi
+
+
 
 
 

@@ -2060,10 +2060,11 @@ def run_eval(
 
             def _make_eval_iter(seed_i: int):
                 ds = th.SingleGraphEpisodeDataset(payload, num_episodes=int(episodes))
+                if hasattr(ds, "set_epoch"):
+                    ds.set_epoch(int(seed_i))
                 return (ds[i] for i in range(len(ds)))
 
         else:
-            # transfer: fixed target window (only if config provides target_index)
             payload = {
                 "X": X,
                 "edge_index": g.edge_index,
@@ -2079,7 +2080,13 @@ def run_eval(
 
             def _make_eval_iter(seed_i: int):
                 ds = th.SingleGraphEpisodeDataset(payload, num_episodes=int(episodes))
+                if hasattr(ds, "set_epoch"):
+                    ds.set_epoch(int(seed_i))
                 return (ds[i] for i in range(len(ds)))
+            
+        
+        
+        
         # --- rollout_fn (same as train.py) ---
         if coin_family == "su2":
             
@@ -2519,6 +2526,18 @@ def run_eval(
                         episodes=int(episodes),
                     )  # (S, T+1, N)
 
+
+                    do_tv_plot = bool(is_mixing)
+
+                    if do_tv_plot and hasattr(plot_mod, "plot_tv_curves"):
+                        plot_mod.plot_tv_curves(
+                            Pt,
+                            savepath=(figdir / f"tv__{safe}.png"),
+                            title=f"{suite} — {cond_tag} — TV-to-uniform",
+                        )
+
+
+
                     safe = _sanitize_filename(cond_tag)
                     if hasattr(plot_mod, "plot_tv_curves"):
                         plot_mod.plot_tv_curves(
@@ -2526,6 +2545,20 @@ def run_eval(
                             savepath=(figdir / f"tv__{safe}.png"),
                             title=f"{suite} — {cond_tag} — TV-to-uniform",
                         )
+
+
+                    is_nodeperm = ("nodepermute" in cond_tag.lower())
+
+
+                    if (not is_nodeperm) and hasattr(plot_mod, "plot_position_timelines"):
+                        plot_mod.plot_position_timelines(
+                            Pt,
+                            savepath=(figdir / f"Pt__{safe}.png"),
+                            title=f"{suite} — {cond_tag} — mean Pt",
+                        )
+
+
+
                     if hasattr(plot_mod, "plot_position_timelines"):
                         plot_mod.plot_position_timelines(
                             Pt,
