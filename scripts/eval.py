@@ -1351,14 +1351,30 @@ def _make_rollout_timeline_fn(
         T = int(batch["T"])
         psi = _init_state(batch)
 
-        # coins: prefer coins_su2 if present; else theta->(U) via helper
-        if hasattr(model, "coins_su2"):
-            coins = model.coins_su2(X, edge_index, T=T)
-        else:
-            theta = model(X, edge_index, T=T)
-            if not hasattr(model, "_su2_from_euler_batch"):
-                raise RuntimeError("SU2 plotting needs model.coins_su2 or model._su2_from_euler_batch.")
-            coins = model._su2_from_euler_batch(theta)
+        # IMPORTANT FOR ABLATIONS:
+        # Prefer forward() -> theta so wrappers (GlobalCoin/TimeFrozen) actually change plots.
+        coins = None
+
+        # 1) Try forward() first: either returns theta (T,N,P) or already-built coins (T,N,2,2)
+        try:
+            out = model(X, edge_index, T=T)
+            if isinstance(out, torch.Tensor):
+                if out.ndim == 3 and hasattr(model, "_su2_from_euler_batch"):
+                    coins = model._su2_from_euler_batch(out)  # theta -> SU2 coins
+                elif out.ndim == 4 and out.shape[-1] == out.shape[-2] == 2:
+                    coins = out  # already SU2 coins
+        except Exception:
+            coins = None
+
+        # 2) Fallback: use coins_su2 if that’s all we have
+        if coins is None:
+            if hasattr(model, "coins_su2"):
+                coins = model.coins_su2(X, edge_index, T=T)
+            else:
+                raise RuntimeError(
+                    "SU2 plotting needs either model.forward->theta + _su2_from_euler_batch "
+                    "or model.coins_su2."
+                )
 
         Pt = torch.empty((T + 1, pm.num_nodes), device=psi.device, dtype=torch.float32)
         Pt[0] = partial_trace_coin(psi, pm).to(torch.float32)
@@ -2316,8 +2332,11 @@ def run_eval(
 
 
     if trainer_native_ok:
-        plot_runners[base_tag] = {"model": model, "dataloader_factory": _make_eval_iter}
-
+        plot_runners[base_tag] = {
+            "model": model,
+            "dataloader_factory": _make_eval_iter,
+            "meta": {},  # base condition has no ablation cfg
+        }
 
 
     base_summary = (base_res or {}).get("summary", {})
@@ -2419,7 +2438,8 @@ def run_eval(
                     plot_runners[cond_tag] = {
                         "model": bundle.model,
                         "dataloader_factory": bundle.dataloader_factory,
-                    }                
+                        "meta": dict(bundle.meta or {}),  # <-- keep ablation_cfg for plotting
+                    }
 
             structured_out["conditions"][cond_tag] = res or {}
 
@@ -2458,10 +2478,43 @@ def run_eval(
                 for cond_tag, rr in plot_runners.items():
                     m = rr["model"]
                     dl = rr["dataloader_factory"]
+                    meta_rr = rr.get("meta", {}) if isinstance(rr, dict) else {}
+
+                    # If this condition has an ablation_cfg (from acpl.eval.ablations),
+                    # wrap the plotting rollout so NodePermute / GlobalCoin / TimeFrozen
+                    # are actually applied during Pt collection.
+                    rollout_tl_used = rollout_tl
+                    if abl_mod is not None and isinstance(meta_rr, Mapping):
+                        ab_cfg_dict = meta_rr.get("ablation_cfg", None)
+                        if isinstance(ab_cfg_dict, Mapping) and hasattr(abl_mod, "AblationConfig") and hasattr(abl_mod, "rollout_with_ablation"):
+                            # Build AblationConfig robustly (ignore extra keys)
+                            try:
+                                ctor = getattr(abl_mod, "AblationConfig")
+                                sig = inspect.signature(ctor)
+                                allowed = set(sig.parameters.keys())
+                                kwargs_cfg = {k: ab_cfg_dict[k] for k in ab_cfg_dict.keys() if k in allowed}
+                                ab_cfg = ctor(**kwargs_cfg)
+
+                                def _rollout_tl_wrapped(model0: torch.nn.Module, batch0: Mapping[str, Any]) -> torch.Tensor:
+                                    # rollout_with_ablation expects rollout_fn -> (P, aux)
+                                    def _inner_rollout(mm: torch.nn.Module, bb: dict) -> tuple[torch.Tensor, dict]:
+                                        return rollout_tl(mm, bb), {}
+                                    P_out, _aux = abl_mod.rollout_with_ablation(
+                                        base_policy=model0,
+                                        rollout_fn=_inner_rollout,
+                                        batch=dict(batch0),
+                                        cfg=ab_cfg,
+                                    )
+                                    return P_out
+
+                                rollout_tl_used = _rollout_tl_wrapped
+                            except Exception as e:
+                                print(f"[warn] plotting ablation wrapper failed for {cond_tag}: {e}", file=sys.stderr)
+
                     Pt = _collect_mean_Pt_over_episodes(
                         model=m,
                         dataloader_factory=dl,
-                        rollout_timeline_fn=rollout_tl,
+                        rollout_timeline_fn=rollout_tl_used,
                         seeds=seed_list,
                         episodes=int(episodes),
                     )  # (S, T+1, N)

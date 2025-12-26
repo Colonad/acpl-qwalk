@@ -1,1 +1,0 @@
-{"cond": "ckpt_policy__abl_GlobalCoin", "policy": "ckpt", "baseline_kind": null, "ablation_meta": {"ablation": "GlobalCoin", "pe_dim": null, "perm_seed": 0}}

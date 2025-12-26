@@ -5,7 +5,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
@@ -64,6 +63,50 @@ def ensure_numpy(x: np.ndarray | torch.Tensor) -> np.ndarray:
     raise TypeError(f"Unsupported type: {type(x)}")
 
 
+
+def _as_probabilities(
+    x: np.ndarray | torch.Tensor,
+    *,
+    imag_tol: float = 1e-9,
+    clip_neg: bool = True,
+    renormalize: bool = True,
+    eps: float = 1e-12,
+) -> np.ndarray:
+    """
+    Convert input to a numerically-safe probability tensor.
+
+    Handles common pipeline cases:
+      - complex with tiny imaginary part -> take real
+      - complex amplitudes -> convert to |.|^2
+      - small negative values -> clip to 0
+      - rows not summing to 1 -> renormalize along last axis
+    """
+    P = ensure_numpy(x)
+
+    # complex handling
+    if np.iscomplexobj(P):
+        max_imag = np.nanmax(np.abs(P.imag)) if P.size else 0.0
+        if max_imag <= imag_tol:
+            P = P.real
+        else:
+            # treat as amplitudes (defensible fallback)
+            P = np.abs(P) ** 2
+
+    P = P.astype(np.float64, copy=False)
+
+    if clip_neg:
+        # clip tiny numerical negatives
+        P = np.where(P < 0.0, 0.0, P)
+
+    if renormalize and P.ndim >= 2:
+        # normalize along last axis (node axis)
+        denom = P.sum(axis=-1, keepdims=True)
+        P = np.divide(P, np.maximum(denom, eps), out=np.zeros_like(P), where=denom > 0)
+
+    return P
+
+
+
 def _uniform(N: int) -> np.ndarray:
     return np.full((N,), 1.0 / max(1, N), dtype=np.float64)
 
@@ -83,7 +126,7 @@ def tv_curve(Pt: np.ndarray | torch.Tensor) -> np.ndarray:
     tv : (T,) if input was (T,N), or (S, T) if input was (S,T,N)
           TV_t = 0.5 * sum_v |P_t[v] - 1/N|
     """
-    P = ensure_numpy(Pt).astype(np.float64)
+    P = _as_probabilities(Pt)
     if P.ndim == 2:
         T, N = P.shape
         U = _uniform(N)
@@ -123,18 +166,19 @@ def mean_ci(
 
     m = np.nanmean(x, axis=axis)
 
-    n = np.sum(np.isfinite(x), axis=axis)
+    n = np.sum(np.isfinite(x), axis=axis).astype(np.float64)
 
-    # If n<=1 along an entry, ddof=1 would yield NaN; collapse CI to mean instead.
-    # We approximate by using ddof=0 in that regime.
-    s = np.nanstd(x, axis=axis, ddof=0)
-    
-    se = np.divide(s, np.maximum(1, np.sqrt(n)), out=np.zeros_like(s), where=n > 0)    
-    
+    # Sample variance where possible (ddof=1); collapse to 0 when n<=1.
+    var = np.nanvar(x, axis=axis, ddof=1)
+    var = np.where(n > 1, var, 0.0)
+
+    se = np.sqrt(var) / np.sqrt(np.maximum(n, 1.0))
+
     z = z_value(conf)
     lo = m - z * se
     hi = m + z * se
     return m, lo, hi
+
 
 
 # --------------------------------------------------------------------------------------
@@ -159,10 +203,14 @@ def _pick_nodes_for_timelines(
         return idx
     if (topk is None) or (topk >= N):
         return list(range(N))
-    # score by final-time mass
-    final = Pt[-1]
-    idx = np.argsort(-final)[:topk].tolist()
+
+
+    # For mixing / spreading, final-time mass is often ~uniform and unstable.
+    # Pick nodes that ever become prominent (max over time) for a more representative timeline.
+    score = Pt.max(axis=0)  # (N,)
+    idx = np.argsort(-score)[:topk].tolist()
     return idx
+
 
 
 def plot_position_timelines(
@@ -198,7 +246,7 @@ def plot_position_timelines(
     """
     plt = _import_matplotlib_pyplot()
     st = style or PlotStyle()
-    P = ensure_numpy(Pt).astype(np.float64)
+    P = _as_probabilities(Pt)
 
     # Normalize shapes
     if P.ndim == 2:
@@ -295,8 +343,33 @@ def plot_tv_curves(
     """
     plt = _import_matplotlib_pyplot()
     st = style or PlotStyle()
-    P = ensure_numpy(Pt).astype(np.float64)
-    tv = tv_curve(P)  # (T,) or (S,T)
+
+
+
+
+
+    A = ensure_numpy(Pt)
+
+    # Accept either:
+    #  - Pt probabilities: (T,N) or (S,T,N)
+    #  - tv curves directly: (T,) or (S,T)
+    if A.ndim == 1:
+        tv = np.asarray(A, dtype=np.float64)
+    elif A.ndim == 2:
+        # Heuristic: if rows sum ~ 1, treat as Pt (T,N). Otherwise treat as tv (S,T).
+        row_sums = np.sum(np.where(np.isfinite(A), A, 0.0), axis=-1)
+        if np.allclose(row_sums, 1.0, atol=1e-3, rtol=1e-3):
+            P = _as_probabilities(A)
+            tv = tv_curve(P)
+        else:
+            tv = np.asarray(A, dtype=np.float64)
+    else:
+        P = _as_probabilities(A)
+        tv = tv_curve(P)
+
+
+
+
 
     if tv.ndim == 1:
         m, lo, hi = tv, None, None

@@ -4,7 +4,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+
 
 import torch
 from torch import Tensor, nn
@@ -70,11 +71,9 @@ class AblationConfig:
     # Input-space ablation
     nope: bool = False
     pe_dim: int | None = None  # number of trailing PE channels (legacy); None => auto-mode allowed
-    nope_keep_last_indicator: bool = False
-    nope_allow_auto: bool = True
-    
-    
+
     # NoPE behavior (needed by apply_ablation_bundle + rollout_with_ablation)
+    
     nope_keep_last_indicator: bool = False
     nope_allow_auto: bool = True
 
@@ -516,7 +515,14 @@ def apply_ablation_bundle(
         if ab.nope or ab.node_permute:
             raise ValueError(f"{canon} requires rollout_fn to transform the batch/graph.")
         wrapped = wrap_policy_for_ablations(model, ab)  # type: ignore[arg-type]
-        return {"model": wrapped, "tag": tag, "meta": {"ablation": canon}}
+        return {
+            "model": wrapped,
+            "tag": tag,
+            "meta": {
+                "ablation": canon,
+                "ablation_cfg": asdict(ab),  # <-- ADD THIS
+            },
+        }
 
     def rollout_fn_ab(m: nn.Module, batch: dict) -> tuple[Tensor, dict]:
         # rollout_with_ablation does the wrapping + batch transforms internally
@@ -532,8 +538,14 @@ def apply_ablation_bundle(
         "dataloader_factory": dataloader_factory,
         "rollout_fn": rollout_fn_ab,
         "tag": tag,
-        "meta": {"ablation": canon, "pe_dim": ab.pe_dim, "perm_seed": ab.perm_seed},
+        "meta": {
+            "ablation": canon,
+            "pe_dim": ab.pe_dim,
+            "perm_seed": ab.perm_seed,
+            "ablation_cfg": asdict(ab),  # <-- ADD THIS
+        },
     }
+
 
 
 

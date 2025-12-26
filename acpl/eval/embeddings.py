@@ -301,7 +301,10 @@ def extract_node_embeddings(
         device = X.device
 
     X0 = X.to(device=device)
+
     ei0 = edge_index.to(device=device)
+    if ei0.dtype != torch.long:
+        ei0 = ei0.to(dtype=torch.long)
 
     method = cfg.method
 
@@ -514,7 +517,9 @@ def compute_embedding_statistics(emb: torch.Tensor) -> dict[str, Any]:
         },
     }
     stats["spectrum"] = explained_variance(emb_f, center=True, eps=1e-12)
-     return stats
+    return stats
+
+
 
 
 # =============================================================================
@@ -777,6 +782,13 @@ def save_embeddings_artifacts(
             "After time aggregation, expected (N,D) embeddings for plotting/stats. "
             f"Got {tuple(emb_plot.shape)}. Check cfg.time_aggregate."
         )
+
+
+    # Numerical safety: embeddings should be finite for stats/PCA
+    if not torch.isfinite(emb_plot).all():
+        bad = (~torch.isfinite(emb_plot)).sum().item()
+        raise RuntimeError(f"Non-finite values in embeddings (count={bad}). Check model/hook output.")
+
 
     # Stats
     stats = compute_embedding_statistics(emb_plot)
