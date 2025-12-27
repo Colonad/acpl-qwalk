@@ -154,26 +154,42 @@ def mean_ci(x, axis=0, conf: float = 0.95):
         raise ValueError(f"conf must be in (0,1); got {conf}")
 
     x = np.asarray(x, dtype=np.float64)
-    # Treat inf as missing
     x = np.where(np.isfinite(x), x, np.nan)
 
-    n = np.sum(~np.isnan(x), axis=axis)
-    mean = np.nanmean(x, axis=axis)
+    valid = ~np.isnan(x)
+    n = np.sum(valid, axis=axis)  # shape = reduced shape
 
-    # ddof=0 is always defined; apply unbiased correction only where n>1
-    var0 = np.nanvar(x, axis=axis, ddof=0)
-    var = np.where(n > 1, var0 * (n / (n - 1)), 0.0)
+    # mean (no "empty slice" warnings)
+    sum_keep = np.nansum(x, axis=axis, keepdims=True)
+    n_keep = np.sum(valid, axis=axis, keepdims=True)
+    mean_keep = np.divide(sum_keep, n_keep, out=np.zeros_like(sum_keep), where=n_keep > 0)
+    mean = np.squeeze(mean_keep, axis=axis)
+    mean = np.where(n > 0, mean, np.nan)
 
-    denom = np.maximum(n, 1)
-    stderr = np.sqrt(var / denom)
+    # population variance var0 = E[(x-mean)^2] with ddof=0 (no warnings)
+    diff = np.where(valid, x - mean_keep, 0.0)
+    ssq = np.sum(diff * diff, axis=axis)
+    var0 = np.divide(ssq, n, out=np.zeros_like(ssq), where=n > 0)
+
+    # unbiased correction for sample variance only where n>1
+    factor = np.zeros_like(var0, dtype=np.float64)
+    np.divide(n, (n - 1), out=factor, where=n > 1)  # <- no divide-by-zero warnings
+    var = var0 * factor
+
+    # stderr = sqrt(var / n) only where n>1
+    stderr2 = np.zeros_like(var, dtype=np.float64)
+    np.divide(var, n, out=stderr2, where=n > 1)
+    stderr = np.sqrt(stderr2)
 
     z = z_value(conf)
     lo = mean - z * stderr
     hi = mean + z * stderr
 
-    # If n<=1, collapse CI to mean
+    # Collapse CI if n<=1; if n==0 keep NaNs
     lo = np.where(n > 1, lo, mean)
     hi = np.where(n > 1, hi, mean)
+    lo = np.where(n > 0, lo, np.nan)
+    hi = np.where(n > 0, hi, np.nan)
 
     return mean, lo, hi
 

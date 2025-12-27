@@ -2555,6 +2555,51 @@ def run_eval(
                         episodes=int(episodes),
                     )  # (S, T+1, N)
 
+
+
+                    # --- NEW: pick ONE consistent node set for all conditions (defendable comparisons) ---
+                    if "nodes_shared" not in locals():
+                        nodes_shared = None
+                        forced_nodes = []
+                        try:
+                            start_node = int(payload.get("start_node", 0))
+                            forced_nodes.append(start_node)
+                        except Exception:
+                            pass
+                        try:
+                            t = payload.get("targets", None)
+                            if isinstance(t, torch.Tensor) and t.numel() > 0:
+                                forced_nodes.extend([int(v) for v in t.detach().cpu().tolist()])
+                        except Exception:
+                            pass
+                        # dedup preserving order
+                        seen = set()
+                        forced_nodes = [v for v in forced_nodes if (v not in seen and not seen.add(v))]
+
+                    if nodes_shared is None:
+                        Pmean = Pt.mean(axis=0)          # (T+1, N)
+                        score = Pmean.max(axis=0)        # (N,)
+                        order = np.argsort(-score).tolist()
+                        Nn = int(Pmean.shape[1])
+                        nodes_shared = []
+                        for v in forced_nodes + order:
+                            v = int(v)
+                            if 0 <= v < Nn and v not in nodes_shared:
+                                nodes_shared.append(v)
+                            if len(nodes_shared) >= 12:
+                                break
+
+
+
+
+
+
+
+
+
+
+
+
                     # TV curves are only meaningful/claimed for mixing suites
                     if is_mixing and hasattr(plot_mod, "plot_tv_curves"):
                         plot_mod.plot_tv_curves(
@@ -2568,6 +2613,8 @@ def run_eval(
                     if (not is_nodeperm) and hasattr(plot_mod, "plot_position_timelines"):
                         plot_mod.plot_position_timelines(
                             Pt,
+                            nodes=nodes_shared,
+                            topk=None,
                             savepath=(figdir / f"Pt__{safe}.png"),
                             title=f"{suite} — {cond_tag} — mean Pt",
                         )
