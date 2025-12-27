@@ -94,6 +94,9 @@ def _as_probabilities(
 
     P = P.astype(np.float64, copy=False)
 
+    P = np.where(np.isfinite(P), P, 0.0)
+
+
     if clip_neg:
         # clip tiny numerical negatives
         P = np.where(P < 0.0, 0.0, P)
@@ -139,30 +142,36 @@ def tv_curve(Pt: np.ndarray | torch.Tensor) -> np.ndarray:
         raise ValueError(f"Expected (T,N) or (S,T,N), got shape {P.shape}.")
 
 
-def mean_ci(x, axis=0, alpha=0.05):
+def mean_ci(x, axis=0, conf: float = 0.95):
     """
-    Mean +/- normal-approx CI. Safe for n=0/1 (no RuntimeWarning).
+    Mean +/- normal-approx CI along `axis`.
+
+    - Safe for n=0/1 (no ddof warnings).
+    - If n<=1, CI collapses to the mean (i.e., "no uncertainty estimate available").
     Returns: mean, lo, hi
     """
-    x = np.asarray(x, dtype=float)
+    if not (0.0 < conf < 1.0):
+        raise ValueError(f"conf must be in (0,1); got {conf}")
 
-    # count non-nan along axis
+    x = np.asarray(x, dtype=np.float64)
+    # Treat inf as missing
+    x = np.where(np.isfinite(x), x, np.nan)
+
     n = np.sum(~np.isnan(x), axis=axis)
     mean = np.nanmean(x, axis=axis)
 
-    # ddof=0 var is always defined; convert to unbiased only where n>1
+    # ddof=0 is always defined; apply unbiased correction only where n>1
     var0 = np.nanvar(x, axis=axis, ddof=0)
     var = np.where(n > 1, var0 * (n / (n - 1)), 0.0)
 
-    denom = np.where(n > 0, n, 1)
+    denom = np.maximum(n, 1)
     stderr = np.sqrt(var / denom)
 
-    # 95% default (alpha=0.05)
-    z = 1.959963984540054  # norm.ppf(0.975)
+    z = z_value(conf)
     lo = mean - z * stderr
     hi = mean + z * stderr
 
-    # If n<=1, CI collapses to the mean (defensible: “no uncertainty estimate available”)
+    # If n<=1, collapse CI to mean
     lo = np.where(n > 1, lo, mean)
     hi = np.where(n > 1, hi, mean)
 

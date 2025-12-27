@@ -1390,7 +1390,29 @@ def _make_rollout_timeline_fn(
         T = int(batch["T"])
         psi = _init_state(batch)
 
-        theta = model(X, edge_index, T=T)
+        
+        
+        theta = None
+        try:
+            out = model(X, edge_index, T=T)
+            if isinstance(out, torch.Tensor):
+                theta = out
+            elif isinstance(out, (tuple, list)) and out and isinstance(out[0], torch.Tensor):
+                theta = out[0]
+        except Exception:
+            theta = None
+
+        if theta is None:
+            if hasattr(model, "coins_anydeg"):
+                theta = model.coins_anydeg(X, edge_index, T=T)
+            else:
+                raise RuntimeError("Any-degree plotting needs model.forward(...) -> theta OR model.coins_anydeg(...).")
+                
+        
+        
+        
+        
+        
         if theta_scale != 1.0:
             theta = theta * float(theta_scale)
         if model.training and float(theta_noise_std) > 0.0:
@@ -2483,18 +2505,24 @@ def run_eval(
                 )
 
                 for cond_tag, rr in plot_runners.items():
+                    safe = _sanitize_filename(cond_tag)
+
                     m = rr["model"]
                     dl = rr["dataloader_factory"]
                     meta_rr = rr.get("meta", {}) if isinstance(rr, dict) else {}
 
-                    # If this condition has an ablation_cfg (from acpl.eval.ablations),
-                    # wrap the plotting rollout so NodePermute / GlobalCoin / TimeFrozen
-                    # are actually applied during Pt collection.
+                    # Default: use base timeline rollout
                     rollout_tl_used = rollout_tl
+
+                    # Optional: if ablations module provides an ablation_cfg + rollout_with_ablation,
+                    # wrap the timeline rollout so plotting exactly matches the ablation semantics.
                     if abl_mod is not None and isinstance(meta_rr, Mapping):
                         ab_cfg_dict = meta_rr.get("ablation_cfg", None)
-                        if isinstance(ab_cfg_dict, Mapping) and hasattr(abl_mod, "AblationConfig") and hasattr(abl_mod, "rollout_with_ablation"):
-                            # Build AblationConfig robustly (ignore extra keys)
+                        if (
+                            isinstance(ab_cfg_dict, Mapping)
+                            and hasattr(abl_mod, "AblationConfig")
+                            and hasattr(abl_mod, "rollout_with_ablation")
+                        ):
                             try:
                                 ctor = getattr(abl_mod, "AblationConfig")
                                 sig = inspect.signature(ctor)
@@ -2506,6 +2534,7 @@ def run_eval(
                                     # rollout_with_ablation expects rollout_fn -> (P, aux)
                                     def _inner_rollout(mm: torch.nn.Module, bb: dict) -> tuple[torch.Tensor, dict]:
                                         return rollout_tl(mm, bb), {}
+
                                     P_out, _aux = abl_mod.rollout_with_ablation(
                                         base_policy=model0,
                                         rollout_fn=_inner_rollout,
@@ -2526,30 +2555,16 @@ def run_eval(
                         episodes=int(episodes),
                     )  # (S, T+1, N)
 
-
-                    do_tv_plot = bool(is_mixing)
-
-                    if do_tv_plot and hasattr(plot_mod, "plot_tv_curves"):
+                    # TV curves are only meaningful/claimed for mixing suites
+                    if is_mixing and hasattr(plot_mod, "plot_tv_curves"):
                         plot_mod.plot_tv_curves(
                             Pt,
                             savepath=(figdir / f"tv__{safe}.png"),
                             title=f"{suite} — {cond_tag} — TV-to-uniform",
                         )
 
-
-
-                    safe = _sanitize_filename(cond_tag)
-                    if hasattr(plot_mod, "plot_tv_curves"):
-                        plot_mod.plot_tv_curves(
-                            Pt,
-                            savepath=(figdir / f"tv__{safe}.png"),
-                            title=f"{suite} — {cond_tag} — TV-to-uniform",
-                        )
-
-
+                    # NodePermute: node identities are meaningless, so timelines are typically not interpretable
                     is_nodeperm = ("nodepermute" in cond_tag.lower())
-
-
                     if (not is_nodeperm) and hasattr(plot_mod, "plot_position_timelines"):
                         plot_mod.plot_position_timelines(
                             Pt,
@@ -2559,12 +2574,7 @@ def run_eval(
 
 
 
-                    if hasattr(plot_mod, "plot_position_timelines"):
-                        plot_mod.plot_position_timelines(
-                            Pt,
-                            savepath=(figdir / f"Pt__{safe}.png"),
-                            title=f"{suite} — {cond_tag} — mean Pt",
-                        )
+                        
             except Exception as e:
                 print(f"[warn] plot generation failed: {e}", file=sys.stderr)
 
