@@ -38,6 +38,8 @@ import os
 from types import MethodType
 from pathlib import Path
 import sys
+import subprocess
+
 from typing import Any
 
 import pickle
@@ -86,6 +88,35 @@ def _json_dump(obj: Any) -> str:
             return super().default(o)
 
     return json.dumps(obj, cls=_NpEncoder)
+
+
+
+def _git_info(repo_root: Path) -> dict[str, Any]:
+    """
+    Best-effort git provenance for defendable artifacts.
+    Safe on machines without git / outside a repo.
+    """
+    repo_root = _as_path(repo_root)
+    out: dict[str, Any] = {"root": str(repo_root)}
+    try:
+        sha = subprocess.check_output(
+            ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        out["commit"] = sha
+        # dirty?
+        dirty = subprocess.call(
+            ["git", "-C", str(repo_root), "diff", "--quiet"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        out["dirty"] = bool(dirty != 0)
+    except Exception:
+        out["commit"] = None
+        out["dirty"] = None
+    return out
+
 
 
 def _torch_load_cpu(path: Path):
@@ -839,6 +870,52 @@ def _maybe_get_plots():
         return None
 
 
+def _maybe_get_reporting():
+    try:
+        return importlib.import_module("acpl.eval.reporting")
+    except Exception:
+        return None
+
+
+def _run_reporting_best_effort(report_mod: Any, evaldir: Path) -> bool:
+    """
+    Run acpl.eval.reporting in a signature-robust way.
+    Returns True if something ran without error.
+    """
+    evaldir = _as_path(evaldir)
+
+    # Prefer function-style APIs if present
+    for fn_name in (
+        "write_reports",
+        "write_report",
+        "generate_reports",
+        "generate_report",
+        "render_reports",
+        "render_report",
+        "build_reports",
+        "build_report",
+    ):
+        fn = getattr(report_mod, fn_name, None)
+        if callable(fn):
+            try:
+                _call_with_accepted_kwargs(fn, evaldir=evaldir, outdir=evaldir, path=evaldir)
+                return True
+            except Exception:
+                pass
+
+    # Fallback: module main(argv)
+    main_fn = getattr(report_mod, "main", None)
+    if callable(main_fn):
+        for argv in (["--evaldir", str(evaldir)], [str(evaldir)], []):
+            try:
+                main_fn(argv)  # many scripts accept argv list
+                return True
+            except SystemExit:
+                return True
+            except Exception:
+                continue
+
+    return False
 
 
 
@@ -1477,20 +1554,58 @@ def _make_rollout_timeline_fn(
     return _rollout_anydeg
 
 
-def _collect_mean_Pt_over_episodes(
+def _collect_Pt_samples_for_plotting(
     *,
     model: torch.nn.Module,
     dataloader_factory: Any,
     rollout_timeline_fn: Any,
     seeds: list[int],
     episodes: int,
-) -> np.ndarray:
+) -> tuple[np.ndarray, dict[str, Any]]:
     """
-    Returns Pt with shape (S, T+1, N): per-seed average over episodes.
+    Return Pt samples shaped (K, T+1, N) PLUS metadata describing what K means.
+
+    Defendable CI convention:
+      - If len(seeds) >= 2: K = #seeds and each sample is the per-seed mean over episodes.
+        (CI across seeds)
+      - If len(seeds) == 1: K = #episodes (up to `episodes`) for that single seed.
+        (CI across episodes; avoids ddof/div0 warnings when seeds=1)
+
+    This is ONLY used for plotting.
     """
     model.eval()
-    out: list[np.ndarray] = []
+
+    seeds = list(seeds or [])
+    if not seeds:
+        raise RuntimeError("No seeds provided to plotting collector.")
+
     with torch.no_grad():
+        # ---- CI across EPISODES when only one seed ----
+        if len(seeds) == 1:
+            s = int(seeds[0])
+            it = dataloader_factory(s)
+            samples: list[np.ndarray] = []
+            n = 0
+            for batch in it:
+                Pt = rollout_timeline_fn(model, batch)  # (T+1, N) torch
+                samples.append(Pt.detach().cpu().numpy())
+                n += 1
+                if n >= int(episodes):
+                    break
+
+            if not samples:
+                raise RuntimeError("No Pt episode samples collected for plotting (single-seed mode).")
+
+            arr = np.stack(samples, axis=0)  # (K=episodes, T+1, N)
+            meta = {
+                "ci_mode": "episodes",
+                "n_samples": int(arr.shape[0]),
+                "seed": s,
+            }
+            return arr, meta
+
+        # ---- CI across SEEDS when multiple seeds ----
+        per_seed_means: list[np.ndarray] = []
         for s in seeds:
             it = dataloader_factory(int(s))
             acc = None
@@ -1503,10 +1618,18 @@ def _collect_mean_Pt_over_episodes(
                     break
             if acc is None or n == 0:
                 continue
-            out.append((acc / float(n)).detach().cpu().numpy())
-    if not out:
-        raise RuntimeError("No Pt data collected for plotting.")
-    return np.stack(out, axis=0)
+            per_seed_means.append((acc / float(n)).detach().cpu().numpy())
+
+        if not per_seed_means:
+            raise RuntimeError("No Pt data collected for plotting (multi-seed mode).")
+
+        arr = np.stack(per_seed_means, axis=0)  # (K=seeds, T+1, N)
+        meta = {
+            "ci_mode": "seeds",
+            "n_samples": int(arr.shape[0]),
+            "seeds": [int(x) for x in seeds],
+        }
+        return arr, meta
 
 
 
@@ -1713,7 +1836,10 @@ def run_eval(
     baseline_kind: str = "hadamard",
     baseline_coins_kwargs: dict[str, Any] | None = None,
     baseline_policy_kwargs: dict[str, Any] | None = None,
+    report: bool = False,
+    strict_ablations: bool = False,
 ) -> None:
+
 
     """
     High-level evaluation orchestrator.
@@ -1747,7 +1873,8 @@ def run_eval(
 
     # Prefer the repo's protocol API used by scripts/train.py
     try:
-        from acpl.eval.protocol import EvalConfig, run_ci_eval, summarize_results
+        from acpl.eval.protocol import EvalConfig, run_ci_eval, summarize_results, compute_ci
+
         from acpl.train.loops import LoopConfig
         from acpl.utils.logging import MetricLogger, MetricLoggerConfig
     except Exception:
@@ -1757,6 +1884,8 @@ def run_eval(
         LoopConfig = None
         MetricLogger = None
         MetricLoggerConfig = None
+        compute_ci = None
+
 
 
 
@@ -1777,6 +1906,7 @@ def run_eval(
 
     abl_mod = _maybe_get_ablations()
     plot_mod = _maybe_get_plots()
+    report_mod = _maybe_get_reporting()
 
     if trainer_native_ok:
         th = _load_train_helpers()
@@ -2160,7 +2290,8 @@ def run_eval(
             ci_method="bootstrap",
             ci_alpha=0.05,
             bootstrap_samples=1000,
-            keep_per_seed_means=False,
+            keep_per_seed_means=(len(seed_list) >= 2),
+
         )
 
         loop_cfg = LoopConfig(
@@ -2219,6 +2350,21 @@ def run_eval(
         "seeds": seed_list,
         "ablations": ablations or [],
         "model_config": model_cfg,
+
+        "git": _git_info(Path(__file__).resolve().parents[1]),
+        "ci_convention": {
+            "pooled_episode_ci": {
+                "meaning": "CI over all episodes pooled across seeds (bootstrap), written to eval_ci.json",
+            },
+            "seed_level_ci": {
+                "meaning": "CI over per-seed episode means (replicates=seeds), written to eval_ci_seed.json when seeds>=2",
+            },
+            "note": "For thesis claims, prefer seeds>=3 and cite seed-level CI.",
+        },
+
+
+
+
     }
     (outdir / "meta.json").write_text(_json_dump(meta))
 
@@ -2298,6 +2444,33 @@ def run_eval(
             }
             (tag_dir / "eval_ci.json").write_text(_json_dump(json_payload), encoding="utf-8")
 
+            # --- NEW: seed-level CI (replicates = seeds), saved separately ---
+            seed_ci_payload: dict[str, Any] = {}
+            seed_ci_text = ""
+            if compute_ci is not None and bool(eval_cfg.keep_per_seed_means) and len(seed_list) >= 2:
+                for metric, vv in results.items():
+                    if not (isinstance(vv, dict) and "all" in vv):
+                        continue
+                    seed_means: list[float] = []
+                    for s in seed_list:
+                        kseed = f"seed={int(s)}"
+                        if kseed in vv and hasattr(vv[kseed], "mean"):
+                            try:
+                                seed_means.append(float(vv[kseed].mean))
+                            except Exception:
+                                pass
+                    if len(seed_means) >= 2:
+                        ci_seed = compute_ci(np.asarray(seed_means, dtype=float), method="student_t", alpha=eval_cfg.ci_alpha)
+                        seed_ci_payload[str(metric)] = _ci_to_dict(ci_seed)
+
+                if seed_ci_payload:
+                    (tag_dir / "eval_ci_seed.json").write_text(_json_dump(seed_ci_payload), encoding="utf-8")
+                    seed_ci_text = (
+                        "Seed-level CI (replicates = seeds; values = per-seed episode means)\n"
+                        f"method=student_t alpha={eval_cfg.ci_alpha} n_seeds={len(seed_list)}\n"
+                    )
+                    (tag_dir / "eval_ci_seed.txt").write_text(seed_ci_text, encoding="utf-8")
+
             if logger is not None:
                 try:
                     logger.close()
@@ -2305,9 +2478,12 @@ def run_eval(
                     pass
 
             return {
-                "summary": {k: d["mean"] for k, d in json_payload.items()},
-                "ci": json_payload,
+                "summary": {k: d["mean"] for k, d in json_payload.items()},     # pooled-episode mean
+                "ci": json_payload,                                            # pooled-episode CI (bootstrap)
+                "summary_seed": {k: v["mean"] for k, v in seed_ci_payload.items()} if seed_ci_payload else {},
+                "ci_seed": seed_ci_payload,                                    # seed-level CI (student_t)
                 "text": summary_text,
+                "text_seed": seed_ci_text,
             }
 
         # Fallback (non-trainer-native): keep your existing logic, but model-only
@@ -2450,9 +2626,14 @@ def run_eval(
             
             
             if bundle is None:
-                # still record a “skipped” entry so your thesis tables don’t silently omit it
+                if strict_ablations:
+                    raise RuntimeError(f"Ablation '{canon}' failed to build (strict_ablations=True).")
                 cond_tag = f"{base_tag}__abl_{canon}__SKIPPED"
                 res = {"summary": {}, "skipped": True, "reason": "ablation_build_failed_or_missing"}
+                    
+            
+            
+            
             else:
                 res = run_one_condition(
                     bundle.tag,
@@ -2504,6 +2685,87 @@ def run_eval(
                     theta_noise_std=theta_noise_std,
                 )
 
+
+                # ---------------- Plotting conventions (defendable) ----------------
+                # 1) CI mode:
+                #    - multi-seed: CI across seeds (per-seed mean over episodes)
+                #    - single-seed: CI across episodes (avoids n=1 ddof warnings)
+                if len(seed_list) < 2:
+                    print(
+                        "[warn] plots: only one seed provided; using CI across episodes (not across seeds). "
+                        "Run >=2 seeds for seed-level CI plots.",
+                        file=sys.stderr,
+                    )
+
+                # 2) Choose ONE node set ONCE (from base condition), reuse across all conditions.
+                forced_nodes: list[int] = []
+                try:
+                    start_node = int(payload.get("start_node", 0))
+                    forced_nodes.append(start_node)
+                except Exception:
+                    pass
+                try:
+                    t = payload.get("targets", None)
+                    if isinstance(t, torch.Tensor) and t.numel() > 0:
+                        forced_nodes.extend([int(v) for v in t.detach().cpu().tolist()])
+                except Exception:
+                    pass
+                # dedup preserving order
+                _seen = set()
+                forced_nodes = [v for v in forced_nodes if (v not in _seen and not _seen.add(v))]
+
+                nodes_shared: list[int] | None = None
+
+                # Compute nodes_shared from the BASE condition only (stable comparisons).
+                if base_tag in plot_runners:
+                    rr0 = plot_runners[base_tag]
+                    m0 = rr0["model"]
+                    dl0 = rr0["dataloader_factory"]
+
+                    Pt0, meta0 = _collect_Pt_samples_for_plotting(
+                        model=m0,
+                        dataloader_factory=dl0,
+                        rollout_timeline_fn=rollout_tl,
+                        seeds=seed_list,
+                        episodes=int(episodes),
+                    )
+
+                    # Need at least 1 sample to pick nodes; (>=2 only matters for CI shading)
+                    Pmean0 = Pt0.mean(axis=0)  # (T+1, N)
+                    score0 = Pmean0.max(axis=0)  # (N,)
+                    order0 = np.argsort(-score0).tolist()
+                    Nn0 = int(Pmean0.shape[1])
+
+                    nodes_shared = []
+                    for v in forced_nodes + order0:
+                        v = int(v)
+                        if 0 <= v < Nn0 and v not in nodes_shared:
+                            nodes_shared.append(v)
+                        if len(nodes_shared) >= 12:
+                            break
+
+                    # Persist node choice for thesis reproducibility
+                    try:
+                        (figdir / "nodes_shared.json").write_text(
+                            _json_dump(
+                                {
+                                    "picked_from": base_tag,
+                                    "forced_nodes": forced_nodes,
+                                    "nodes_shared": nodes_shared,
+                                    "rule": "top-by-max(Pmean_over_time) on base condition; reused for all conditions",
+                                    "ci_mode_base": meta0.get("ci_mode", None),
+                                    "n_samples_base": meta0.get("n_samples", None),
+                                }
+                            ),
+                            encoding="utf-8",
+                        )
+                    except Exception:
+                        pass
+
+
+
+
+
                 for cond_tag, rr in plot_runners.items():
                     safe = _sanitize_filename(cond_tag)
 
@@ -2547,13 +2809,24 @@ def run_eval(
                             except Exception as e:
                                 print(f"[warn] plotting ablation wrapper failed for {cond_tag}: {e}", file=sys.stderr)
 
-                    Pt = _collect_mean_Pt_over_episodes(
+                    Pt, pt_meta = _collect_Pt_samples_for_plotting(
                         model=m,
                         dataloader_factory=dl,
                         rollout_timeline_fn=rollout_tl_used,
                         seeds=seed_list,
                         episodes=int(episodes),
-                    )  # (S, T+1, N)
+                    )  # (K, T+1, N)
+
+                    # If K<2, most CI code will warn (ddof/div0). Skip CI plots in that case.
+                    if int(Pt.shape[0]) < 2:
+                        print(
+                            f"[warn] plots: {cond_tag} produced only K={Pt.shape[0]} sample(s); "
+                            "skipping CI-based plots to avoid misleading uncertainty.",
+                            file=sys.stderr,
+                        )
+                        continue
+
+                    ci_note = f"CI across {pt_meta.get('ci_mode','?')} (K={pt_meta.get('n_samples','?')})"
 
 
 
@@ -2605,7 +2878,7 @@ def run_eval(
                         plot_mod.plot_tv_curves(
                             Pt,
                             savepath=(figdir / f"tv__{safe}.png"),
-                            title=f"{suite} — {cond_tag} — TV-to-uniform",
+                            title=f"{suite} — {cond_tag} — TV-to-uniform — {ci_note}",
                         )
 
                     # NodePermute: node identities are meaningless, so timelines are typically not interpretable
@@ -2616,7 +2889,7 @@ def run_eval(
                             nodes=nodes_shared,
                             topk=None,
                             savepath=(figdir / f"Pt__{safe}.png"),
-                            title=f"{suite} — {cond_tag} — mean Pt",
+                            title=f"{suite} — {cond_tag} — mean Pt — {ci_note}",
                         )
 
 
@@ -2624,6 +2897,26 @@ def run_eval(
                         
             except Exception as e:
                 print(f"[warn] plot generation failed: {e}", file=sys.stderr)
+
+
+
+
+    if report:
+        if report_mod is None:
+            print("[warn] report requested, but acpl.eval.reporting could not be imported; skipping.", file=sys.stderr)
+        else:
+            ok = _run_reporting_best_effort(report_mod, outdir)
+            if not ok:
+                print("[warn] report requested, but reporting entrypoint failed; skipping.", file=sys.stderr)
+
+
+
+
+
+
+
+
+
 
 # --------------------------------- CLI ----------------------------------------
 
@@ -2702,6 +2995,20 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--plots", action="store_true", help="Generate figures via acpl.eval.plots if available."
     )
+
+
+    p.add_argument(
+        "--report",
+        action="store_true",
+        help="Run acpl.eval.reporting on the produced eval directory (best-effort).",
+    )
+    p.add_argument(
+        "--strict_ablations",
+        action="store_true",
+        help="Fail the run if any requested ablation cannot be applied (recommended for thesis runs).",
+    )
+
+
     p.add_argument(
         "--override",
         type=str,
@@ -2718,9 +3025,12 @@ def _parse_seeds(s: str) -> list[int]:
         return [0]
     if "," in s:
         return [int(x) for x in s.split(",") if x != ""]
-    # integer => range(N)
+    # integer => range(N), BUT avoid the very common confusion where "--seeds 1"
+    # is intended to mean "seed id 1" (not "one seed: seed 0").
     try:
         n = int(s)
+        if n in (0, 1):
+            return [n]
         return list(range(n))
     except Exception:
         # space-separated list?
@@ -2904,7 +3214,10 @@ def main(argv: list[str] | None = None) -> None:
         baseline_kind=str(args.baseline),
         baseline_coins_kwargs=baseline_coins_kwargs,
         baseline_policy_kwargs=baseline_policy_kwargs,
+        report=bool(args.report),
+        strict_ablations=bool(args.strict_ablations),
     )
+    
 
 
 

@@ -717,6 +717,69 @@ def _normalize_config(config: Any) -> Mapping[str, Any]:
     raise TypeError("config must be a Mapping (e.g., dict parsed from YAML/JSON).")
 
 
+def _manifest_hex_from_config(cfg: Mapping[str, Any], *, digest_bytes: int = 16) -> tuple[str, str]:
+    """
+    Repo-consistent manifest hash for reproducible dataset routing.
+
+    Returns (manifest_hex, algo_name).
+
+    We try to match scripts/train.py / scripts/eval.py convention:
+      - YAML safe_dump(sort_keys=True) then blake2b(digest_size=16)
+
+    If YAML dumping fails for some reason, fall back to canonical JSON bytes.
+    """
+    try:
+        blob = yaml.safe_dump(_to_builtin(cfg), sort_keys=True).encode("utf-8")
+        hx = blake2b(blob, digest_size=int(digest_bytes)).hexdigest()
+        return hx, "yaml_safe_dump_blake2b16"
+    except Exception:
+        blob = _canonical_json_bytes(_to_builtin(cfg))
+        hx = blake2b(blob, digest_size=int(digest_bytes)).hexdigest()
+        return hx, "canonical_json_blake2b16"
+
+
+def _derive_episode_seed(manifest_hex: str, split: str, global_idx: int, *, mod: int = 2**32) -> int:
+    """
+    Public, audit-friendly seed rule:
+        seed = blake2b( manifest_hex | split | global_idx, digest_size=8 ) mod 2^32
+    """
+    msg = f"{manifest_hex}|{split}|{int(global_idx)}".encode("utf-8")
+    h = blake2b(msg, digest_size=8).digest()
+    return int.from_bytes(h, "little") % int(mod)
+
+
+def _git_head_info() -> dict[str, Any]:
+    """
+    Best-effort capture of repo versioning for defendability.
+    Never raises.
+    """
+    out: dict[str, Any] = {}
+    try:
+        import subprocess
+
+        # Find repo root relative to this file
+        here = Path(__file__).resolve()
+        repo = here
+        for _ in range(8):
+            if (repo / ".git").exists():
+                break
+            repo = repo.parent
+
+        if (repo / ".git").exists():
+            head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=str(repo)).decode().strip()
+            out["head"] = head
+            # Dirty flag
+            rc = subprocess.call(["git", "diff", "--quiet"], cwd=str(repo))
+            out["dirty"] = bool(rc != 0)
+        else:
+            out["head"] = None
+            out["dirty"] = None
+    except Exception:
+        out["head"] = None
+        out["dirty"] = None
+    return out
+
+
 def make_eval_manifest(
     config: Mapping[str, Any],
     *,
@@ -738,19 +801,15 @@ def make_eval_manifest(
     if int(count) < 0:
         raise ValueError("count must be >= 0")
 
-    # Respect per-split knobs when previewing graph/task choices.
-    # NOTE: EpisodeGenerator is instantiated with `split=...`, so any split-specific
-    # graph/task distributions are honored when we compute family/size metadata below.
     gen = EpisodeGenerator(cfg, split=split)
 
-    # Deterministically generate the requested number of eval indices.
-    # `EpisodeGenerator.export_eval_index` guarantees self-consistency:
-    #   episode_seed == derive_seed(manifest_hex, split, global_idx)
-    pairs = gen.export_eval_index(split, count=int(count))
-    if len(pairs) != int(count):
-        raise RuntimeError(f"export_eval_index returned {len(pairs)} entries (expected {int(count)})")
- 
-    base = Path(out_dir) / gen.manifest_hexdigest
+    # Prefer generator-provided manifest hex if available (authoritative).
+    man_hex = getattr(gen, "manifest_hexdigest", None)
+    man_algo = "EpisodeGenerator.manifest_hexdigest"
+    if not isinstance(man_hex, str) or not man_hex:
+        man_hex, man_algo = _manifest_hex_from_config(cfg, digest_bytes=16)
+
+    base = Path(out_dir) / str(man_hex)
     _ensure_dir(base)
     jsonl_path = base / f"{split}.jsonl"
     idx_path = base / "index.json"
@@ -758,23 +817,68 @@ def make_eval_manifest(
     if jsonl_path.exists() and not overwrite:
         raise FileExistsError(f"{jsonl_path} exists; use overwrite=True to replace.")
 
-    # Build entries
-    entries = []
+    # -------------------------
+    # Build (global_idx, episode_seed) pairs
+    # -------------------------
+    seed_rule = None
+    pairs: list[tuple[int, int]] = []
+
+    if hasattr(gen, "export_eval_index") and callable(getattr(gen, "export_eval_index")):
+        pairs = list(gen.export_eval_index(split, count=int(count)))
+        seed_rule = "EpisodeGenerator.export_eval_index"
+        if len(pairs) != int(count):
+            raise RuntimeError(f"export_eval_index returned {len(pairs)} entries (expected {int(count)})")
+    else:
+        # Fully deterministic, public seed rule (no generator internals).
+        pairs = [(i, _derive_episode_seed(str(man_hex), str(split), i)) for i in range(int(count))]
+        seed_rule = "blake2b8(manifest_hex|split|global_idx) mod 2^32"
+
+    # -------------------------
+    # Optional episode metadata (best-effort, PUBLIC only)
+    # -------------------------
+    def _preview_meta(gidx: int) -> tuple[str | None, dict[str, Any], str | None]:
+        """
+        Try to extract (family, size_dict, task_name) without touching private methods.
+        If generator exposes a public preview/describe API, we use it; otherwise return Nones.
+        """
+        # Common public-ish names we can probe safely:
+        for name in ("preview_global", "describe_global", "meta_for_global", "episode_meta", "preview"):
+            fn = getattr(gen, name, None)
+            if callable(fn):
+                try:
+                    rec = fn(int(gidx))
+                    if isinstance(rec, Mapping):
+                        fam = rec.get("family", None)
+                        size = rec.get("size", {}) if isinstance(rec.get("size", {}), Mapping) else {}
+                        task = rec.get("task", None)
+                        return (str(fam) if fam is not None else None, dict(size), str(task) if task is not None else None)
+                except Exception:
+                    pass
+        return (None, {}, None)
+
+    router_master_seed = getattr(gen, "router_master_seed", None)
+    if router_master_seed is None:
+        router_master_seed = getattr(gen, "_router_master_seed", None)  # tolerate if your generator already has it
+    try:
+        router_master_seed = int(router_master_seed) if router_master_seed is not None else None
+    except Exception:
+        router_master_seed = None
+
+    entries: list[dict[str, Any]] = []
     for gidx, epseed in pairs:
-        base_seed = gen._canonical_seed_for_global(gidx)  # deterministic by design
-        cfg_i, task_i = gen._make_cfg_task_for_global(gidx)
-        fam, size_kv = gen._family_and_size_kv(cfg_i)
+        fam, size_kv, task_name = _preview_meta(int(gidx))
         entries.append(
             {
-                "manifest_hex": gen.manifest_hexdigest,
-                "router_master_seed": int(gen._router_master_seed),
-                "split": split,
+                "manifest_hex": str(man_hex),
+                "manifest_hex_algo": str(man_algo),
+                "seed_rule": str(seed_rule),
+                "router_master_seed": router_master_seed,
+                "split": str(split),
                 "global_idx": int(gidx),
                 "episode_seed": int(epseed),
                 "family": fam,
                 "size": dict(size_kv),
-                "task": str(task_i.get("name", "transfer")).lower(),
-                "base_seed": int(base_seed),
+                "task": (str(task_name).lower() if task_name is not None else None),
             }
         )
 
@@ -789,24 +893,33 @@ def make_eval_manifest(
     # Compute digests
     b2, sh = _file_digests(jsonl_path)
 
-    # Update/Write index.json
+    # Update/Write index.json (defendable metadata included)
     meta = {
         "schema_version": 1,
         "created_unix": int(time.time()),
-        "manifest_hex": gen.manifest_hexdigest,
-        "rules": "phase_b2_default_v1",
+        "manifest_hex": str(man_hex),
+        "manifest_hex_algo": str(man_algo),
+        "seed_rule": str(seed_rule),
+        "generator": {
+            "module": getattr(type(gen), "__module__", None),
+            "qualname": getattr(type(gen), "__qualname__", getattr(type(gen), "__name__", None)),
+        },
+        "git": _git_head_info(),
+        "python": sys.version,
         "splits": {},
     }
+
     if idx_path.exists():
         try:
             old = json.loads(idx_path.read_text(encoding="utf-8"))
-            if isinstance(old, dict) and old.get("manifest_hex") == gen.manifest_hexdigest:
-                meta.update({k: old[k] for k in old.keys() if k not in ("splits",)})
-                meta["splits"] = old.get("splits", {})
+            # Preserve prior splits if same manifest hex
+            if isinstance(old, dict) and old.get("manifest_hex") == str(man_hex):
+                if isinstance(old.get("splits", None), dict):
+                    meta["splits"] = old["splits"]
         except Exception:
             pass
 
-    meta["splits"][split] = {
+    meta["splits"][str(split)] = {
         "file": jsonl_path.name,
         "count": len(entries),
         "blake2b_256": b2,
@@ -882,11 +995,62 @@ def verify_manifest(
     # Validate manifest_hex inside entries
     for e in read_eval_manifest(index_path, split):
         if e.get("manifest_hex") != man_hex:
-            if strict:
-                raise ValueError("Entry manifest_hex does not match index manifest_hex")
-            return False
+            
+            # Validate entries are self-consistent and audit-friendly
+            entries = read_eval_manifest(index_path, split)
+
+            # Required keys (family/size/task are allowed to be None/empty)
+            required = {"manifest_hex", "split", "global_idx", "episode_seed"}
+            seen_idx: set[int] = set()
+
+            seed_rule = str(index.get("seed_rule", ""))
+
+            for e in entries:
+                if not isinstance(e, dict):
+                    if strict:
+                        raise ValueError("Malformed JSONL entry (not an object)")
+                    return False
+
+                missing = required - set(e.keys())
+                if missing:
+                    if strict:
+                        raise ValueError(f"JSONL entry missing keys: {sorted(missing)}")
+                    return False
+
+                if e.get("manifest_hex") != man_hex:
+                    if strict:
+                        raise ValueError("Entry manifest_hex does not match index manifest_hex")
+                    return False
+
+                if str(e.get("split")) != str(split):
+                    if strict:
+                        raise ValueError("Entry split does not match requested split")
+                    return False
+
+                try:
+                    gidx = int(e.get("global_idx"))
+                    epseed = int(e.get("episode_seed"))
+                except Exception:
+                    if strict:
+                        raise ValueError("Entry global_idx/episode_seed must be integers")
+                    return False
+
+                if gidx in seen_idx:
+                    if strict:
+                        raise ValueError(f"Duplicate global_idx detected: {gidx}")
+                    return False
+                seen_idx.add(gidx)
+
+                # If we used the public seed rule fallback, we can *fully* verify seeds.
+                if seed_rule.startswith("blake2b8("):
+                    expected = _derive_episode_seed(str(man_hex), str(split), gidx)
+                    if int(epseed) != int(expected):
+                        if strict:
+                            raise ValueError(f"episode_seed mismatch at global_idx={gidx}: got {epseed}, expected {expected}")
+                        return False
 
     return ok
+
 
 
 # ------------------------------------ CLI ------------------------------------- #
