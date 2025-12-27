@@ -7,7 +7,7 @@ from typing import Union
 import torch
 
 from .portmap import PortMap
-from .shift import ShiftOp, build_shift
+from .shift import ShiftOp, build_shift, apply_shift
 
 __all__ = [
     "apply_coin_blockdiag",  # Phase A (deg==2) path (kept for BC)
@@ -149,9 +149,15 @@ def apply_coin_blockdiag(
         if check_local_norm:
             post_norm = _precompute_local_norms_1D(out, pm, range(N))
             # Only check deg==2 nodes
-            mask = (deg == 2).cpu().numpy()
+            
+            
+            mask = (deg == 2)
+            if mask.device != pre_norm.device:
+                mask = mask.to(device=pre_norm.device)
             pre = pre_norm[mask]
-            post = post_norm[mask]
+            post = post_norm[mask]            
+            
+            
             if pre.numel() > 0 and not torch.allclose(post, pre, atol=atol, rtol=0):
                 raise AssertionError("Local norm not preserved on some degree-2 nodes.")
         return out
@@ -173,9 +179,14 @@ def apply_coin_blockdiag(
 
     if check_local_norm:
         post_norm = _precompute_local_norms_2D(out, pm, range(N))
-        mask = (deg == 2).cpu().numpy()
+        
+        
+        mask = (deg == 2)
+        if mask.device != pre_norm.device:
+            mask = mask.to(device=pre_norm.device)
         pre = pre_norm[:, mask]
         post = post_norm[:, mask]
+        
         if pre.numel() > 0 and not torch.allclose(post, pre, atol=atol, rtol=0):
             raise AssertionError("Local norm not preserved at some degree-2 nodes (batched).")
 
@@ -332,11 +343,7 @@ def apply_coin_blocks_general(
     A = pm.src.numel()
     _same_lastdim(psi, A)
 
-    # Case 3: global Ct (A,A) or (B,A,A)
-    if isinstance(coins, torch.Tensor) and _is_blockdiag_matrix(coins, A):
-        return _apply_coin_blockdiag_matrix(psi, coins, out=out)
-
-    # Case 1: classic SU(2) stack
+    # Case 1: classic SU(2) stack (route this FIRST to avoid A==2 ambiguity)
     if isinstance(coins, torch.Tensor) and _is_su2_stack(coins):
         return apply_coin_blockdiag(
             psi,
@@ -364,6 +371,17 @@ def apply_coin_blocks_general(
     )
 
 
+    # Case 3: global Ct (A,A) or (B,A,A)
+    if (
+        isinstance(coins, torch.Tensor)
+        and coins.is_complex()
+        and coins.shape[-2:] == (A, A)
+        and (coins.ndim == 2 or (psi.ndim == 2 and coins.ndim == 3 and coins.shape[0] == psi.shape[0]))
+    ):
+        return _apply_coin_blockdiag_matrix(psi, coins, out=out)
+
+
+
 # --------------------------------------------------------------------------- #
 #                               Step operator                                 #
 # --------------------------------------------------------------------------- #
@@ -375,6 +393,11 @@ def apply_then_shift(
     coins: CoinsLike,
     *,
     shift: ShiftOp | None = None,
+
+
+    shift_phase: torch.Tensor | None = None,
+    shift_mask: torch.Tensor | None = None,
+
     out: torch.Tensor | None = None,
     check_local_norm: bool = False,
     atol: float = 1e-6,
@@ -392,43 +415,14 @@ def apply_then_shift(
         psi,
         coins,
         pm,
-        out=None,  # allocate fresh tmp (lets us share `out` for the final result)
+        out=None,
         check_local_norm=check_local_norm,
         atol=atol,
     )
 
+    # Apply shift (optionally with disorder modifiers)
+    return apply_shift(tmp, shift, phase=shift_phase, mask=shift_mask, out=out)
 
-
-    # Ensure permutation index is on the same device as tmp (index_select requirement).
-    perm = shift.perm
-    if isinstance(perm, torch.Tensor):
-        if perm.dtype != torch.long:
-            perm = perm.to(dtype=torch.long)
-        if perm.device != tmp.device:
-            perm = perm.to(device=tmp.device)
-            # Cache it back onto shift to avoid repeated .to() in long rollouts.
-            try:
-               shift.perm = perm
-            except Exception:
-                pass
-    else:
-        raise TypeError("shift.perm must be a torch.Tensor")
-
-
-
-
-    # Flip–flop shift is an index permutation over the arc axis
-    if tmp.ndim == 1:
-        res = tmp.index_select(0, perm)
-    elif tmp.ndim == 2:
-        res = tmp.index_select(1, perm)
-    else:
-        raise ValueError("psi must be rank-1 or rank-2 over the arc axis.")
-
-    if out is not None:
-        out.copy_(res)
-        return out
-    return res
 
 
 def step(
@@ -476,6 +470,10 @@ def step(
         pm,
         coins,
         shift=shift,
+
+        shift_phase=None,
+        shift_mask=None,
+
         out=out,
         check_local_norm=check_local_norm,
         atol=atol,

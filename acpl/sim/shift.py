@@ -77,7 +77,14 @@ class ShiftOp:
         val = torch.ones(A, dtype=dtype, device=self.device)
         return torch.sparse_coo_tensor(idx, val, (A, A), dtype=dtype, device=self.device).coalesce()
 
-    def apply(self, psi: torch.Tensor, *, out: torch.Tensor | None = None) -> torch.Tensor:
+    def apply(
+        self,
+        psi: torch.Tensor,
+        *,
+        phase: torch.Tensor | None = None,
+        mask: torch.Tensor | None = None,
+        out: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         """
         Apply S to a statevector ψ laid out in the arc basis.
 
@@ -97,16 +104,52 @@ class ShiftOp:
         if not psi.is_complex():
             raise TypeError("psi must be a complex tensor (complex64/complex128).")
 
-        # Gathering along the last dimension is the fastest realization of a permutation.
+        # Ensure perm is long and on the same device as psi (index_select requirement).
+        perm = self.perm
+        if perm.dtype != torch.long:
+            perm = perm.to(dtype=torch.long)
+        if perm.device != psi.device:
+            perm = perm.to(device=psi.device)
+            # Optional cache-back (dataclass is frozen, so bypass safely)
+            try:
+                object.__setattr__(self, "perm", perm)
+                object.__setattr__(self, "device", psi.device)
+            except Exception:
+                pass
+
+        def _apply_modifiers(x: torch.Tensor) -> torch.Tensor:
+            if phase is not None:
+                if phase.ndim != 1 or int(phase.numel()) != self.A:
+                    raise ValueError(f"phase must be (A,) with A={self.A}")
+                x = x * phase.to(device=x.device, dtype=x.dtype)
+            if mask is not None:
+                if mask.ndim != 1 or int(mask.numel()) != self.A:
+                    raise ValueError(f"mask must be (A,) with A={self.A}")
+                x = x * mask.to(device=x.device, dtype=x.real.dtype)
+            return x
+        
+        
+        
+        
+        
         if psi.ndim == 1:
-            result = psi.index_select(0, self.perm)
+
+
+            result = psi.index_select(0, perm)
+            result = _apply_modifiers(result)            
+            
+            
             if out is not None:
                 out.copy_(result)
                 return out
             return result
         elif psi.ndim == 2:
             # (B, A) -> gather columns per row using the same perm
-            result = psi.index_select(1, self.perm)
+            
+            
+            result = psi.index_select(1, perm)
+            result = _apply_modifiers(result)            
+            
             if out is not None:
                 out.copy_(result)
                 return out
@@ -188,6 +231,12 @@ def apply_shift(
     psi: torch.Tensor,
     shift: ShiftOp | torch.Tensor,
     *,
+
+
+    phase: torch.Tensor | None = None,
+    mask: torch.Tensor | None = None,
+
+
     out: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """
@@ -215,12 +264,16 @@ def apply_shift(
     _ensure_complex_dtype(psi.dtype)
 
     if isinstance(shift, ShiftOp):
-        return shift.apply(psi, out=out)
+        return shift.apply(psi, phase=phase, mask=mask, out=out)
 
     # Assume `shift` is a (A,) long permutation
     perm = shift
     if perm.dtype != torch.long:
         raise TypeError("`shift` as Tensor must be torch.long permutation of shape (A,).")
+
+
+    if perm.device != psi.device:
+        perm = perm.to(device=psi.device)
 
     A = perm.numel()
     if psi.shape[-1] != A:
@@ -228,12 +281,25 @@ def apply_shift(
 
     if psi.ndim == 1:
         result = psi.index_select(0, perm)
+        
+        
+        if phase is not None: result = result * phase.to(device=psi.device, dtype=psi.dtype)
+        if mask is not None:  result = result * mask.to(device=psi.device, dtype=psi.real.dtype)
+        
+        
+        
         if out is not None:
             out.copy_(result)
             return out
         return result
     elif psi.ndim == 2:
         result = psi.index_select(1, perm)
+        
+        if phase is not None: result = result * phase.to(device=psi.device, dtype=psi.dtype)
+        if mask is not None:  result = result * mask.to(device=psi.device, dtype=psi.real.dtype)
+        
+        
+        
         if out is not None:
             out.copy_(result)
             return out
