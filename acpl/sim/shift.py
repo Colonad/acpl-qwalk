@@ -279,6 +279,39 @@ def apply_shift(
     if psi.shape[-1] != A:
         raise ValueError(f"psi last-dim must be {A} (got {psi.shape[-1]}).")
 
+
+
+
+
+
+    # Validate / align optional modifiers
+    if phase is not None:
+        if (phase.ndim != 1) or (phase.numel() != A):
+            raise ValueError(f"phase must be shape (A,) with A={A}, got {tuple(phase.shape)}.")
+        if not phase.is_complex():
+            raise TypeError("phase must be complex (unit-magnitude complex phases).")
+        if phase.device != psi.device:
+            phase = phase.to(device=psi.device)
+        if phase.dtype != psi.dtype:
+            phase = phase.to(dtype=psi.dtype)
+
+    if mask is not None:
+        if (mask.ndim != 1) or (mask.numel() != A):
+            raise ValueError(f"mask must be shape (A,) with A={A}, got {tuple(mask.shape)}.")
+        if mask.device != psi.device:
+            mask = mask.to(device=psi.device)
+        # allow bool or float-ish, but apply as real dtype
+        if mask.dtype == torch.bool or not mask.is_floating_point():
+            mask = mask.to(dtype=psi.real.dtype)
+        else:
+            mask = mask.to(dtype=psi.real.dtype)
+
+
+
+
+
+
+
     if psi.ndim == 1:
         result = psi.index_select(0, perm)
         
@@ -295,10 +328,12 @@ def apply_shift(
     elif psi.ndim == 2:
         result = psi.index_select(1, perm)
         
-        if phase is not None: result = result * phase.to(device=psi.device, dtype=psi.dtype)
-        if mask is not None:  result = result * mask.to(device=psi.device, dtype=psi.real.dtype)
-        
-        
+        if phase is not None:
+            result = result * phase
+        if mask is not None:
+            result = result * mask
+            
+            
         
         if out is not None:
             out.copy_(result)

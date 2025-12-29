@@ -33,7 +33,10 @@ import importlib
 import io
 import json
 import hashlib
+import copy
+import math
 from dataclasses import dataclass
+
 import os
 from types import MethodType
 from pathlib import Path
@@ -45,8 +48,8 @@ from typing import Any
 import pickle
 import re
 
-
-
+import platform
+import time
 import numpy as np
 
 try:
@@ -877,6 +880,26 @@ def _maybe_get_reporting():
         return None
 
 
+
+
+def _maybe_get_stats():
+    try:
+        return importlib.import_module("acpl.eval.stats")
+    except Exception:
+        return None
+
+
+def _maybe_get_embeddings():
+    try:
+        return importlib.import_module("acpl.eval.embeddings")
+    except Exception:
+        return None
+
+
+
+
+
+
 def _run_reporting_best_effort(report_mod: Any, evaldir: Path) -> bool:
     """
     Run acpl.eval.reporting in a signature-robust way.
@@ -916,6 +939,1157 @@ def _run_reporting_best_effort(report_mod: Any, evaldir: Path) -> bool:
                 continue
 
     return False
+
+
+
+
+
+# --------------------------- Disorder + Robust sweeps ---------------------------
+
+def _maybe_get_disorder():
+    """
+    Optional disorder plumbing module. Your Phase-6 work adds acpl/sim/disorder.py.
+    Keep this best-effort so eval.py stays usable without it.
+    """
+    try:
+        return importlib.import_module("acpl.sim.disorder")
+    except Exception:
+        return None
+
+
+def _stable_seed_u64(*parts: Any) -> int:
+    """
+    Deterministic 64-bit seed derived from mixed parts (strings/numbers/dicts).
+    Stable across runs/machines; safe for naming + RNG seeding.
+    """
+    h = hashlib.blake2b(digest_size=8)
+    for p in parts:
+        if isinstance(p, (bytes, bytearray)):
+            b = bytes(p)
+        elif isinstance(p, (str, int, float, bool)) or p is None:
+            b = str(p).encode("utf-8")
+        else:
+            # dict/list/etc -> stable json
+            try:
+                b = json.dumps(p, sort_keys=True, default=str).encode("utf-8")
+            except Exception:
+                b = repr(p).encode("utf-8")
+        h.update(b)
+        h.update(b"\0")
+    return int.from_bytes(h.digest(), "little", signed=False)
+
+
+def _as_float_list(x: Any) -> list[float]:
+    """
+    Accept:
+      - list/tuple of numbers/strings
+      - comma-separated string "0,0.1,0.2"
+      - space-separated string "0 0.1 0.2"
+    """
+    if x is None:
+        return []
+    if isinstance(x, (list, tuple)):
+        out = []
+        for v in x:
+            try:
+                out.append(float(v))
+            except Exception:
+                continue
+        return out
+    if isinstance(x, str):
+        s = x.strip()
+        if not s:
+            return []
+        # allow commas or whitespace
+        toks = []
+        if "," in s:
+            toks = [t.strip() for t in s.split(",")]
+        else:
+            toks = s.split()
+        out = []
+        for t in toks:
+            if not t:
+                continue
+            out.append(float(t))
+        return out
+    try:
+        return [float(x)]
+    except Exception:
+        return []
+
+
+def _normalize_disorder_cfg(d: Any) -> dict[str, Any]:
+    """
+    Ensure a dict shape. If absent, return {enabled: False}.
+    """
+    if isinstance(d, dict):
+        dd = dict(d)
+    else:
+        dd = {}
+    if "enabled" not in dd:
+        dd["enabled"] = False
+    return dd
+
+
+def _override_disorder_for_sweep(
+    base: dict[str, Any],
+    *,
+    kind: str,
+    sigma: float,
+) -> dict[str, Any]:
+    """
+    Create a new disorder cfg that enables ONLY the requested kind (edge_phase or coin_dephase)
+    and sets its sigma, while preserving other knobs (mode/clamp/etc) from base.
+    """
+    out = copy.deepcopy(_normalize_disorder_cfg(base))
+    out["enabled"] = True
+
+    # normalize keys
+    kind_l = (kind or "").strip().lower()
+
+    # ensure subdicts exist
+    out.setdefault("edge_phase", {})
+    out.setdefault("coin_dephase", {})
+
+    # disable all, then enable one
+    if isinstance(out.get("edge_phase"), dict):
+        out["edge_phase"]["enabled"] = False
+    if isinstance(out.get("coin_dephase"), dict):
+        out["coin_dephase"]["enabled"] = False
+
+    if kind_l in ("edge_phase", "edgephase", "edge-phase"):
+        if not isinstance(out["edge_phase"], dict):
+            out["edge_phase"] = {}
+        out["edge_phase"]["enabled"] = True
+        out["edge_phase"]["sigma"] = float(sigma)
+    elif kind_l in ("coin_dephase", "coindephase", "coin-dephase"):
+        if not isinstance(out["coin_dephase"], dict):
+            out["coin_dephase"] = {}
+        out["coin_dephase"]["enabled"] = True
+        out["coin_dephase"]["sigma"] = float(sigma)
+    else:
+        raise ValueError(f"Unknown sweep kind: {kind!r}")
+
+    return out
+
+
+def _build_shift_with_optional_disorder(
+    th: Any,
+    pm: Any,
+    *,
+    disorder_cfg: dict[str, Any] | None,
+    disorder_seed: int | None,
+    dis_mod: Any | None,
+):
+    """
+    Best-effort: build shift that includes disorder.
+    Supports multiple repo evolutions:
+      - th.build_shift(pm, disorder=..., disorder_seed=...)
+      - th.build_shift(pm, disorder=..., seed=...)
+      - dis_mod.make_disordered_shift(...) / apply_to_shift(...) wrappers
+    Falls back to plain th.build_shift(pm).
+    """
+    dcfg = _normalize_disorder_cfg(disorder_cfg)
+    enabled = bool(dcfg.get("enabled", False))
+    if not enabled:
+        return th.build_shift(pm)
+
+    # 1) Try passing kwargs into th.build_shift
+    build = getattr(th, "build_shift", None)
+    if callable(build):
+        try:
+            return _call_with_accepted_kwargs(build, pm=pm, disorder=dcfg, disorder_seed=disorder_seed, seed=disorder_seed)
+        except TypeError:
+            # older build_shift(pm) only
+            pass
+        except Exception:
+            pass
+
+    # 2) Fallback: build plain shift then let disorder module transform it
+    shift0 = th.build_shift(pm)
+
+    if dis_mod is not None:
+        for fn_name in (
+            "make_disordered_shift",
+            "build_disordered_shift",
+            "with_disorder",
+            "apply_to_shift",
+            "apply_shift_disorder",
+        ):
+            fn = getattr(dis_mod, fn_name, None)
+            if callable(fn):
+                try:
+                    # Try common signatures
+                    return _call_with_accepted_kwargs(
+                        fn,
+                        shift=shift0,
+                        pm=pm,
+                        disorder=dcfg,
+                        cfg=dcfg,
+                        seed=disorder_seed,
+                        disorder_seed=disorder_seed,
+                    )
+                except Exception:
+                    continue
+
+    # 3) Last resort: return plain shift (but warn upstream)
+    return shift0
+
+
+def _build_rollout_fn_with_optional_disorder(
+    th: Any,
+    *,
+    pm: Any,
+    shift: Any,
+    adaptor: Any | None,
+    family: str,
+    cdtype: Any,
+    device: Any,
+    init_mode: str,
+    coin_cfg: dict[str, Any] | None,
+    disorder_cfg: dict[str, Any] | None,
+    disorder_seed: int | None,
+):
+    """
+    Build rollout_fn for protocol evaluation, with best-effort disorder injection.
+    We pass disorder=... and disorder_seed/seed=... through a kw-filtering caller,
+    so older helpers safely ignore them.
+    """
+    fam = (family or "su2").lower().strip()
+    ccfg = coin_cfg or {}
+    dcfg = _normalize_disorder_cfg(disorder_cfg)
+
+    if fam == "su2":
+        return _call_positional_with_accepted_kwargs(
+            th.make_rollout_su2_dv2,
+            pm,
+            shift,
+            cdtype=cdtype,
+            device=device,
+            init_mode=init_mode,
+            disorder=dcfg,
+            disorder_seed=disorder_seed,
+            seed=disorder_seed,
+        )
+
+    theta_scale = float(ccfg.get("theta_scale", 1.0))
+    theta_noise_std = float(ccfg.get("theta_noise_std", 0.0))
+
+    return _call_positional_with_accepted_kwargs(
+        th.make_rollout_anydeg_exp_or_cayley,
+        pm,
+        shift,
+        adaptor=adaptor,
+        family=fam,
+        cdtype=cdtype,
+        device=device,
+        init_mode=init_mode,
+        theta_scale=theta_scale,
+        theta_noise_std=theta_noise_std,
+        disorder=dcfg,
+        disorder_seed=disorder_seed,
+        seed=disorder_seed,
+    )
+
+
+@dataclass(frozen=True)
+class RobustSweepSpec:
+    kind: str
+    sigmas: list[float]
+    trials: int
+    bootstrap_samples: int
+
+
+def _extract_robust_sweep_specs(
+    cfg: dict[str, Any] | None,
+    *,
+    kinds_override: list[str] | None,
+    sigmas_override: str | None,
+    trials_override: int | None,
+    bootstrap_samples: int,
+) -> tuple[list[RobustSweepSpec], bool]:
+
+    """
+    Read cfg['eval']['robustness'] which you defined in YAML.
+    Allows CLI overrides.
+    """
+    kinds = [k.strip() for k in (kinds_override or []) if str(k).strip()]
+    if not kinds:
+        # default: use whatever exists in config
+        kinds = ["edge_phase", "coin_dephase"]
+
+    sig_override = _as_float_list(sigmas_override) if sigmas_override else []
+
+    root = {}
+    if isinstance(cfg, dict):
+        root = cfg.get("eval", {}) or {}
+    rob = root.get("robustness", {}) if isinstance(root, dict) else {}
+    enabled = bool(rob.get("enabled", False)) if isinstance(rob, dict) else False
+
+    # If user requested sweeps via CLI, run even if YAML disabled.
+    # If neither CLI nor YAML enabled, caller should skip.
+    specs: list[RobustSweepSpec] = []
+    for kind in kinds:
+        k = kind.strip()
+        k_l = k.lower()
+
+        # pull from YAML if available
+        sigmas = []
+        trials = None
+
+        if isinstance(rob, dict) and k_l in rob and isinstance(rob[k_l], dict):
+            sigmas = _as_float_list(rob[k_l].get("sigma_grid", []))
+            try:
+                trials = int(rob[k_l].get("trials", 0))
+            except Exception:
+                trials = None
+
+        if sig_override:
+            sigmas = sig_override
+
+        if not sigmas:
+            # sensible default grid if none provided
+            sigmas = [0.0, 0.05, 0.1, 0.15, 0.2]
+
+        if trials_override is not None:
+            trials = int(trials_override)
+
+        if trials is None or trials <= 0:
+            # robust default
+            trials = 10
+
+        specs.append(
+            RobustSweepSpec(
+                kind=k_l,
+                sigmas=[float(s) for s in sigmas if math.isfinite(float(s)) and float(s) >= 0.0],
+                trials=int(trials),
+                bootstrap_samples=int(bootstrap_samples),
+            )
+        )
+
+    return specs, enabled
+
+
+def _call_plot_robustness_sweep_best_effort(
+    fn,
+    *,
+    sigmas: list[float],
+    metrics: dict[str, np.ndarray],
+    savepath: Path,
+    title: str,
+    xlabel: str,
+):
+    """
+    Best-effort adapter to call acpl.eval.plots.plot_robustness_sweep across signature variants.
+    We expect metrics arrays shaped (K, M) where M=len(sigmas), K=trials (replicates).
+    """
+    x = np.asarray(sigmas, dtype=float)
+
+    attempts = [
+        # common keyword style
+        ((), {"x": x, "metrics": metrics, "savepath": savepath, "title": title, "xlabel": xlabel}),
+        ((), {"sigmas": x, "metrics": metrics, "savepath": savepath, "title": title, "xlabel": xlabel}),
+        ((), {"xgrid": x, "metrics": metrics, "savepath": savepath, "title": title, "xlabel": xlabel}),
+        # positional variants
+        ((x, metrics), {"savepath": savepath, "title": title, "xlabel": xlabel}),
+        ((x, metrics, savepath), {"title": title, "xlabel": xlabel}),
+        # minimal
+        ((x, metrics, savepath), {}),
+        ((x, metrics), {}),
+    ]
+
+    last_err = None
+    for args, kwargs in attempts:
+        try:
+            return _call_positional_with_accepted_kwargs(fn, *args, **kwargs)
+        except TypeError as e:
+            last_err = e
+            continue
+    if last_err is not None:
+        raise last_err
+
+
+def _select_metrics_for_sweep_plot(metric_names: list[str], max_metrics: int = 6) -> list[str]:
+    """
+    Keep plots readable: prioritize success/tv/cvar-like metrics, then fill.
+    """
+    prio = []
+    rest = []
+    for m in metric_names:
+        ml = m.lower()
+        if any(k in ml for k in ("succ", "success", "tv", "cvar", "regret", "hit", "mix")):
+            prio.append(m)
+        else:
+            rest.append(m)
+    out = prio + rest
+    return out[: max_metrics]
+
+
+def _run_robustness_sweeps(
+    *,
+    outdir: Path,
+    cond_runners: Mapping[str, dict[str, Any]],
+    cfg: dict[str, Any],
+    th: Any,
+    pm: Any,
+    coin_family: str,
+    coin_cfg: dict[str, Any],
+    adaptor: Any | None,
+    cdtype: Any,
+    device: Any,
+    init_mode: str,
+    seeds: list[int],
+    episodes: int,
+    loop_cfg: Any,
+    EvalConfig: Any,
+    proto_entry: Any,
+    compute_ci: Any | None,
+    plot_mod: Any | None,
+    manifest_hex: str,
+    seed_base: int,
+    kinds_override: list[str] | None,
+    sigmas_override: str | None,
+    trials_override: int | None,
+    bootstrap_samples: int,
+    ci_alpha: float,
+    max_plot_metrics: int = 6,
+) -> dict[str, Any]:
+    """
+    Runs sigma sweeps for configured disorder kinds.
+    Writes:
+      outdir/robust_sweeps/<cond>/<kind>/{meta.json, trials.jsonl, summary.json, sweep.png?}
+    Returns a compact dict to embed into summary.json.
+    """
+    outdir = _as_path(outdir)
+    dis_mod = _maybe_get_disorder()
+
+    base_disorder = _normalize_disorder_cfg(cfg.get("disorder", {}) if isinstance(cfg, dict) else {})
+
+    specs, yaml_enabled = _extract_robust_sweep_specs(
+        cfg,
+        kinds_override=kinds_override,
+        sigmas_override=sigmas_override,
+        trials_override=trials_override,
+        bootstrap_samples=bootstrap_samples,
+    )
+
+    sweep_root = _ensure_dir(outdir / "robust_sweeps")
+    summary_out: dict[str, Any] = {"yaml_enabled": bool(yaml_enabled), "conditions": {}}
+
+    for cond_tag, rr in cond_runners.items():
+        safe_cond = _sanitize_filename(cond_tag)
+        cond_dir = _ensure_dir(sweep_root / safe_cond)
+        m = rr["model"]
+        dl_factory = rr["dataloader_factory"]
+
+        cond_block: dict[str, Any] = {"kinds": {}}
+
+        for spec in specs:
+            kind = spec.kind
+            sigmas = list(spec.sigmas)
+            trials = int(spec.trials)
+
+            if not sigmas:
+                continue
+
+            kind_dir = _ensure_dir(cond_dir / kind)
+            trials_jsonl = kind_dir / "trials.jsonl"
+
+            # Build a sweep-local eval config: same seeds, fewer bootstraps if user requested.
+            eval_cfg_sweep = EvalConfig(
+                seeds=[int(s) for s in seeds],
+                n_seeds=len(seeds),
+                device=str(device),
+                progress_bar=False,
+                ci_method="bootstrap",
+                ci_alpha=float(ci_alpha),
+                bootstrap_samples=int(spec.bootstrap_samples),
+                keep_per_seed_means=(len(seeds) >= 2),
+            )
+
+            meta = {
+                "cond": cond_tag,
+                "kind": kind,
+                "sigmas": sigmas,
+                "trials": trials,
+                "episodes": int(episodes),
+                "seeds": [int(s) for s in seeds],
+                "bootstrap_samples_per_trial": int(spec.bootstrap_samples),
+                "manifest_hex": manifest_hex,
+                "seed_base": int(seed_base),
+                "base_disorder": base_disorder,
+                "note": "Each trial uses a distinct disorder_seed; episodes/seeds still control dataset randomness.",
+            }
+            (kind_dir / "meta.json").write_text(_json_dump(meta), encoding="utf-8")
+
+            # Collect raw matrices: metric -> (trials, len(sigmas))
+            metric_names: list[str] = []
+            mats: dict[str, np.ndarray] = {}
+            # To ensure consistent metric set, we discover metrics on first run.
+            discovered = False
+
+            with trials_jsonl.open("w", encoding="utf-8") as f:
+                for j, sigma in enumerate(sigmas):
+                    for t in range(trials):
+                        disorder_seed = _stable_seed_u64(
+                            "robust_sweep",
+                            manifest_hex,
+                            cond_tag,
+                            kind,
+                            float(sigma),
+                            int(t),
+                            int(seed_base),
+                        ) & ((1 << 63) - 1)
+
+                        dcfg = _override_disorder_for_sweep(base_disorder, kind=kind, sigma=float(sigma))
+
+                        shift_t = _build_shift_with_optional_disorder(
+                            th,
+                            pm,
+                            disorder_cfg=dcfg,
+                            disorder_seed=int(disorder_seed),
+                            dis_mod=dis_mod,
+                        )
+
+                        rollout_t = _build_rollout_fn_with_optional_disorder(
+                            th,
+                            pm=pm,
+                            shift=shift_t,
+                            adaptor=adaptor,
+                            family=coin_family,
+                            cdtype=cdtype,
+                            device=device,
+                            init_mode=init_mode,
+                            coin_cfg=coin_cfg,
+                            disorder_cfg=dcfg,
+                            disorder_seed=int(disorder_seed),
+                        )
+
+                        # Run protocol
+                        results = proto_entry(
+                            model=m,
+                            dataloader_factory=dl_factory,
+                            rollout_fn=rollout_t,
+                            loop_cfg=loop_cfg,
+                            eval_cfg=eval_cfg_sweep,
+                            logger=None,
+                            step=0,
+                        )
+
+                        # Discover metric names and allocate matrices once
+                        if not discovered:
+                            metric_names = [
+                                str(k) for k, v in results.items()
+                                if isinstance(v, dict) and "all" in v and hasattr(v["all"], "mean")
+                            ]
+                            for mn in metric_names:
+                                mats[mn] = np.full((trials, len(sigmas)), np.nan, dtype=float)
+                            discovered = True
+
+                        # Record per-trial pooled means (+ CI if available)
+                        row = {
+                            "sigma": float(sigma),
+                            "trial": int(t),
+                            "disorder_seed": int(disorder_seed),
+                            "metrics": {},
+                        }
+                        for mn in metric_names:
+                            vv = results.get(mn, None)
+                            if isinstance(vv, dict) and "all" in vv and hasattr(vv["all"], "mean"):
+                                mean_v = float(vv["all"].mean)
+                                mats[mn][t, j] = mean_v
+                                row["metrics"][mn] = {
+                                    "mean": mean_v,
+                                    "lo": float(getattr(vv["all"], "lo", mean_v)),
+                                    "hi": float(getattr(vv["all"], "hi", mean_v)),
+                                    "stderr": float(getattr(vv["all"], "stderr", 0.0)),
+                                    "n": int(getattr(vv["all"], "n", 0)),
+                                }
+
+                        f.write(_json_dump(row) + "\n")
+
+            # Summarize across trials at each sigma (CI over trials)
+            summary_kind: dict[str, Any] = {"sigmas": sigmas, "trials": trials, "metrics": {}}
+            for mn, mat in mats.items():
+                means = []
+                los = []
+                his = []
+                ns = []
+                for j in range(mat.shape[1]):
+                    col = mat[:, j]
+                    col = col[np.isfinite(col)]
+                    ns.append(int(col.shape[0]))
+                    if col.shape[0] == 0:
+                        means.append(float("nan"))
+                        los.append(float("nan"))
+                        his.append(float("nan"))
+                        continue
+                    if compute_ci is not None and col.shape[0] >= 2:
+                        ci = compute_ci(np.asarray(col, dtype=float), method="student_t", alpha=float(ci_alpha))
+                        means.append(float(ci.mean))
+                        los.append(float(ci.lo))
+                        his.append(float(ci.hi))
+                    else:
+                        # fallback: no CI
+                        m0 = float(np.mean(col))
+                        means.append(m0)
+                        los.append(m0)
+                        his.append(m0)
+
+                summary_kind["metrics"][mn] = {
+                    "mean": means,
+                    "lo": los,
+                    "hi": his,
+                    "n": ns,
+                    "ci_over": "trials",
+                    "ci_method": "student_t" if compute_ci is not None else "none",
+                    "alpha": float(ci_alpha),
+                }
+
+            (kind_dir / "summary.json").write_text(_json_dump(summary_kind), encoding="utf-8")
+
+            # Plot sweep (best-effort)
+            if plot_mod is not None and hasattr(plot_mod, "plot_robustness_sweep") and discovered:
+                fn = getattr(plot_mod, "plot_robustness_sweep")
+                chosen = _select_metrics_for_sweep_plot(metric_names, max_metrics=max_plot_metrics)
+                metrics_for_plot = {mn: mats[mn] for mn in chosen if mn in mats}
+
+                if metrics_for_plot:
+                    try:
+                        _call_plot_robustness_sweep_best_effort(
+                            fn,
+                            sigmas=sigmas,
+                            metrics=metrics_for_plot,
+                            savepath=(kind_dir / f"sweep__{safe_cond}__{kind}.png"),
+                            title=f"Robustness sweep — {cond_tag} — {kind}",
+                            xlabel=f"{kind}.sigma",
+                        )
+                    except Exception as e:
+                        print(f"[warn] robustness sweep plot failed for {cond_tag}/{kind}: {e}", file=sys.stderr)
+
+            cond_block["kinds"][kind] = {
+                "dir": str(kind_dir.relative_to(outdir)),
+                "sigmas": sigmas,
+                "trials": trials,
+                "metrics": list(mats.keys()),
+            }
+
+        summary_out["conditions"][cond_tag] = cond_block
+
+    return summary_out
+
+
+
+
+# ----------------------- First-class artifacts: stats + embeddings -----------------------
+
+def _sha256_file(path: Path, *, chunk_bytes: int = 8 * 1024 * 1024) -> str | None:
+    """
+    Best-effort sha256 for provenance. Returns None if unreadable.
+    """
+    try:
+        h = hashlib.sha256()
+        with path.open("rb") as f:
+            while True:
+                b = f.read(chunk_bytes)
+                if not b:
+                    break
+                h.update(b)
+        return h.hexdigest()
+    except Exception:
+        return None
+
+
+def _env_info() -> dict[str, Any]:
+    """
+    Machine/software provenance for defendable results.
+    """
+    out: dict[str, Any] = {
+        "time_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "python": sys.version.replace("\n", " "),
+        "platform": platform.platform(),
+        "executable": sys.executable,
+        "cwd": os.getcwd(),
+        "numpy": getattr(np, "__version__", None),
+    }
+    try:
+        out["torch"] = getattr(torch, "__version__", None)
+        out["torch_cuda_available"] = bool(torch.cuda.is_available())
+        out["torch_cuda_version"] = getattr(torch.version, "cuda", None)
+        out["torch_cudnn_version"] = (torch.backends.cudnn.version() if torch.backends.cudnn.is_available() else None)
+    except Exception:
+        pass
+    return out
+
+
+def _resolve_attr_path(root: Any, path: str) -> Any | None:
+    """
+    Resolve dotted attribute path like "gnn" or "encoder.gnn".
+    Returns None if any hop fails.
+    """
+    cur = root
+    for part in (path or "").split("."):
+        part = part.strip()
+        if not part:
+            continue
+        if not hasattr(cur, part):
+            return None
+        cur = getattr(cur, part)
+    return cur
+
+
+def _unwrap_tensor(out: Any) -> torch.Tensor | None:
+    if isinstance(out, torch.Tensor):
+        return out
+    if isinstance(out, (tuple, list)) and out and isinstance(out[0], torch.Tensor):
+        return out[0]
+    return None
+
+
+def _encode_nodes_best_effort(
+    model: torch.nn.Module,
+    X: torch.Tensor,
+    edge_index: torch.Tensor,
+    *,
+    T: int | None,
+    cfg: dict[str, Any] | None,
+) -> torch.Tensor:
+    """
+    Stable hook for node embeddings.
+
+    Preferred:
+      - model.encode_nodes(X, edge_index, T=...)
+    Accepts fallback hook path:
+      - cfg['model']['hook_module_path'] or cfg['eval']['hook_module_path'] (e.g., "gnn")
+
+    Then tries common module/method names.
+    Returns embeddings shaped (N, D).
+    """
+    hook_path = None
+    if isinstance(cfg, dict):
+        try:
+            hook_path = (cfg.get("eval", {}) or {}).get("hook_module_path", None)
+        except Exception:
+            hook_path = None
+        if hook_path is None:
+            try:
+                hook_path = (cfg.get("model", {}) or {}).get("hook_module_path", None)
+            except Exception:
+                hook_path = None
+    hook_path = str(hook_path).strip() if hook_path else ""
+
+    # Candidate (object, method_name) pairs in priority order
+    cands: list[tuple[Any, str]] = []
+
+    # 0) explicit hook module path (if provided)
+    if hook_path:
+        m0 = _resolve_attr_path(model, hook_path)
+        if m0 is not None:
+            cands.append((m0, "encode_nodes"))
+            cands.append((m0, "encode"))
+            cands.append((m0, "forward_features"))
+            cands.append((m0, "node_embeddings"))
+            cands.append((m0, "get_node_embeddings"))
+
+    # 1) model-level hook
+    cands.append((model, "encode_nodes"))
+    cands.append((model, "node_embeddings"))
+    cands.append((model, "get_node_embeddings"))
+
+    # 2) common submodules
+    for attr in ("gnn", "encoder", "backbone", "net", "mpnn"):
+        if hasattr(model, attr):
+            mm = getattr(model, attr)
+            cands.append((mm, "encode_nodes"))
+            cands.append((mm, "encode"))
+            cands.append((mm, "forward_features"))
+            cands.append((mm, "node_embeddings"))
+
+    # Try calls with signature adaptation
+    last_err: Exception | None = None
+    for obj, meth in cands:
+        fn = getattr(obj, meth, None)
+        if not callable(fn):
+            continue
+
+        attempts: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+        # positional
+        attempts.append(((X, edge_index), {}))
+        if T is not None:
+            attempts.append(((X, edge_index), {"T": int(T)}))
+        # keyword
+        attempts.append(((), {"X": X, "edge_index": edge_index}))
+        if T is not None:
+            attempts.append(((), {"X": X, "edge_index": edge_index, "T": int(T)}))
+
+        for args, kwargs in attempts:
+            try:
+                out = _call_positional_with_accepted_kwargs(fn, *args, **kwargs)
+                emb = _unwrap_tensor(out)
+                if emb is None:
+                    continue
+                # Accept (B,N,D) or (N,D)
+                if emb.ndim == 3:
+                    emb = emb.mean(dim=0)
+                if emb.ndim != 2:
+                    continue
+                return emb
+            except Exception as e:
+                last_err = e
+                continue
+
+    raise RuntimeError(
+        "Could not obtain node embeddings. "
+        "Implement model.encode_nodes(X, edge_index, T=...) or set cfg.eval.hook_module_path='gnn'. "
+        + (f"Last error: {type(last_err).__name__}: {last_err}" if last_err else "")
+    )
+
+
+def _collect_embedding_samples_for_artifacts(
+    *,
+    model: torch.nn.Module,
+    dataloader_factory: Any,
+    seeds: list[int],
+    episodes: int,
+    cfg: dict[str, Any] | None,
+    device: Any,
+    T_default: int | None,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """
+    Returns embeddings shaped (K, N, D) + meta.
+
+    Defendable CI convention:
+      - seeds>=2: K=#seeds, each sample is per-seed mean over episodes
+      - seeds==1: K=#episodes (CI across episodes)
+    """
+    model.eval()
+    seeds = list(seeds or [])
+    if not seeds:
+        raise RuntimeError("No seeds provided for embedding artifacts.")
+    episodes = int(max(1, episodes))
+
+    def _get_T(batch: Mapping[str, Any]) -> int | None:
+        try:
+            return int(batch.get("T", T_default if T_default is not None else 0))
+        except Exception:
+            return T_default
+
+    with torch.no_grad():
+        # --- single seed => per-episode embeddings ---
+        if len(seeds) == 1:
+            s = int(seeds[0])
+            it = dataloader_factory(s)
+            embs: list[np.ndarray] = []
+            n = 0
+            for batch in it:
+                if not isinstance(batch, Mapping):
+                    continue
+                X = batch.get("X", None)
+                edge_index = batch.get("edge_index", None)
+                if not (isinstance(X, torch.Tensor) and isinstance(edge_index, torch.Tensor)):
+                    continue
+                X = X.to(device=device)
+                edge_index = edge_index.to(device=device)
+                T_use = _get_T(batch)
+                E = _encode_nodes_best_effort(model, X, edge_index, T=T_use, cfg=cfg)
+                embs.append(E.detach().cpu().numpy())
+                n += 1
+                if n >= episodes:
+                    break
+            if not embs:
+                raise RuntimeError("No embeddings collected (single-seed mode).")
+            arr = np.stack(embs, axis=0)  # (K=episodes, N, D)
+            meta = {"ci_mode": "episodes", "n_samples": int(arr.shape[0]), "seed": s}
+            return arr, meta
+
+        # --- multi-seed => per-seed mean embeddings ---
+        per_seed: list[np.ndarray] = []
+        kept_seeds: list[int] = []
+        for s in seeds:
+            it = dataloader_factory(int(s))
+            acc = None
+            n = 0
+            for batch in it:
+                if not isinstance(batch, Mapping):
+                    continue
+                X = batch.get("X", None)
+                edge_index = batch.get("edge_index", None)
+                if not (isinstance(X, torch.Tensor) and isinstance(edge_index, torch.Tensor)):
+                    continue
+                X = X.to(device=device)
+                edge_index = edge_index.to(device=device)
+                T_use = _get_T(batch)
+                E = _encode_nodes_best_effort(model, X, edge_index, T=T_use, cfg=cfg)  # (N,D)
+                acc = E if acc is None else (acc + E)
+                n += 1
+                if n >= episodes:
+                    break
+            if acc is None or n == 0:
+                continue
+            per_seed.append((acc / float(n)).detach().cpu().numpy())
+            kept_seeds.append(int(s))
+
+        if not per_seed:
+            raise RuntimeError("No embeddings collected (multi-seed mode).")
+        arr = np.stack(per_seed, axis=0)  # (K=seeds, N, D)
+        meta = {"ci_mode": "seeds", "n_samples": int(arr.shape[0]), "seeds": kept_seeds}
+        return arr, meta
+
+
+def _embedding_stats(emb: np.ndarray) -> dict[str, Any]:
+    """
+    Compute robust embedding summaries without ddof warnings.
+    emb: (K, N, D)
+    """
+    K, N, D = emb.shape
+    flat = emb.reshape(K * N, D)
+    mean = np.nanmean(flat, axis=0)
+    var = np.nanvar(flat, axis=0, ddof=1) if (flat.shape[0] > 1) else np.nanvar(flat, axis=0, ddof=0)
+    norm = np.linalg.norm(flat, axis=1)
+    out = {
+        "K": int(K),
+        "N": int(N),
+        "D": int(D),
+        "mean_per_dim": mean.tolist(),
+        "var_per_dim": var.tolist(),
+        "mean_norm": float(np.nanmean(norm)),
+        "std_norm": float(np.nanstd(norm, ddof=1) if norm.shape[0] > 1 else np.nanstd(norm, ddof=0)),
+        "finite_frac": float(np.isfinite(flat).mean()),
+    }
+    return out
+
+
+def _pca2_numpy(X: np.ndarray) -> tuple[np.ndarray, list[float]]:
+    """
+    PCA to 2D via SVD. Returns (N,2) coords and explained variance ratio (len=2).
+    """
+    X = np.asarray(X, dtype=float)
+    X = X - np.mean(X, axis=0, keepdims=True)
+    U, S, Vt = np.linalg.svd(X, full_matrices=False)
+    Z = X @ Vt[:2].T
+    ev = (S**2)
+    denom = float(ev.sum()) if float(ev.sum()) > 0 else 1.0
+    r = [(float(ev[i]) / denom) for i in range(min(2, len(ev)))]
+    while len(r) < 2:
+        r.append(0.0)
+    return Z, r
+
+
+def _save_pca_scatter_png(savepath: Path, Z: np.ndarray, *, title: str) -> None:
+    """
+    Best-effort headless scatter for PCA.
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        import matplotlib.pyplot as plt
+
+        plt.figure()
+        plt.scatter(Z[:, 0], Z[:, 1], s=6)
+        plt.title(title)
+        plt.tight_layout()
+        plt.savefig(savepath, dpi=200)
+        plt.close()
+    except Exception:
+        pass
+
+
+def _write_embeddings_artifacts_fallback(
+    *,
+    outdir: Path,
+    cond: str,
+    emb: np.ndarray,
+    meta: dict[str, Any],
+    note: str,
+) -> dict[str, Any]:
+    """
+    Always-available embeddings artifact writer (no dependency on acpl.eval.embeddings).
+    """
+    root = _ensure_dir(outdir / "artifacts" / "embeddings" / _sanitize_filename(cond))
+    (root / "meta.json").write_text(_json_dump({"cond": cond, "meta": meta, "note": note}), encoding="utf-8")
+
+    np.save(root / "embeddings.npy", emb)                 # (K,N,D)
+    meanE = np.mean(emb, axis=0)                          # (N,D)
+    np.save(root / "embeddings_mean.npy", meanE)
+
+    Z, evr = _pca2_numpy(meanE)
+    np.save(root / "pca2.npy", Z)
+    (root / "pca2_meta.json").write_text(_json_dump({"explained_var_ratio_2d": evr}), encoding="utf-8")
+    _save_pca_scatter_png(root / "pca2_scatter.png", Z, title=f"PCA2 embeddings — {cond}")
+
+    return {
+        "dir": str(root.relative_to(outdir)),
+        "files": ["meta.json", "embeddings.npy", "embeddings_mean.npy", "pca2.npy", "pca2_meta.json", "pca2_scatter.png"],
+    }
+
+
+def _write_stats_artifacts(
+    *,
+    outdir: Path,
+    stats_payload: dict[str, Any],
+) -> None:
+    root = _ensure_dir(outdir / "artifacts")
+    (root / "stats.json").write_text(_json_dump(stats_payload), encoding="utf-8")
+
+    # Also produce a human-readable table (defendable for thesis appendix)
+    lines: list[str] = []
+    lines.append("EVAL STATS (first-class artifacts)")
+    lines.append("")
+    env = stats_payload.get("env", {})
+    lines.append(f"UTC: {env.get('time_utc', '')}")
+    lines.append(f"Python: {env.get('python', '')}")
+    lines.append(f"Torch: {env.get('torch', '')} CUDA_avail={env.get('torch_cuda_available', '')}")
+    lines.append("")
+
+    conds = stats_payload.get("conditions", {})
+    for cond, block in conds.items():
+        lines.append(f"[{cond}]")
+        evalm = block.get("eval_metrics", {})
+        if evalm:
+            lines.append("  Metrics:")
+            for k, v in evalm.items():
+                lines.append(f"    - {k}: {v}")
+        emb = block.get("embeddings", None)
+        if isinstance(emb, dict):
+            lines.append("  Embeddings:")
+            lines.append(f"    - ci_mode: {emb.get('ci_mode')}  K={emb.get('K')}  N={emb.get('N')}  D={emb.get('D')}")
+            lines.append(f"    - mean_norm: {emb.get('mean_norm'):.6g}  std_norm: {emb.get('std_norm'):.6g}")
+            lines.append(f"    - finite_frac: {emb.get('finite_frac'):.3g}")
+        lines.append("")
+
+    (root / "stats_table.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_first_class_artifacts(
+    *,
+    outdir: Path,
+    cfg: dict[str, Any] | None,
+    conditions: Mapping[str, dict[str, Any]],
+    structured_out: dict[str, Any],
+    seeds: list[int],
+    episodes: int,
+    device: Any,
+    T_default: int | None,
+    max_nodes: int,
+    want_embeddings: bool,
+    want_stats: bool,
+    emb_mod: Any | None,
+    stats_mod: Any | None,
+) -> None:
+    """
+    Creates:
+      outdir/artifacts/stats.json
+      outdir/artifacts/stats_table.txt
+      outdir/artifacts/embeddings/<cond>/*
+
+    Uses acpl.eval.embeddings / acpl.eval.stats if present, else falls back to built-ins.
+    """
+    outdir = _as_path(outdir)
+    _ensure_dir(outdir / "artifacts")
+
+    payload: dict[str, Any] = {
+        "env": _env_info(),
+        "git": _git_info(Path(__file__).resolve().parents[1]),
+        "cfg_manifest_hex": None,
+        "conditions": {},
+    }
+
+    # Manifest hash (stable)
+    if isinstance(cfg, dict):
+        try:
+            import yaml as _yaml
+            blob = _yaml.safe_dump(cfg, sort_keys=True).encode("utf-8")
+        except Exception:
+            blob = json.dumps(cfg, sort_keys=True, default=str).encode("utf-8")
+        payload["cfg_manifest_hex"] = hashlib.blake2b(blob, digest_size=16).hexdigest()
+
+    for cond, rr in conditions.items():
+        block: dict[str, Any] = {}
+
+        # Eval metrics (from structured_out)
+        try:
+            cres = (structured_out.get("conditions", {}) or {}).get(cond, {})
+            summary = (cres or {}).get("summary", {}) or {}
+            block["eval_metrics"] = {str(k): float(v) for k, v in summary.items()} if isinstance(summary, dict) else {}
+        except Exception:
+            block["eval_metrics"] = {}
+
+        # Embeddings
+        if want_embeddings:
+            try:
+                m = rr["model"]
+                dl = rr["dataloader_factory"]
+                # Safety: skip huge graphs
+                try:
+                    # probe one batch to see N
+                    it0 = dl(int(seeds[0])) if seeds else dl(0)
+                    b0 = next(iter(it0))
+                    X0 = b0.get("X", None) if isinstance(b0, Mapping) else None
+                    N0 = int(X0.shape[-2]) if isinstance(X0, torch.Tensor) and X0.ndim >= 2 else None
+                    if (N0 is not None) and (N0 > int(max_nodes)):
+                        raise RuntimeError(f"N={N0} exceeds embeddings_max_nodes={max_nodes}; skipping embeddings for {cond}.")
+                except StopIteration:
+                    raise RuntimeError("No batches available to probe embeddings.")
+                except Exception:
+                    # if probing fails, still try to collect (collector will error if truly impossible)
+                    pass
+
+                emb, meta = _collect_embedding_samples_for_artifacts(
+                    model=m,
+                    dataloader_factory=dl,
+                    seeds=seeds,
+                    episodes=episodes,
+                    cfg=cfg,
+                    device=device,
+                    T_default=T_default,
+                )
+                estats = _embedding_stats(emb)
+                estats["ci_mode"] = meta.get("ci_mode", None)
+                estats["n_samples"] = meta.get("n_samples", None)
+
+                # Prefer acpl.eval.embeddings if it exposes a writer
+                wrote = None
+                if emb_mod is not None:
+                    for fn_name in ("write_embeddings", "save_embeddings", "export_embeddings", "run", "main"):
+                        fn = getattr(emb_mod, fn_name, None)
+                        if callable(fn):
+                            try:
+                                wrote = _call_with_accepted_kwargs(
+                                    fn,
+                                    outdir=outdir / "artifacts" / "embeddings" / _sanitize_filename(cond),
+                                    cond=cond,
+                                    embeddings=emb,
+                                    meta=meta,
+                                    cfg=cfg,
+                                )
+                                break
+                            except Exception:
+                                continue
+
+                if wrote is None:
+                    wrote = _write_embeddings_artifacts_fallback(
+                        outdir=outdir, cond=cond, emb=emb, meta=meta, note="fallback_writer"
+                    )
+
+                block["embeddings"] = estats
+                block["embeddings_artifact"] = wrote
+            except Exception as e:
+                block["embeddings_error"] = f"{type(e).__name__}: {e}"
+
+        payload["conditions"][cond] = block
+
+    if want_stats:
+        # Let stats module optionally post-process the payload (best-effort)
+        if stats_mod is not None:
+            for fn_name in ("postprocess_stats", "finalize_stats", "augment_stats"):
+                fn = getattr(stats_mod, fn_name, None)
+                if callable(fn):
+                    try:
+                        payload = _call_with_accepted_kwargs(fn, payload=payload, outdir=outdir) or payload
+                    except Exception:
+                        pass
+
+        _write_stats_artifacts(outdir=outdir, stats_payload=payload)
 
 
 
@@ -1561,6 +2735,10 @@ def _collect_Pt_samples_for_plotting(
     rollout_timeline_fn: Any,
     seeds: list[int],
     episodes: int,
+
+    ckpt_path: Path | None = None,
+    artifacts_request: Mapping[str, Any] | None = None,
+
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """
     Return Pt samples shaped (K, T+1, N) PLUS metadata describing what K means.
@@ -1597,11 +2775,21 @@ def _collect_Pt_samples_for_plotting(
                 raise RuntimeError("No Pt episode samples collected for plotting (single-seed mode).")
 
             arr = np.stack(samples, axis=0)  # (K=episodes, T+1, N)
-            meta = {
+            meta: dict[str, Any] = {
                 "ci_mode": "episodes",
                 "n_samples": int(arr.shape[0]),
                 "seed": s,
+                "env": _env_info(),
             }
+            if ckpt_path is not None:
+                try:
+                    p = _as_path(ckpt_path)
+                    meta["checkpoint_path"] = str(p)
+                    meta["checkpoint_sha256"] = _sha256_file(p) if p.exists() else None
+                except Exception:
+                    meta["checkpoint_sha256"] = None
+            if artifacts_request is not None:
+                meta["artifacts_request"] = dict(artifacts_request)
             return arr, meta
 
         # ---- CI across SEEDS when multiple seeds ----
@@ -1624,11 +2812,26 @@ def _collect_Pt_samples_for_plotting(
             raise RuntimeError("No Pt data collected for plotting (multi-seed mode).")
 
         arr = np.stack(per_seed_means, axis=0)  # (K=seeds, T+1, N)
-        meta = {
+        meta: dict[str, Any] = {
             "ci_mode": "seeds",
             "n_samples": int(arr.shape[0]),
             "seeds": [int(x) for x in seeds],
         }
+
+
+
+        if ckpt_path is not None:
+            try:
+                p = _as_path(ckpt_path)
+                meta["checkpoint_path"] = str(p)
+                meta["checkpoint_sha256"] = _sha256_file(p) if p.exists() else None
+            except Exception:
+                meta["checkpoint_sha256"] = None
+        if artifacts_request is not None:
+            meta["artifacts_request"] = dict(artifacts_request)
+
+
+
         return arr, meta
 
 
@@ -1818,6 +3021,25 @@ def _write_csv(rows: list[Mapping[str, Any]], out_csv: Path) -> None:
     out_csv.write_text(buf.getvalue())
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ------------------------------ Main runner -----------------------------------
 
 
@@ -1838,6 +3060,25 @@ def run_eval(
     baseline_policy_kwargs: dict[str, Any] | None = None,
     report: bool = False,
     strict_ablations: bool = False,
+    # Robustness sweep runner (Phase 6)
+    robust_sweep: bool = False,
+    robust_sweep_kinds: list[str] | None = None,
+    robust_sweep_sigma: str | None = None,
+    robust_sweep_trials: int | None = None,
+    robust_sweep_bootstrap: int = 200,
+    robust_sweep_include_ablations: bool = False,
+    robust_sweep_max_plot_metrics: int = 6,
+
+
+    # First-class artifacts (B7)
+    artifacts: bool = True,
+    artifacts_embeddings: bool = True,
+    artifacts_stats: bool = True,
+    artifacts_embed_episodes: int = 32,
+    artifacts_embed_seed: int | None = None,
+    artifacts_embeddings_max_nodes: int = 4096,
+
+
 ) -> None:
 
 
@@ -1907,6 +3148,8 @@ def run_eval(
     abl_mod = _maybe_get_ablations()
     plot_mod = _maybe_get_plots()
     report_mod = _maybe_get_reporting()
+    stats_mod = _maybe_get_stats()
+    emb_mod = _maybe_get_embeddings()
 
     if trainer_native_ok:
         th = _load_train_helpers()
@@ -1981,8 +3224,24 @@ def run_eval(
             pairs.sort()
 
         pm = th.build_portmap(pairs, num_nodes=g.N, coalesce=True)
-        shift = th.build_shift(pm)
 
+        # ---- Disorder plumbing (base eval must reflect cfg['disorder']) ----
+        _dis_mod = _maybe_get_disorder()
+        disorder_cfg = _normalize_disorder_cfg(cfg.get("disorder", {}) if isinstance(cfg, dict) else {})
+        shift = _build_shift_with_optional_disorder(
+            th,
+            pm,
+            disorder_cfg=disorder_cfg,
+            disorder_seed=int(seed_base),
+            dis_mod=_dis_mod,
+        )
+
+        if bool(disorder_cfg.get("enabled", False)) and _dis_mod is None:
+            print(
+                "[warn] cfg.disorder.enabled=True but acpl.sim.disorder could not be imported; "
+                "shift disorder may be inactive until disorder plumbing lands.",
+                file=sys.stderr,
+            )
 
 
 
@@ -2248,9 +3507,13 @@ def run_eval(
                 pm,
                 shift,
                 cdtype=cdtype,
-                device=torch_device,   # filtered out if helper doesn’t accept it
+                device=torch_device,
                 init_mode=init_mode,
-            )            
+                disorder=disorder_cfg,
+                disorder_seed=int(seed_base),
+                seed=int(seed_base),
+            )
+           
             
             
             title_suffix = "SU2 (deg=2)"
@@ -2267,11 +3530,15 @@ def run_eval(
                 adaptor=adaptor,
                 family=coin_family,
                 cdtype=cdtype,
-                device=torch_device,  
+                device=torch_device,
                 init_mode=init_mode,
                 theta_scale=theta_scale,
                 theta_noise_std=theta_noise_std,
+                disorder=disorder_cfg,
+                disorder_seed=int(seed_base),
+                seed=int(seed_base),
             )
+
             
             
             title_suffix = f"{coin_family.upper()} (any degree)"
@@ -2361,6 +3628,18 @@ def run_eval(
             },
             "note": "For thesis claims, prefer seeds>=3 and cite seed-level CI.",
         },
+        "disorder": disorder_cfg if trainer_native_ok else None,
+        "disorder_seed_base": int(seed_base) if trainer_native_ok else None,
+        "robust_sweep_request": {
+            "enabled": bool(robust_sweep),
+            "kinds_override": list(robust_sweep_kinds or []),
+            "sigma_override": robust_sweep_sigma,
+            "trials_override": robust_sweep_trials,
+            "bootstrap_samples_per_trial": int(robust_sweep_bootstrap),
+            "include_ablations": bool(robust_sweep_include_ablations),
+            "max_plot_metrics": int(robust_sweep_max_plot_metrics),
+        },
+
 
 
 
@@ -2658,9 +3937,125 @@ def run_eval(
             row.update({f"metric.{k}": v for k, v in summ.items()})
             summaries_for_csv.append(row)
 
+
+
+    # ---------------- Robustness sweeps (Phase 6) ----------------
+    if trainer_native_ok and bool(robust_sweep):
+        try:
+            # choose which conditions to sweep
+            if robust_sweep_include_ablations:
+                sweep_conds = dict(plot_runners)
+            else:
+                sweep_conds = {base_tag: plot_runners[base_tag]} if base_tag in plot_runners else {}
+
+            if not sweep_conds:
+                print("[warn] robust_sweep requested but no sweepable conditions found; skipping.", file=sys.stderr)
+            else:
+                sweep_out = _run_robustness_sweeps(
+                    outdir=outdir,
+                    cond_runners=sweep_conds,
+                    cfg=cfg if trainer_native_ok else {},
+                    th=th,
+                    pm=pm,
+                    coin_family=coin_family,
+                    coin_cfg=(cfg.get("coin", {}) or {}) if isinstance(cfg, dict) else {},
+                    adaptor=adaptor,
+                    cdtype=cdtype,
+                    device=torch_device,
+                    init_mode=init_mode,
+                    seeds=seed_list,
+                    episodes=int(episodes),
+                    loop_cfg=loop_cfg,
+                    EvalConfig=EvalConfig,
+                    proto_entry=proto_entry,
+                    compute_ci=compute_ci,
+                    plot_mod=plot_mod,
+                    manifest_hex=str(manifest_hex),
+                    seed_base=int(seed_base),
+                    kinds_override=robust_sweep_kinds,
+                    sigmas_override=robust_sweep_sigma,
+                    trials_override=robust_sweep_trials,
+                    bootstrap_samples=int(robust_sweep_bootstrap),
+                    ci_alpha=float(eval_cfg.ci_alpha),
+                    max_plot_metrics=int(robust_sweep_max_plot_metrics),
+                )
+                structured_out["robust_sweeps"] = sweep_out
+        except Exception as e:
+            print(f"[warn] robustness sweeps failed: {e}", file=sys.stderr)
+
+
+
     # Write summaries
     _write_csv(summaries_for_csv, outdir / "summary.csv")
     (outdir / "summary.json").write_text(_json_dump(structured_out))
+
+
+
+
+
+
+    # ---------------- First-class artifacts (B7): stats + embeddings ----------------
+    if bool(artifacts):
+        try:
+            if trainer_native_ok:
+                # Optionally force a single seed for embedding artifacts (useful for quick CI runs)
+                seeds_for_emb = seed_list
+                if artifacts_embed_seed is not None:
+                    seeds_for_emb = [int(artifacts_embed_seed)]
+
+                # T_default is known in trainer-native path
+                T_default = int(T) if "T" in locals() else None
+
+                _write_first_class_artifacts(
+                    outdir=outdir,
+                    cfg=cfg if isinstance(cfg, dict) else None,
+                    conditions=plot_runners,                 # models + dataloaders per condition
+                    structured_out=structured_out,
+                    seeds=seeds_for_emb,
+                    episodes=int(min(int(episodes), int(artifacts_embed_episodes))),
+                    device=torch_device,
+                    T_default=T_default,
+                    max_nodes=int(artifacts_embeddings_max_nodes),
+                    want_embeddings=bool(artifacts_embeddings),
+                    want_stats=bool(artifacts_stats),
+                    emb_mod=emb_mod,
+                    stats_mod=stats_mod,
+                )
+            else:
+                # Non-trainer-native: still emit stats.json/table from summaries (no embeddings)
+                _write_first_class_artifacts(
+                    outdir=outdir,
+                    cfg=None,
+                    conditions={},                           # no dataloaders available
+                    structured_out=structured_out,
+                    seeds=seed_list,
+                    episodes=int(min(int(episodes), int(artifacts_embed_episodes))),
+                    device=torch.device("cpu"),
+                    T_default=None,
+                    max_nodes=int(artifacts_embeddings_max_nodes),
+                    want_embeddings=False,
+                    want_stats=bool(artifacts_stats),
+                    emb_mod=emb_mod,
+                    stats_mod=stats_mod,
+                )
+        except Exception as e:
+            print(f"[warn] artifact generation failed: {type(e).__name__}: {e}", file=sys.stderr)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     if plots and plot_mod is not None:
         if not trainer_native_ok:
@@ -2728,6 +4123,9 @@ def run_eval(
                         rollout_timeline_fn=rollout_tl,
                         seeds=seed_list,
                         episodes=int(episodes),
+
+                        ckpt_path=ckpt_path,
+                        artifacts_request=meta.get("artifacts_request", None),
                     )
 
                     # Need at least 1 sample to pick nodes; (>=2 only matters for CI shading)
@@ -2815,6 +4213,11 @@ def run_eval(
                         rollout_timeline_fn=rollout_tl_used,
                         seeds=seed_list,
                         episodes=int(episodes),
+
+                        ckpt_path=ckpt_path,
+                        artifacts_request=meta.get("artifacts_request", None),
+
+
                     )  # (K, T+1, N)
 
                     # If K<2, most CI code will warn (ddof/div0). Skip CI plots in that case.
@@ -2997,6 +4400,34 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
 
 
+
+    # First-class artifacts (B7)
+    p.add_argument("--no_artifacts", action="store_true", help="Disable writing outdir/artifacts/*.")
+    p.add_argument("--no_embeddings", action="store_true", help="Disable embeddings artifacts (artifacts/embeddings/*).")
+    p.add_argument("--no_stats", action="store_true", help="Disable stats artifacts (artifacts/stats.json + stats_table.txt).")
+    p.add_argument(
+        "--embeddings_episodes",
+        type=int,
+        default=32,
+        help="Episodes per seed used to compute embedding artifacts (caps at --episodes).",
+    )
+    p.add_argument(
+        "--embeddings_seed",
+        type=int,
+        default=None,
+        help="If set, compute embedding artifacts using ONLY this seed id (faster quick checks).",
+    )
+    p.add_argument(
+        "--embeddings_max_nodes",
+        type=int,
+        default=4096,
+        help="Safety cap: skip embedding artifacts if N exceeds this value.",
+    )
+
+
+
+
+
     p.add_argument(
         "--report",
         action="store_true",
@@ -3007,6 +4438,53 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Fail the run if any requested ablation cannot be applied (recommended for thesis runs).",
     )
+
+
+    p.add_argument(
+        "--robust_sweep",
+        action="store_true",
+        help=(
+            "Run robustness sigma sweeps defined in cfg['eval']['robustness'] "
+            "(writes outdir/robust_sweeps/*)."
+        ),
+    )
+    p.add_argument(
+        "--robust_sweep_kinds",
+        type=str,
+        nargs="*",
+        default=[],
+        help="Subset of kinds to sweep (default: edge_phase coin_dephase).",
+    )
+    p.add_argument(
+        "--robust_sweep_sigma",
+        type=str,
+        default=None,
+        help="Override sigma grid for ALL kinds: e.g. '0,0.05,0.1,0.2'.",
+    )
+    p.add_argument(
+        "--robust_sweep_trials",
+        type=int,
+        default=None,
+        help="Override number of disorder trials per sigma (default from YAML or 10).",
+    )
+    p.add_argument(
+        "--robust_sweep_bootstrap",
+        type=int,
+        default=200,
+        help="Bootstrap samples per trial (lower=faster).",
+    )
+    p.add_argument(
+        "--robust_sweep_include_ablations",
+        action="store_true",
+        help="Also sweep each ablation condition (expensive). Default: sweep base condition only.",
+    )
+    p.add_argument(
+        "--robust_sweep_max_plot_metrics",
+        type=int,
+        default=6,
+        help="Max number of metrics to include in each sweep plot.",
+    )
+
 
 
     p.add_argument(
@@ -3216,6 +4694,24 @@ def main(argv: list[str] | None = None) -> None:
         baseline_policy_kwargs=baseline_policy_kwargs,
         report=bool(args.report),
         strict_ablations=bool(args.strict_ablations),
+    
+        robust_sweep=bool(args.robust_sweep),
+        robust_sweep_kinds=list(args.robust_sweep_kinds or []),
+        robust_sweep_sigma=args.robust_sweep_sigma,
+        robust_sweep_trials=args.robust_sweep_trials,
+        robust_sweep_bootstrap=int(args.robust_sweep_bootstrap),
+        robust_sweep_include_ablations=bool(args.robust_sweep_include_ablations),
+        robust_sweep_max_plot_metrics=int(args.robust_sweep_max_plot_metrics),
+    
+    
+        artifacts=(not bool(args.no_artifacts)),
+        artifacts_embeddings=(not bool(args.no_embeddings)),
+        artifacts_stats=(not bool(args.no_stats)),
+        artifacts_embed_episodes=int(args.embeddings_episodes),
+        artifacts_embed_seed=(int(args.embeddings_seed) if args.embeddings_seed is not None else None),
+        artifacts_embeddings_max_nodes=int(args.embeddings_max_nodes),
+
+
     )
     
 

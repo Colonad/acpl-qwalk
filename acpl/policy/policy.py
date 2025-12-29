@@ -235,6 +235,43 @@ class ACPLPolicy(nn.Module):
             return theta, h_next
         return theta
 
+
+
+
+    # --------------------------- Embedding hook (B7) --------------------------- #
+    def encode_nodes(
+        self,
+        X: torch.Tensor,
+        edge_index: torch.Tensor,
+        *,
+        edge_weight: torch.Tensor | None = None,
+        detach: bool = False,
+    ) -> torch.Tensor:
+        r"""
+        Return node embeddings from the policy encoder.
+
+        This is a **stable evaluation hook** used by `scripts/eval.py` to write
+        first-class artifacts under:
+            <outdir>/artifacts/embeddings/<cond>/
+
+        Parameters
+        ----------
+        X : (N, Fin) float tensor
+        edge_index : (2, E) long tensor
+        edge_weight : optional (E,) tensor
+            If provided, passed through to the underlying GCN.
+        detach : bool
+            If True, returns `z.detach()` (recommended for evaluation export).
+
+        Returns
+        -------
+        z : (N, Dz) tensor
+            Node embeddings produced by the GNN encoder.
+        """
+        self._check_minimal(X, edge_index)
+        z = self.encoder(X, edge_index, edge_weight)  # (N, Dz)
+        return z.detach() if detach else z
+
     # ---------------------- differentiable inline SU(2) lift ---------------------- #
     @staticmethod
     def _su2_from_euler_batch(theta: torch.Tensor, *, dtype=torch.complex64) -> torch.Tensor:

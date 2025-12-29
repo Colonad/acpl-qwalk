@@ -365,21 +365,22 @@ def apply_coin_blocks_general(
             atol=atol,
         )
 
-    raise TypeError(
-        "Unsupported 'coins' type. Expected (N,2,2) tensor, list of per-node (d_v,d_v), "
-        "or Ct matrix of shape (A,A)/(B,A,A)."
-    )
-
-
     # Case 3: global Ct (A,A) or (B,A,A)
-    if (
-        isinstance(coins, torch.Tensor)
-        and coins.is_complex()
-        and coins.shape[-2:] == (A, A)
-        and (coins.ndim == 2 or (psi.ndim == 2 and coins.ndim == 3 and coins.shape[0] == psi.shape[0]))
-    ):
+    # IMPORTANT: keep this AFTER SU2-stack routing to avoid the A==2 ambiguity.
+    if isinstance(coins, torch.Tensor) and _is_blockdiag_matrix(coins, A):
+        # If Ct is batched, it must match psi batch
+        if coins.ndim == 3:
+            if psi.ndim != 2 or coins.shape[0] != psi.shape[0]:
+                raise ValueError(
+                    f"Batched Ct must be (B,A,A) matching psi (B,A); "
+                    f"got Ct={tuple(coins.shape)}, psi={tuple(psi.shape)}."
+                )
         return _apply_coin_blockdiag_matrix(psi, coins, out=out)
 
+    raise TypeError(
+        "Unsupported 'coins' type. Expected (N,2,2) tensor, list/tuple of per-node (d_v,d_v), "
+        "or Ct matrix of shape (A,A) or (B,A,A)."
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -431,6 +432,10 @@ def step(
     coins: CoinsLike,
     *,
     shift: ShiftOp | None = None,
+
+    shift_phase: torch.Tensor | None = None,
+    shift_mask: torch.Tensor | None = None,
+
     out: torch.Tensor | None = None,
     check_local_norm: bool = False,
     atol: float = 1e-6,
@@ -471,8 +476,9 @@ def step(
         coins,
         shift=shift,
 
-        shift_phase=None,
-        shift_mask=None,
+        shift_phase=shift_phase,
+        shift_mask=shift_mask,
+
 
         out=out,
         check_local_norm=check_local_norm,
