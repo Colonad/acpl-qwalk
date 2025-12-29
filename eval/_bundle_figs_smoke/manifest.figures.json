@@ -1,0 +1,237 @@
+{
+  "entries": [
+    {
+      "bytes": 53329,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke/figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy/Pt__ckpt_policy.png",
+        "rel": "figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy/Pt__ckpt_policy.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke",
+      "ext": ".png",
+      "kind": "Pt",
+      "meta_hash": "1a810b6b4ed9d00de323c95f5493abbe",
+      "mtime_utc": "2025-12-29T05:37:49Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_1a810b6b",
+      "sha256": "02d357fbd58aa5451911bd5a4836686f2dcaa401da079430d12e64ae6de1953f",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/figs/Pt__ckpt_policy.png",
+        "rel": "figs/Pt__ckpt_policy.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 23767,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke/figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy/embeddings_pca2d__ckpt_policy.png",
+        "rel": "figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy/embeddings_pca2d__ckpt_policy.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke",
+      "ext": ".png",
+      "kind": "embeddings_pca2d",
+      "meta_hash": "1a810b6b4ed9d00de323c95f5493abbe",
+      "mtime_utc": "2025-12-29T05:37:46Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_1a810b6b",
+      "sha256": "ab34fbcb3bf62d76ad894444f1a5bd81d7b69c2e11a142e0de524e051d2e11a8",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy/embeddings.pca2d.png",
+        "rel": "artifacts/embeddings/ckpt_policy/embeddings.pca2d.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 63199,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy__abl_GlobalCoin",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke/figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_GlobalCoin/Pt__ckpt_policy_abl_GlobalCoin.png",
+        "rel": "figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_GlobalCoin/Pt__ckpt_policy_abl_GlobalCoin.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke",
+      "ext": ".png",
+      "kind": "Pt",
+      "meta_hash": "1a810b6b4ed9d00de323c95f5493abbe",
+      "mtime_utc": "2025-12-29T05:37:52Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_1a810b6b",
+      "sha256": "3f931894544dd06361d15b239614cc295ae3d6268e0f1c327583893d85081927",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/figs/Pt__ckpt_policy_abl_GlobalCoin.png",
+        "rel": "figs/Pt__ckpt_policy_abl_GlobalCoin.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 25334,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy__abl_GlobalCoin",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke/figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_GlobalCoin/embeddings_pca2d__ckpt_policy_abl_GlobalCoin.png",
+        "rel": "figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_GlobalCoin/embeddings_pca2d__ckpt_policy_abl_GlobalCoin.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke",
+      "ext": ".png",
+      "kind": "embeddings_pca2d",
+      "meta_hash": "1a810b6b4ed9d00de323c95f5493abbe",
+      "mtime_utc": "2025-12-29T05:37:46Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_1a810b6b",
+      "sha256": "c6579bda1d63775f2005867e01b5217fb81e497b7632aa8e7a9986fc860a86e0",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_GlobalCoin/embeddings.pca2d.png",
+        "rel": "artifacts/embeddings/ckpt_policy_abl_GlobalCoin/embeddings.pca2d.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 61544,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy__abl_NoPE",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke/figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_NoPE/Pt__ckpt_policy_abl_NoPE.png",
+        "rel": "figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_NoPE/Pt__ckpt_policy_abl_NoPE.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke",
+      "ext": ".png",
+      "kind": "Pt",
+      "meta_hash": "1a810b6b4ed9d00de323c95f5493abbe",
+      "mtime_utc": "2025-12-29T05:37:51Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_1a810b6b",
+      "sha256": "6432ea540bcac24ef24eaddf00e50464d6b8737894cbf1696c6f8fdc4bda11ae",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/figs/Pt__ckpt_policy_abl_NoPE.png",
+        "rel": "figs/Pt__ckpt_policy_abl_NoPE.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 24872,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy__abl_NoPE",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke/figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_NoPE/embeddings_pca2d__ckpt_policy_abl_NoPE.png",
+        "rel": "figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_NoPE/embeddings_pca2d__ckpt_policy_abl_NoPE.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke",
+      "ext": ".png",
+      "kind": "embeddings_pca2d",
+      "meta_hash": "1a810b6b4ed9d00de323c95f5493abbe",
+      "mtime_utc": "2025-12-29T05:37:46Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_1a810b6b",
+      "sha256": "d45bdc8905e07d330ab94e6671ca0c900a2fd1f92950e9c489126c8133ad62e2",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_NoPE/embeddings.pca2d.png",
+        "rel": "artifacts/embeddings/ckpt_policy_abl_NoPE/embeddings.pca2d.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 25329,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy__abl_NodePermute",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke/figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_NodePermute/embeddings_pca2d__ckpt_policy_abl_NodePermute.png",
+        "rel": "figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_NodePermute/embeddings_pca2d__ckpt_policy_abl_NodePermute.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke",
+      "ext": ".png",
+      "kind": "embeddings_pca2d",
+      "meta_hash": "1a810b6b4ed9d00de323c95f5493abbe",
+      "mtime_utc": "2025-12-29T05:37:47Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_1a810b6b",
+      "sha256": "2642024b6e0d9405f963dccccdb9ad5ba8422ca12d9eed1cb83486518ef90cbc",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_NodePermute/embeddings.pca2d.png",
+        "rel": "artifacts/embeddings/ckpt_policy_abl_NodePermute/embeddings.pca2d.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 59099,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy__abl_TimeFrozen",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke/figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_TimeFrozen/Pt__ckpt_policy_abl_TimeFrozen.png",
+        "rel": "figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_TimeFrozen/Pt__ckpt_policy_abl_TimeFrozen.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke",
+      "ext": ".png",
+      "kind": "Pt",
+      "meta_hash": "1a810b6b4ed9d00de323c95f5493abbe",
+      "mtime_utc": "2025-12-29T05:37:53Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_1a810b6b",
+      "sha256": "b3a580f17843c39a1e10902ed5d71d6102b30fd3ac952df2238a6377b995d0c9",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/figs/Pt__ckpt_policy_abl_TimeFrozen.png",
+        "rel": "figs/Pt__ckpt_policy_abl_TimeFrozen.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 25039,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy__abl_TimeFrozen",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke/figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_TimeFrozen/embeddings_pca2d__ckpt_policy_abl_TimeFrozen.png",
+        "rel": "figures/basic_valid/basic_valid_ckpt_model_last.pt_10_1_1a810b6b/ckpt_policy_abl_TimeFrozen/embeddings_pca2d__ckpt_policy_abl_TimeFrozen.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke",
+      "ext": ".png",
+      "kind": "embeddings_pca2d",
+      "meta_hash": "1a810b6b4ed9d00de323c95f5493abbe",
+      "mtime_utc": "2025-12-29T05:37:46Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_1a810b6b",
+      "sha256": "ae80ffe059f65d472c175c85b598075d1bc17a5d11c951a49b0a53cac8ae5fc6",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_TimeFrozen/embeddings.pca2d.png",
+        "rel": "artifacts/embeddings/ckpt_policy_abl_TimeFrozen/embeddings.pca2d.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    }
+  ],
+  "meta": {
+    "argv": [
+      "scripts/make_figures.py",
+      "--evaldirs",
+      "eval/tmp_smoke",
+      "--outdir",
+      "eval/_bundle_figs_smoke",
+      "--mode",
+      "copy",
+      "--layout",
+      "hier",
+      "--include-embeddings",
+      "--verbose"
+    ],
+    "counts": {
+      "entries": 9,
+      "errors": 0,
+      "evaldirs": 1
+    },
+    "cwd": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk",
+    "errors": [],
+    "figures_root": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke/figures",
+    "generated_at": "2025-12-29T05:43:36Z",
+    "git": {
+      "branch": "main",
+      "describe": "e09e52e-dirty",
+      "dirty": true,
+      "head": "e09e52e065eb6fc40b490aa219a441b140aa8139"
+    },
+    "include_embeddings": true,
+    "layout": "hier",
+    "mode": "copy",
+    "outdir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_bundle_figs_smoke",
+    "schema": "acpl.make_figures.v1"
+  }
+}

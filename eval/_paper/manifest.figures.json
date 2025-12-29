@@ -1,0 +1,163 @@
+{
+  "entries": [
+    {
+      "bytes": 53329,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_paper/figures/basic_valid__Pt.png",
+        "rel": "figures/basic_valid__Pt.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3",
+      "ext": ".png",
+      "kind": "Pt",
+      "meta_hash": "059eaca8ebe982a254ff114925fe89f3",
+      "mtime_utc": "2025-12-29T02:55:46Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_059eaca8",
+      "sha256": "02d357fbd58aa5451911bd5a4836686f2dcaa401da079430d12e64ae6de1953f",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3/figs/Pt__ckpt_policy.png",
+        "rel": "figs/Pt__ckpt_policy.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 40746,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_paper/figures/basic_valid__embedding_artifact.png",
+        "rel": "figures/basic_valid__embedding_artifact.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3",
+      "ext": ".png",
+      "kind": "embedding_artifact",
+      "meta_hash": "059eaca8ebe982a254ff114925fe89f3",
+      "mtime_utc": "2025-12-29T02:55:42Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_059eaca8",
+      "sha256": "714e9848baaeb3cd871de971fdd8672c1d265f4caba0da2d589290a365d6318e",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3/artifacts/embeddings/ckpt_policy/pca2_scatter.png",
+        "rel": "artifacts/embeddings/ckpt_policy/pca2_scatter.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 53329,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_paper/figures/basic_valid__mask_sensitivity.png",
+        "rel": "figures/basic_valid__mask_sensitivity.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3",
+      "ext": ".png",
+      "kind": "mask_sensitivity",
+      "meta_hash": "059eaca8ebe982a254ff114925fe89f3",
+      "mtime_utc": "2025-12-29T02:55:46Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_059eaca8",
+      "sha256": "02d357fbd58aa5451911bd5a4836686f2dcaa401da079430d12e64ae6de1953f",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3/figs/Pt__ckpt_policy.png",
+        "rel": "figs/Pt__ckpt_policy.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 63199,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_paper/figures/basic_valid__mask_sensitivity__3f931894__2.png",
+        "rel": "figures/basic_valid__mask_sensitivity__3f931894__2.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3",
+      "ext": ".png",
+      "kind": "mask_sensitivity",
+      "meta_hash": "059eaca8ebe982a254ff114925fe89f3",
+      "mtime_utc": "2025-12-29T02:55:48Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_059eaca8",
+      "sha256": "3f931894544dd06361d15b239614cc295ae3d6268e0f1c327583893d85081927",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3/figs/Pt__ckpt_policy_abl_GlobalCoin.png",
+        "rel": "figs/Pt__ckpt_policy_abl_GlobalCoin.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 61544,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_paper/figures/basic_valid__mask_sensitivity__6432ea54__2.png",
+        "rel": "figures/basic_valid__mask_sensitivity__6432ea54__2.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3",
+      "ext": ".png",
+      "kind": "mask_sensitivity",
+      "meta_hash": "059eaca8ebe982a254ff114925fe89f3",
+      "mtime_utc": "2025-12-29T02:55:47Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_059eaca8",
+      "sha256": "6432ea540bcac24ef24eaddf00e50464d6b8737894cbf1696c6f8fdc4bda11ae",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3/figs/Pt__ckpt_policy_abl_NoPE.png",
+        "rel": "figs/Pt__ckpt_policy_abl_NoPE.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    },
+    {
+      "bytes": 59099,
+      "checkpoint": "runs/testing/model_last.pt",
+      "cond": "ckpt_policy",
+      "dest": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_paper/figures/basic_valid__mask_sensitivity__b3a580f1__2.png",
+        "rel": "figures/basic_valid__mask_sensitivity__b3a580f1__2.png"
+      },
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3",
+      "ext": ".png",
+      "kind": "mask_sensitivity",
+      "meta_hash": "059eaca8ebe982a254ff114925fe89f3",
+      "mtime_utc": "2025-12-29T02:55:50Z",
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_059eaca8",
+      "sha256": "b3a580f17843c39a1e10902ed5d71d6102b30fd3ac952df2238a6377b995d0c9",
+      "source": {
+        "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp3/figs/Pt__ckpt_policy_abl_TimeFrozen.png",
+        "rel": "figs/Pt__ckpt_policy_abl_TimeFrozen.png"
+      },
+      "suite": "basic_valid",
+      "tags": []
+    }
+  ],
+  "meta": {
+    "argv": [
+      "scripts/make_figures.py",
+      "--evaldirs",
+      "eval/tmp3",
+      "--outdir",
+      "eval/_paper",
+      "--paper",
+      "--include-embeddings"
+    ],
+    "counts": {
+      "entries": 6,
+      "errors": 0,
+      "evaldirs": 1
+    },
+    "cwd": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk",
+    "errors": [],
+    "figures_root": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_paper/figures",
+    "generated_at": "2025-12-29T22:22:18Z",
+    "include_embeddings": true,
+    "mode": "copy",
+    "outdir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_paper",
+    "paper_cond": null,
+    "paper_include_ablations": false,
+    "paper_prefix": null,
+    "schema": "acpl.make_figures.paper.v1"
+  }
+}

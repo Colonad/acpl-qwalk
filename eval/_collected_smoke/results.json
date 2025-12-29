@@ -1,0 +1,839 @@
+{
+  "errors": [],
+  "generated_at": "2025-12-29T05:41:57Z",
+  "git": {
+    "branch": "main",
+    "describe": "e09e52e-dirty",
+    "dirty": true,
+    "head": "e09e52e065eb6fc40b490aa219a441b140aa8139"
+  },
+  "metric_columns": {
+    "mix.H": "mix_H",
+    "mix.hell": "mix_hell",
+    "mix.js": "mix_js",
+    "mix.tv": "mix_tv",
+    "target.success": "target_success",
+    "target.tv_vsU": "target_tv_vsU"
+  },
+  "metrics": [
+    "mix.tv",
+    "target.tv_vsU",
+    "target.success",
+    "mix.H",
+    "mix.hell",
+    "mix.js"
+  ],
+  "outdir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/_collected_smoke",
+  "root": null,
+  "runs": [
+    {
+      "ablations": [
+        "NoPE",
+        "GlobalCoin",
+        "TimeFrozen",
+        "NodePermute"
+      ],
+      "baseline_kind": null,
+      "checkpoint": "runs/testing/model_last.pt",
+      "conditions": {
+        "ckpt_policy": {
+          "ablation_meta": {},
+          "baseline_kind": null,
+          "cond": "ckpt_policy",
+          "kind": "base",
+          "metrics": {
+            "mix.H": {
+              "hi": 1.867385983467102,
+              "lo": 1.867385983467102,
+              "mean": 1.867385983467102,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.hell": {
+              "hi": 0.7763198018074036,
+              "lo": 0.7763198018074036,
+              "mean": 0.7763198018074036,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.js": {
+              "hi": 0.47693905234336853,
+              "lo": 0.47693905234336853,
+              "mean": 0.47693905234336853,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.kl_pu": {
+              "hi": 2.291511058807373,
+              "lo": 2.291511058807373,
+              "mean": 2.291511058807373,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.l2": {
+              "hi": 0.4391302764415741,
+              "lo": 0.4391302764415741,
+              "mean": 0.4391302764415741,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.tv": {
+              "hi": 0.8375473022460938,
+              "lo": 0.8375473022460938,
+              "mean": 0.8375473022460938,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.H": {
+              "hi": 1.867385983467102,
+              "lo": 1.867385983467102,
+              "mean": 1.867385983467102,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.KLpU": {
+              "hi": 2.291511058807373,
+              "lo": 2.291511058807373,
+              "mean": 2.291511058807373,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.cvar_neglogOmega": {
+              "hi": 18.42068099975586,
+              "lo": 18.42068099975586,
+              "mean": 18.42068099975586,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.gini": {
+              "hi": 0.9235054850578308,
+              "lo": 0.9235054850578308,
+              "mean": 0.9235054850578308,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.js_vsU": {
+              "hi": 0.47693905234336853,
+              "lo": 0.47693905234336853,
+              "mean": 0.47693905234336853,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.maxp": {
+              "hi": 0.31588080525398254,
+              "lo": 0.31588080525398254,
+              "mean": 0.31588080525398254,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.success": {
+              "hi": 0.0,
+              "lo": 0.0,
+              "mean": 0.0,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.tv_vsU": {
+              "hi": 0.8375473022460938,
+              "lo": 0.8375473022460938,
+              "mean": 0.8375473022460938,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            }
+          },
+          "paths": {
+            "embeddings/embeddings.meta.json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy/embeddings.meta.json",
+            "embeddings/embeddings.npy": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy/embeddings.npy",
+            "embeddings/embeddings_mean.npy": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy/embeddings_mean.npy",
+            "embeddings/embeddings_stats.json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy/embeddings_stats.json",
+            "fig_pt": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/figs/Pt__ckpt_policy.png"
+          },
+          "policy": "ckpt"
+        },
+        "ckpt_policy__abl_GlobalCoin": {
+          "ablation_meta": {
+            "ablation": "GlobalCoin",
+            "ablation_cfg": {
+              "device": "cpu",
+              "global_coin": true,
+              "node_permute": false,
+              "nope": false,
+              "nope_allow_auto": true,
+              "nope_keep_last_indicator": false,
+              "pe_dim": null,
+              "perm_seed": 0,
+              "strict_shapes": true,
+              "time_frozen": false
+            },
+            "pe_dim": null,
+            "perm_seed": 0
+          },
+          "baseline_kind": null,
+          "cond": "ckpt_policy__abl_GlobalCoin",
+          "kind": "ablation",
+          "metrics": {
+            "mix.H": {
+              "hi": 2.448192596435547,
+              "lo": 2.448192596435547,
+              "mean": 2.448192596435547,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.hell": {
+              "hi": 0.6902519464492798,
+              "lo": 0.6902519464492798,
+              "mean": 0.6902519464492798,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.js": {
+              "hi": 0.37638187408447266,
+              "lo": 0.37638187408447266,
+              "mean": 0.37638187408447266,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.kl_pu": {
+              "hi": 1.7107036113739014,
+              "lo": 1.7107036113739014,
+              "mean": 1.7107036113739014,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.l2": {
+              "hi": 0.3535798490047455,
+              "lo": 0.3535798490047455,
+              "mean": 0.3535798490047455,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.tv": {
+              "hi": 0.7130449414253235,
+              "lo": 0.7130449414253235,
+              "mean": 0.7130449414253235,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.H": {
+              "hi": 2.448192596435547,
+              "lo": 2.448192596435547,
+              "mean": 2.448192596435547,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.KLpU": {
+              "hi": 1.7107036113739014,
+              "lo": 1.7107036113739014,
+              "mean": 1.7107036113739014,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.cvar_neglogOmega": {
+              "hi": 18.42068099975586,
+              "lo": 18.42068099975586,
+              "mean": 18.42068099975586,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.gini": {
+              "hi": 0.8586774468421936,
+              "lo": 0.8586774468421936,
+              "mean": 0.8586774468421936,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.js_vsU": {
+              "hi": 0.37638187408447266,
+              "lo": 0.37638187408447266,
+              "mean": 0.37638187408447266,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.maxp": {
+              "hi": 0.2857063114643097,
+              "lo": 0.2857063114643097,
+              "mean": 0.2857063114643097,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.success": {
+              "hi": 0.0,
+              "lo": 0.0,
+              "mean": 0.0,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.tv_vsU": {
+              "hi": 0.7130449414253235,
+              "lo": 0.7130449414253235,
+              "mean": 0.7130449414253235,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            }
+          },
+          "paths": {
+            "embeddings/embeddings.meta.json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_GlobalCoin/embeddings.meta.json",
+            "embeddings/embeddings.npy": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_GlobalCoin/embeddings.npy",
+            "embeddings/embeddings_mean.npy": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_GlobalCoin/embeddings_mean.npy",
+            "embeddings/embeddings_stats.json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_GlobalCoin/embeddings_stats.json",
+            "fig_pt": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/figs/Pt__ckpt_policy_abl_GlobalCoin.png"
+          },
+          "policy": "ckpt"
+        },
+        "ckpt_policy__abl_NoPE": {
+          "ablation_meta": {
+            "ablation": "NoPE",
+            "ablation_cfg": {
+              "device": "cpu",
+              "global_coin": false,
+              "node_permute": false,
+              "nope": true,
+              "nope_allow_auto": true,
+              "nope_keep_last_indicator": false,
+              "pe_dim": null,
+              "perm_seed": 0,
+              "strict_shapes": true,
+              "time_frozen": false
+            },
+            "pe_dim": null,
+            "perm_seed": 0
+          },
+          "baseline_kind": null,
+          "cond": "ckpt_policy__abl_NoPE",
+          "kind": "ablation",
+          "metrics": {
+            "mix.H": {
+              "hi": 1.8463232517242432,
+              "lo": 1.8463232517242432,
+              "mean": 1.8463232517242432,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.hell": {
+              "hi": 0.7925617694854736,
+              "lo": 0.7925617694854736,
+              "mean": 0.7925617694854736,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.js": {
+              "hi": 0.4847533404827118,
+              "lo": 0.4847533404827118,
+              "mean": 0.4847533404827118,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.kl_pu": {
+              "hi": 2.3125789165496826,
+              "lo": 2.3125789165496826,
+              "mean": 2.3125789165496826,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.l2": {
+              "hi": 0.45682379603385925,
+              "lo": 0.45682379603385925,
+              "mean": 0.45682379603385925,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.tv": {
+              "hi": 0.8335531949996948,
+              "lo": 0.8335531949996948,
+              "mean": 0.8335531949996948,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.H": {
+              "hi": 1.8463232517242432,
+              "lo": 1.8463232517242432,
+              "mean": 1.8463232517242432,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.KLpU": {
+              "hi": 2.3125789165496826,
+              "lo": 2.3125789165496826,
+              "mean": 2.3125789165496826,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.cvar_neglogOmega": {
+              "hi": 18.42068099975586,
+              "lo": 18.42068099975586,
+              "mean": 18.42068099975586,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.gini": {
+              "hi": 0.9253145456314087,
+              "lo": 0.9253145456314087,
+              "mean": 0.9253145456314087,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.js_vsU": {
+              "hi": 0.4847533404827118,
+              "lo": 0.4847533404827118,
+              "mean": 0.4847533404827118,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.maxp": {
+              "hi": 0.39477357268333435,
+              "lo": 0.39477357268333435,
+              "mean": 0.39477357268333435,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.success": {
+              "hi": 0.0,
+              "lo": 0.0,
+              "mean": 0.0,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.tv_vsU": {
+              "hi": 0.8335531949996948,
+              "lo": 0.8335531949996948,
+              "mean": 0.8335531949996948,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            }
+          },
+          "paths": {
+            "embeddings/embeddings.meta.json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_NoPE/embeddings.meta.json",
+            "embeddings/embeddings.npy": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_NoPE/embeddings.npy",
+            "embeddings/embeddings_mean.npy": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_NoPE/embeddings_mean.npy",
+            "embeddings/embeddings_stats.json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_NoPE/embeddings_stats.json",
+            "fig_pt": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/figs/Pt__ckpt_policy_abl_NoPE.png"
+          },
+          "policy": "ckpt"
+        },
+        "ckpt_policy__abl_NodePermute": {
+          "ablation_meta": {
+            "ablation": "NodePermute",
+            "ablation_cfg": {
+              "device": "cpu",
+              "global_coin": false,
+              "node_permute": true,
+              "nope": false,
+              "nope_allow_auto": true,
+              "nope_keep_last_indicator": false,
+              "pe_dim": null,
+              "perm_seed": 0,
+              "strict_shapes": true,
+              "time_frozen": false
+            },
+            "pe_dim": null,
+            "perm_seed": 0
+          },
+          "baseline_kind": null,
+          "cond": "ckpt_policy__abl_NodePermute",
+          "kind": "ablation",
+          "metrics": {
+            "mix.H": {
+              "hi": 1.93927001953125,
+              "lo": 1.93927001953125,
+              "mean": 1.93927001953125,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.hell": {
+              "hi": 0.7859556674957275,
+              "lo": 0.7859556674957275,
+              "mean": 0.7859556674957275,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.js": {
+              "hi": 0.4758949279785156,
+              "lo": 0.4758949279785156,
+              "mean": 0.4758949279785156,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.kl_pu": {
+              "hi": 2.219630718231201,
+              "lo": 2.219630718231201,
+              "mean": 2.219630718231201,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.l2": {
+              "hi": 0.4363527297973633,
+              "lo": 0.4363527297973633,
+              "mean": 0.4363527297973633,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.tv": {
+              "hi": 0.8296528458595276,
+              "lo": 0.8296528458595276,
+              "mean": 0.8296528458595276,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.H": {
+              "hi": 1.93927001953125,
+              "lo": 1.93927001953125,
+              "mean": 1.93927001953125,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.KLpU": {
+              "hi": 2.219630718231201,
+              "lo": 2.219630718231201,
+              "mean": 2.219630718231201,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.cvar_neglogOmega": {
+              "hi": 2.689516305923462,
+              "lo": 2.689516305923462,
+              "mean": 2.689516305923462,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.gini": {
+              "hi": 0.9146378636360168,
+              "lo": 0.9146378636360168,
+              "mean": 0.9146378636360168,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.js_vsU": {
+              "hi": 0.4758949279785156,
+              "lo": 0.4758949279785156,
+              "mean": 0.4758949279785156,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.maxp": {
+              "hi": 0.3637799620628357,
+              "lo": 0.3637799620628357,
+              "mean": 0.3637799620628357,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.success": {
+              "hi": 0.06791378557682037,
+              "lo": 0.06791378557682037,
+              "mean": 0.06791378557682037,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.tv_vsU": {
+              "hi": 0.8296528458595276,
+              "lo": 0.8296528458595276,
+              "mean": 0.8296528458595276,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            }
+          },
+          "paths": {
+            "embeddings/embeddings.meta.json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_NodePermute/embeddings.meta.json",
+            "embeddings/embeddings.npy": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_NodePermute/embeddings.npy",
+            "embeddings/embeddings_mean.npy": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_NodePermute/embeddings_mean.npy",
+            "embeddings/embeddings_stats.json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_NodePermute/embeddings_stats.json"
+          },
+          "policy": "ckpt"
+        },
+        "ckpt_policy__abl_TimeFrozen": {
+          "ablation_meta": {
+            "ablation": "TimeFrozen",
+            "ablation_cfg": {
+              "device": "cpu",
+              "global_coin": false,
+              "node_permute": false,
+              "nope": false,
+              "nope_allow_auto": true,
+              "nope_keep_last_indicator": false,
+              "pe_dim": null,
+              "perm_seed": 0,
+              "strict_shapes": true,
+              "time_frozen": true
+            },
+            "pe_dim": null,
+            "perm_seed": 0
+          },
+          "baseline_kind": null,
+          "cond": "ckpt_policy__abl_TimeFrozen",
+          "kind": "ablation",
+          "metrics": {
+            "mix.H": {
+              "hi": 1.6177523136138916,
+              "lo": 1.6177523136138916,
+              "mean": 1.6177523136138916,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.hell": {
+              "hi": 0.8058537244796753,
+              "lo": 0.8058537244796753,
+              "mean": 0.8058537244796753,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.js": {
+              "hi": 0.5078890919685364,
+              "lo": 0.5078890919685364,
+              "mean": 0.5078890919685364,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.kl_pu": {
+              "hi": 2.5411458015441895,
+              "lo": 2.5411458015441895,
+              "mean": 2.5411458015441895,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.l2": {
+              "hi": 0.5018445253372192,
+              "lo": 0.5018445253372192,
+              "mean": 0.5018445253372192,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "mix.tv": {
+              "hi": 0.8665448427200317,
+              "lo": 0.8665448427200317,
+              "mean": 0.8665448427200317,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.H": {
+              "hi": 1.6177523136138916,
+              "lo": 1.6177523136138916,
+              "mean": 1.6177523136138916,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.KLpU": {
+              "hi": 2.5411458015441895,
+              "lo": 2.5411458015441895,
+              "mean": 2.5411458015441895,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.cvar_neglogOmega": {
+              "hi": 18.42068099975586,
+              "lo": 18.42068099975586,
+              "mean": 18.42068099975586,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.gini": {
+              "hi": 0.9397301077842712,
+              "lo": 0.9397301077842712,
+              "mean": 0.9397301077842712,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.js_vsU": {
+              "hi": 0.5078890919685364,
+              "lo": 0.5078890919685364,
+              "mean": 0.5078890919685364,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.maxp": {
+              "hi": 0.37225520610809326,
+              "lo": 0.37225520610809326,
+              "mean": 0.37225520610809326,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.success": {
+              "hi": 0.0,
+              "lo": 0.0,
+              "mean": 0.0,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            },
+            "target.tv_vsU": {
+              "hi": 0.8665448427200317,
+              "lo": 0.8665448427200317,
+              "mean": 0.8665448427200317,
+              "n": 10,
+              "source": "ci",
+              "stderr": 0.0
+            }
+          },
+          "paths": {
+            "embeddings/embeddings.meta.json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_TimeFrozen/embeddings.meta.json",
+            "embeddings/embeddings.npy": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_TimeFrozen/embeddings.npy",
+            "embeddings/embeddings_mean.npy": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_TimeFrozen/embeddings_mean.npy",
+            "embeddings/embeddings_stats.json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/artifacts/embeddings/ckpt_policy_abl_TimeFrozen/embeddings_stats.json",
+            "fig_pt": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke/figs/Pt__ckpt_policy_abl_TimeFrozen.png"
+          },
+          "policy": "ckpt"
+        }
+      },
+      "device": "cpu",
+      "episodes": 10,
+      "evaldir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke",
+      "meta_hash": "1a810b6b4ed9d00de323c95f5493abbe",
+      "model_config_hash": "be715f8c53e826475546868921dca704",
+      "policy": "ckpt",
+      "raw_meta": {
+        "ablations": [
+          "NoPE",
+          "GlobalCoin",
+          "TimeFrozen",
+          "NodePermute"
+        ],
+        "ablations_canonical": [
+          "NoPE",
+          "GlobalCoin",
+          "TimeFrozen",
+          "NodePermute"
+        ],
+        "baseline_coins_kwargs": null,
+        "baseline_kind": null,
+        "baseline_policy_kwargs": null,
+        "checkpoint": "runs/testing/model_last.pt",
+        "ci_convention": {
+          "note": "For thesis claims, prefer seeds>=3 and cite seed-level CI.",
+          "pooled_episode_ci": {
+            "meaning": "CI over all episodes pooled across seeds (bootstrap), written to eval_ci.json"
+          },
+          "seed_level_ci": {
+            "meaning": "CI over per-seed episode means (replicates=seeds), written to eval_ci_seed.json when seeds>=2"
+          }
+        },
+        "device": "cpu",
+        "disorder": {
+          "enabled": false
+        },
+        "disorder_seed_base": 0,
+        "episodes": 10,
+        "git": {
+          "commit": "e09e52e065eb6fc40b490aa219a441b140aa8139",
+          "dirty": true,
+          "root": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk"
+        },
+        "model_config": {
+          "controller": {
+            "bidirectional": true,
+            "dropout": 0.0,
+            "hidden": 64,
+            "kind": "gru",
+            "layernorm": true,
+            "layers": 1
+          },
+          "gnn": {
+            "activation": "gelu",
+            "dropedge": 0.0,
+            "dropout": 0.0,
+            "hidden": 64,
+            "kind": "gcn",
+            "layernorm": true,
+            "out": 64,
+            "residual": true
+          },
+          "head": {
+            "dropout": 0.0,
+            "hidden": 0,
+            "layernorm": true,
+            "out_scale": 1.0
+          },
+          "time_pe": {
+            "dim": 32,
+            "learned_scale": true
+          }
+        },
+        "policy": "ckpt",
+        "robust_sweep_request": {
+          "bootstrap_samples_per_trial": 200,
+          "enabled": false,
+          "include_ablations": false,
+          "kinds_override": [],
+          "max_plot_metrics": 6,
+          "sigma_override": null,
+          "trials_override": null
+        },
+        "seeds": [
+          1
+        ],
+        "suite": "basic_valid"
+      },
+      "run_id": "basic_valid_ckpt_model_last.pt_10_1_1a810b6b",
+      "seeds": [
+        1
+      ],
+      "suite": "basic_valid"
+    }
+  ],
+  "schema": "acpl.collect_results.v1"
+}

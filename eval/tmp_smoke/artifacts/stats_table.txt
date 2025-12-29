@@ -1,0 +1,111 @@
+EVAL STATS (first-class artifacts)
+
+UTC: 2025-12-29T05:37:45Z
+Python: 3.11.9 (main, Apr 19 2024, 16:48:06) [GCC 11.2.0]
+Torch: 2.4.1+cu121 CUDA_avail=False
+
+[ckpt_policy]
+  Metrics:
+    - mix.tv: 0.8375473022460938
+    - mix.js: 0.47693905234336853
+    - mix.hell: 0.7763198018074036
+    - mix.l2: 0.4391302764415741
+    - mix.H: 1.867385983467102
+    - mix.kl_pu: 2.291511058807373
+    - target.success: 0.0
+    - target.maxp: 0.31588080525398254
+    - target.gini: 0.9235054850578308
+    - target.tv_vsU: 0.8375473022460938
+    - target.js_vsU: 0.47693905234336853
+    - target.H: 1.867385983467102
+    - target.KLpU: 2.291511058807373
+    - target.cvar_neglogOmega: 18.42068099975586
+  Embeddings:
+    - ci_mode: episodes  K=10  N=64  D=64
+    - mean_norm: 7.99996  std_norm: 4.69695e-07
+    - finite_frac: 1
+
+[ckpt_policy__abl_NoPE]
+  Metrics:
+    - mix.tv: 0.8335531949996948
+    - mix.js: 0.4847533404827118
+    - mix.hell: 0.7925617694854736
+    - mix.l2: 0.45682379603385925
+    - mix.H: 1.8463232517242432
+    - mix.kl_pu: 2.3125789165496826
+    - target.success: 0.0
+    - target.maxp: 0.39477357268333435
+    - target.gini: 0.9253145456314087
+    - target.tv_vsU: 0.8335531949996948
+    - target.js_vsU: 0.4847533404827118
+    - target.H: 1.8463232517242432
+    - target.KLpU: 2.3125789165496826
+    - target.cvar_neglogOmega: 18.42068099975586
+  Embeddings:
+    - ci_mode: episodes  K=10  N=64  D=64
+    - mean_norm: 7.99996  std_norm: 4.69695e-07
+    - finite_frac: 1
+
+[ckpt_policy__abl_GlobalCoin]
+  Metrics:
+    - mix.tv: 0.7130449414253235
+    - mix.js: 0.37638187408447266
+    - mix.hell: 0.6902519464492798
+    - mix.l2: 0.3535798490047455
+    - mix.H: 2.448192596435547
+    - mix.kl_pu: 1.7107036113739014
+    - target.success: 0.0
+    - target.maxp: 0.2857063114643097
+    - target.gini: 0.8586774468421936
+    - target.tv_vsU: 0.7130449414253235
+    - target.js_vsU: 0.37638187408447266
+    - target.H: 2.448192596435547
+    - target.KLpU: 1.7107036113739014
+    - target.cvar_neglogOmega: 18.42068099975586
+  Embeddings:
+    - ci_mode: episodes  K=10  N=64  D=64
+    - mean_norm: 7.99996  std_norm: 4.69695e-07
+    - finite_frac: 1
+
+[ckpt_policy__abl_TimeFrozen]
+  Metrics:
+    - mix.tv: 0.8665448427200317
+    - mix.js: 0.5078890919685364
+    - mix.hell: 0.8058537244796753
+    - mix.l2: 0.5018445253372192
+    - mix.H: 1.6177523136138916
+    - mix.kl_pu: 2.5411458015441895
+    - target.success: 0.0
+    - target.maxp: 0.37225520610809326
+    - target.gini: 0.9397301077842712
+    - target.tv_vsU: 0.8665448427200317
+    - target.js_vsU: 0.5078890919685364
+    - target.H: 1.6177523136138916
+    - target.KLpU: 2.5411458015441895
+    - target.cvar_neglogOmega: 18.42068099975586
+  Embeddings:
+    - ci_mode: episodes  K=10  N=64  D=64
+    - mean_norm: 7.99996  std_norm: 4.69695e-07
+    - finite_frac: 1
+
+[ckpt_policy__abl_NodePermute]
+  Metrics:
+    - mix.tv: 0.8296528458595276
+    - mix.js: 0.4758949279785156
+    - mix.hell: 0.7859556674957275
+    - mix.l2: 0.4363527297973633
+    - mix.H: 1.93927001953125
+    - mix.kl_pu: 2.219630718231201
+    - target.success: 0.06791378557682037
+    - target.maxp: 0.3637799620628357
+    - target.gini: 0.9146378636360168
+    - target.tv_vsU: 0.8296528458595276
+    - target.js_vsU: 0.4758949279785156
+    - target.H: 1.93927001953125
+    - target.KLpU: 2.219630718231201
+    - target.cvar_neglogOmega: 2.689516305923462
+  Embeddings:
+    - ci_mode: episodes  K=10  N=64  D=64
+    - mean_norm: 7.99996  std_norm: 4.69695e-07
+    - finite_frac: 1
+

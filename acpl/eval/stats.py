@@ -6,7 +6,6 @@ import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Literal, Mapping, Sequence
-from acpl.eval.stats import explained_variance
 
 
 
@@ -42,6 +41,10 @@ __all__ = [
     "covariance_matrix",
     "explained_variance",
     "embedding_basic_stats",
+    "postprocess_stats",
+    "finalize_stats",
+    "augment_stats",
+
 ]
 
 
@@ -746,14 +749,22 @@ def explained_variance(
 
 def embedding_basic_stats(emb: torch.Tensor, *, cfg: StatsEvalConfig | None = None) -> dict[str, Any]:
     """
-    "Overall statistics" for node embeddings.
+    "Overall statistics" for node embeddings, research-grade + finite-safe.
 
     Returns:
       - shape
-      - global scalar mean/var/std/min/max over all entries
-      - per-dimension mean/var/std/min/max
-      - per-node norm summary
-      - covariance spectrum summary (variance/eigenvalues)
+      - global scalar mean/var/std/min/max over all entries (finite-masked)
+      - per-dimension mean/var/std/min/max (finite-masked, per-dim denominators)
+      - per-node norm summary (computed on finite-masked embeddings)
+      - covariance spectrum summary (variance/eigenvalues) on finite-masked embeddings
+
+    Notes
+    -----
+    - If embeddings contain NaN/Inf, we DO NOT silently pretend everything is fine:
+        * we report nonfinite counts + fractions
+        * we compute stats on the finite subset only
+        * we use a zero-filled masked copy for norms/spectrum so those remain defined
+    - This makes evaluation artifacts defendable and reproducible.
     """
     if cfg is None:
         cfg = StatsEvalConfig()
@@ -767,30 +778,282 @@ def embedding_basic_stats(emb: torch.Tensor, *, cfg: StatsEvalConfig | None = No
     X = X.detach()
     if X.is_cuda:
         X = X.cpu()
-    X = X.to(cfg.float_dtype)
+
+    # Use float64 internally for stable masked moments, but keep cfg.float_dtype for outputs if desired.
+    # (The returned numbers are Python floats/lists anyway.)
+    X = X.to(torch.float64)
 
     N, D = X.shape
 
-    # per-node norms
-    norms = torch.linalg.norm(X, dim=1)
+    finite = torch.isfinite(X)  # (N,D) bool
+    finite_n = int(finite.sum().item())
+    total_n = int(X.numel())
+    nonfinite_n = int(total_n - finite_n)
+    finite_fraction = float(finite_n / max(1, total_n))
+
+    # Zero-filled masked copy (safe for norms/spectrum; moments computed with explicit denominators below).
+    Xf = torch.where(finite, X, torch.zeros_like(X))
+
+    # ----------------------------
+    # Global moments on finite set
+    # ----------------------------
+    denom_g = float(max(1, finite_n))
+    sum_g = float(Xf.sum().item())
+    sumsq_g = float((Xf * Xf).sum().item())
+
+    mean_g = sum_g / denom_g if finite_n > 0 else float("nan")
+    ex2_g = sumsq_g / denom_g if finite_n > 0 else float("nan")
+    var_g = max(0.0, ex2_g - mean_g * mean_g) if finite_n > 0 else float("nan")
+    std_g = math.sqrt(var_g) if finite_n > 0 else float("nan")
+
+    # Finite-only min/max
+    if finite_n > 0:
+        x_min = float(torch.where(finite, X, torch.full_like(X, float("inf"))).min().item())
+        x_max = float(torch.where(finite, X, torch.full_like(X, float("-inf"))).max().item())
+        abs_mean = float(Xf.abs().sum().item() / denom_g)
+        abs_max = float(Xf.abs().max().item())
+    else:
+        x_min = float("nan")
+        x_max = float("nan")
+        abs_mean = float("nan")
+        abs_max = float("nan")
+
+    # -----------------------------------
+    # Per-dimension finite-masked moments
+    # -----------------------------------
+    finite_d = finite.sum(dim=0)  # (D,)
+    denom_d = finite_d.to(torch.float64).clamp_min(1.0)  # avoid divide-by-zero
+    sum_d = Xf.sum(dim=0)  # (D,)
+    sumsq_d = (Xf * Xf).sum(dim=0)  # (D,)
+
+    mean_d = sum_d / denom_d
+    ex2_d = sumsq_d / denom_d
+    var_d = (ex2_d - mean_d * mean_d).clamp_min(0.0)
+    std_d = torch.sqrt(var_d)
+
+    # Mark dims with zero finite entries as NaN
+    zero_d = (finite_d == 0)
+    if bool(zero_d.any().item()):
+        nanv = torch.full_like(mean_d, float("nan"))
+        mean_d = torch.where(zero_d, nanv, mean_d)
+        var_d = torch.where(zero_d, nanv, var_d)
+        std_d = torch.where(zero_d, nanv, std_d)
+
+    # Per-dimension min/max on finite set
+    if finite_n > 0:
+        min_d = torch.where(finite, X, torch.full_like(X, float("inf"))).amin(dim=0)
+        max_d = torch.where(finite, X, torch.full_like(X, float("-inf"))).amax(dim=0)
+        # Dims with no finite entries -> NaN
+        if bool(zero_d.any().item()):
+            min_d = torch.where(zero_d, torch.full_like(min_d, float("nan")), min_d)
+            max_d = torch.where(zero_d, torch.full_like(max_d, float("nan")), max_d)
+    else:
+        min_d = torch.full((D,), float("nan"), dtype=torch.float64)
+        max_d = torch.full((D,), float("nan"), dtype=torch.float64)
+
+    # -----------------------------------
+    # Node-level diagnostics + norms
+    # -----------------------------------
+    row_all_finite = finite.all(dim=1)  # (N,)
+    finite_rows_n = int(row_all_finite.sum().item())
+    nonfinite_rows_n = int(N - finite_rows_n)
+    finite_rows_fraction = float(finite_rows_n / max(1, N))
+
+    # Norms computed on masked embeddings; report how many rows were non-finite.
+    norms = torch.linalg.norm(Xf, dim=1)  # (N,)
+
+    # Cast back to cfg.float_dtype for spectrum/norm summary stability if you prefer
+    Xf_out = Xf.to(cfg.float_dtype)
 
     stats: dict[str, Any] = {
         "shape": [int(N), int(D)],
         "global": {
-            "mean": float(X.mean().item()),
-            "var": float(X.var(unbiased=False).item()),
-            "std": float(X.std(unbiased=False).item()),
-            "min": float(X.min().item()),
-            "max": float(X.max().item()),
+            # original keys (but now finite-masked)
+            "mean": float(mean_g),
+            "var": float(var_g),
+            "std": float(std_g),
+            "min": float(x_min),
+            "max": float(x_max),
+            # research-grade additions
+            "abs_mean": float(abs_mean),
+            "abs_max": float(abs_max),
+            "finite_fraction": float(finite_fraction),
+            "nonfinite_n": int(nonfinite_n),
+            "finite_n": int(finite_n),
+            "total_n": int(total_n),
         },
         "per_dim": {
-            "mean": X.mean(dim=0).tolist(),
-            "var": X.var(dim=0, unbiased=False).tolist(),
-            "std": X.std(dim=0, unbiased=False).tolist(),
-            "min": X.amin(dim=0).tolist(),
-            "max": X.amax(dim=0).tolist(),
+            # original keys
+            "mean": mean_d.to(torch.float32).tolist(),
+            "var": var_d.to(torch.float32).tolist(),
+            "std": std_d.to(torch.float32).tolist(),
+            "min": min_d.to(torch.float32).tolist(),
+            "max": max_d.to(torch.float32).tolist(),
+            # additions (defendability)
+            "finite_n": finite_d.to(torch.int64).tolist(),
+            "nonfinite_n": (N - finite_d).to(torch.int64).tolist(),
+            "finite_fraction": (finite_d.to(torch.float64) / float(max(1, N))).tolist(),
         },
-        "norms": summarize_samples(norms, quantiles=cfg.quantiles).to_dict(),
-        "spectrum": explained_variance(X, center=True, eps=cfg.eps),
+        "nodes": {
+            "finite_rows_n": int(finite_rows_n),
+            "nonfinite_rows_n": int(nonfinite_rows_n),
+            "finite_rows_fraction": float(finite_rows_fraction),
+        },
+        "norms": {
+            **summarize_samples(norms, quantiles=cfg.quantiles).to_dict(),
+            # additions (so norms aren’t misread if many rows had NaN/Inf originally)
+            "nonfinite_rows_n": int(nonfinite_rows_n),
+            "finite_rows_n": int(finite_rows_n),
+        },
+        # Spectrum computed on the finite-masked copy (zero-filled for non-finite)
+        "spectrum": explained_variance(Xf_out, center=True, eps=cfg.eps),
     }
     return stats
+
+
+
+
+# =============================================================================
+# Stats post-processing + merging helpers (first-class artifacts)
+# =============================================================================
+
+def postprocess_stats(
+    obj: Any,
+    *,
+    nonfinite: Literal["keep", "null", "string", "raise"] = "keep",
+    _depth: int = 0,
+    _max_depth: int = 64,
+) -> Any:
+    """
+    Recursively convert stats objects into JSON-friendly Python types.
+
+    Handles:
+      - torch.Tensor -> list / scalar
+      - numpy arrays/scalars -> list / scalar
+      - Path -> str
+      - dataclasses -> dict
+      - NaN/Inf policy via `nonfinite`
+
+    nonfinite policies:
+      - "keep":   keep float('nan')/inf as-is (Python json allows by default, but non-standard JSON)
+      - "null":   convert NaN/Inf to None
+      - "string": convert NaN/Inf to "nan"/"inf"/"-inf"
+      - "raise":  raise ValueError if any NaN/Inf encountered
+    """
+    if _depth > _max_depth:
+        raise RecursionError("postprocess_stats exceeded maximum recursion depth.")
+
+    # dataclass -> dict
+    try:
+        # don't import dataclasses at top; keep local to avoid overhead
+        import dataclasses
+        if dataclasses.is_dataclass(obj):
+            obj = dataclasses.asdict(obj)
+    except Exception:
+        pass
+
+    # Path -> str
+    if isinstance(obj, Path):
+        return str(obj)
+
+    # torch.Tensor -> python
+    if isinstance(obj, torch.Tensor):
+        t = obj.detach()
+        if t.is_complex():
+            t = t.real
+        if t.is_cuda:
+            t = t.cpu()
+        if t.numel() == 1:
+            return postprocess_stats(t.item(), nonfinite=nonfinite, _depth=_depth + 1)
+        return postprocess_stats(t.tolist(), nonfinite=nonfinite, _depth=_depth + 1)
+
+    # numpy -> python
+    if isinstance(obj, np.ndarray):
+        return postprocess_stats(obj.tolist(), nonfinite=nonfinite, _depth=_depth + 1)
+    if isinstance(obj, np.generic):
+        return postprocess_stats(obj.item(), nonfinite=nonfinite, _depth=_depth + 1)
+
+    # basic scalars
+    if isinstance(obj, (bool, int, str)) or obj is None:
+        return obj
+
+    if isinstance(obj, float):
+        if math.isfinite(obj):
+            return obj
+        if nonfinite == "keep":
+            return obj
+        if nonfinite == "null":
+            return None
+        if nonfinite == "string":
+            if math.isnan(obj):
+                return "nan"
+            return "inf" if obj > 0 else "-inf"
+        raise ValueError(f"Non-finite float encountered: {obj!r}")
+
+    # mappings
+    from collections.abc import Mapping as ABCMapping, Sequence as ABCSequence
+    if isinstance(obj, ABCMapping):
+        return {str(k): postprocess_stats(v, nonfinite=nonfinite, _depth=_depth + 1) for k, v in obj.items()}
+
+    # sequences (but not strings)
+    if isinstance(obj, ABCSequence) and not isinstance(obj, (str, bytes, bytearray)):
+        return [postprocess_stats(v, nonfinite=nonfinite, _depth=_depth + 1) for v in obj]
+
+    # fallback: try to stringify (last resort)
+    return str(obj)
+
+
+def augment_stats(
+    base: Mapping[str, Any] | None,
+    extra: Mapping[str, Any] | None,
+    *,
+    overwrite: bool = True,
+) -> dict[str, Any]:
+    """
+    Deep-merge `extra` into `base` (both treated as dict-like).
+
+    - If both values are dicts, merges recursively.
+    - Otherwise overwrites if `overwrite=True`; else keeps base.
+    """
+    out: dict[str, Any] = dict(base or {})
+    if not extra:
+        return out
+
+    for k, v in extra.items():
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
+            out[k] = augment_stats(out[k], v, overwrite=overwrite)
+        else:
+            if overwrite or (k not in out):
+                out[k] = v
+    return out
+
+
+def finalize_stats(
+    stats: Mapping[str, Any],
+    *,
+    nonfinite: Literal["keep", "null", "string", "raise"] = "keep",
+    add_meta: bool = True,
+) -> dict[str, Any]:
+    """
+    Finalize a stats payload for artifact writing:
+      - deep converts to JSON-safe types (postprocess_stats)
+      - optionally adds a small meta block with counts/notes
+
+    This is intended to be called right before writing JSON artifacts.
+    """
+    processed = postprocess_stats(stats, nonfinite=nonfinite)
+
+    if not isinstance(processed, dict):
+        processed = {"value": processed}
+
+    if add_meta:
+        # Lightweight meta: helps provenance without forcing callers to remember it.
+        meta = {
+            "writer": "acpl.eval.stats.finalize_stats",
+            "nonfinite_policy": str(nonfinite),
+        }
+        processed = augment_stats(processed, {"_finalize_meta": meta}, overwrite=False)
+
+    return processed
+
+

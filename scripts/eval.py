@@ -4042,21 +4042,6 @@ def run_eval(
             print(f"[warn] artifact generation failed: {type(e).__name__}: {e}", file=sys.stderr)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     if plots and plot_mod is not None:
         if not trainer_native_ok:
             print("[warn] plots requested, but trainer-native eval path is unavailable; skipping plots.", file=sys.stderr)
@@ -4335,6 +4320,21 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     
     p.add_argument("--ckpt", type=str, required=False, help="Path to checkpoint file or directory (recommended).")
 
+
+
+     p.add_argument(
+         "--config",
+         type=str,
+         default=None,
+         help=(
+             "Optional config YAML/JSON path. If provided and --ckpt is omitted, "
+             "eval will run using this config (useful for baseline-only evaluations). "
+             "If --ckpt is provided, config is loaded from the checkpoint unless overridden via --override."
+         ),
+     )
+
+
+
     p.add_argument(
         "--policy",
         type=str,
@@ -4399,6 +4399,27 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--plots", action="store_true", help="Generate figures via acpl.eval.plots if available."
     )
 
+
+
+    p.add_argument(
+        "--report",
+        action="store_true",
+        help="Run acpl.eval.reporting (best-effort) after evaluation to produce additional tables/figures.",
+    )
+    p.add_argument(
+        "--strict_ablations",
+        action="store_true",
+        help="If set, any ablation build failure is a hard error (otherwise it is skipped with a warning).",
+    )
+ 
+     # Overrides (trainer-style dotted overrides)
+    p.add_argument(
+        "--override",
+        type=str,
+        nargs="*",
+        default=[],
+        help="Trainer-style overrides as key=val (supports dotted keys). Example: model.gnn.hidden=128 seed=123",
+    )
 
 
     # First-class artifacts (B7)
@@ -4488,13 +4509,196 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
     p.add_argument(
-        "--override",
-        type=str,
-        nargs="*",
-        default=[],
-        help="Extra key=val overrides passed to the evaluation protocol (e.g., task=search horizon=128).",
+         "--override",
+         type=str,
+         nargs="*",
+         default=[],
+         help="Extra key=val overrides passed to the evaluation protocol (e.g., task=search horizon=128).",
     )
+
+
+
+
+    p.add_argument(
+        "--embeddings_max_nodes",
+         type=int,
+         default=4096,
+         help="Skip embeddings artifacts when probed graph has more than this many nodes (avoid OOM).",
+    )
+ 
+     # Robustness sweeps (Phase 6)
+    p.add_argument(
+        "--robust_sweep",
+        action="store_true",
+        help="Enable robustness sigma sweeps (requires trainer-native eval path).",
+    )
+    p.add_argument(
+         "--robust_kinds",
+         type=str,
+         nargs="*",
+         default=[],
+         help="Disorder kinds to sweep (e.g., edge_phase coin_dephase). Default uses YAML or both.",
+    )
+    p.add_argument(
+         "--robust_sigmas",
+         type=str,
+         default=None,
+         help="Sigma grid override as comma/space list, e.g. '0,0.05,0.1,0.2' or '0 0.05 0.1'.",
+    )
+    p.add_argument(
+         "--robust_trials",
+         type=int,
+         default=None,
+         help="Trials per sigma (override YAML). Each trial uses a distinct disorder_seed.",
+    )
+    p.add_argument(
+        "--robust_bootstrap",
+        type=int,
+        default=200,
+        help="Bootstrap samples per trial for CI in sweeps (smaller=cheaper).",
+    )
+    p.add_argument(
+        "--robust_include_ablations",
+        action="store_true",
+        help="If set, also run robustness sweeps for ablation conditions (otherwise base condition only).",
+    )
+    p.add_argument(
+        "--robust_max_plot_metrics",
+        type=int,
+        default=6,
+        help="Max number of metrics to show on sweep plots (keep readability).",
+    )
+
+
+
+
+
     return p.parse_args(argv)
+
+
+
+# ------------------------------ CLI helpers -----------------------------------
+
+def _coerce_scalar(s: str) -> Any:
+     """
+     Parse a scalar string into bool/int/float/json/list/dict where appropriate.
+     Conservative and deterministic.
+     """
+     if s is None:
+         return None
+     x = str(s).strip()
+     if x == "":
+         return ""
+     low = x.lower()
+     if low in ("true", "false"):
+         return low == "true"
+     if low in ("none", "null"):
+         return None
+     # int
+     try:
+         if re.fullmatch(r"[+-]?\d+", x):
+             return int(x)
+     except Exception:
+         pass
+     # float
+     try:
+         if re.fullmatch(r"[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?", x):
+             return float(x)
+     except Exception:
+         pass
+     # json object/array
+     if (x.startswith("{") and x.endswith("}")) or (x.startswith("[") and x.endswith("]")):
+         try:
+             return json.loads(x)
+         except Exception:
+             return x
+     return x
+ 
+
+
+
+
+
+
+def _set_nested_dotted(d: dict[str, Any], key: str, value: Any) -> None:
+     """
+     Set d["a"]["b"]["c"] = value for key "a.b.c".
+     Creates intermediate dicts as needed.
+     """
+     parts = [p for p in str(key).split(".") if p]
+     if not parts:
+         return
+     cur = d
+     for p in parts[:-1]:
+         nxt = cur.get(p, None)
+         if not isinstance(nxt, dict):
+             nxt = {}
+             cur[p] = nxt
+         cur = nxt
+     cur[parts[-1]] = value
+ 
+
+def _parse_kv_list(items: list[str]) -> dict[str, Any]:
+     """
+     Parse ["a=1", "b.c=true", "name=foo"] into nested dicts with type coercion.
+     """
+     out: dict[str, Any] = {}
+     for it in items or []:
+         s = str(it).strip()
+         if not s:
+             continue
+         if "=" not in s:
+             # allow bare flags like "foo" -> True
+             _set_nested_dotted(out, s, True)
+             continue
+         k, v = s.split("=", 1)
+         k = k.strip()
+         v = v.strip()
+         if not k:
+             continue
+         _set_nested_dotted(out, k, _coerce_scalar(v))
+     return out
+
+def _parse_seeds_arg(s: str) -> int | list[int]:
+     """
+     Seeds argument:
+       - "5" -> int(5) meaning range(5)
+       - "0,1,2" -> explicit list
+       - "0 1 2" -> explicit list
+     """
+     x = str(s).strip()
+     if x == "":
+         return 0
+     # pure int
+     if re.fullmatch(r"\d+", x):
+         return int(x)
+     # list
+     toks = [t.strip() for t in (x.split(",") if "," in x else x.split())]
+     out: list[int] = []
+     for t in toks:
+         if not t:
+             continue
+         out.append(int(t))
+     return out
+
+
+def _load_config_file(path: Path) -> dict[str, Any]:
+     p = _as_path(path)
+     if not p.exists():
+         raise FileNotFoundError(f"Config file not found: {p}")
+     txt = p.read_text(encoding="utf-8")
+     # YAML preferred if available
+     if p.suffix.lower() in (".yml", ".yaml"):
+         try:
+             import yaml as _yaml
+             obj = _yaml.safe_load(txt)
+         except Exception as e:
+             raise RuntimeError(f"Failed to parse YAML config: {p} ({e})")
+     else:
+         obj = json.loads(txt)
+     if not isinstance(obj, dict):
+         raise TypeError(f"Config must be a dict at top-level: {p}")
+     return obj
 
 
 def _parse_seeds(s: str) -> list[int]:
@@ -4657,22 +4861,35 @@ def _kv_overrides(pairs: list[str]) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
 
-    if args.policy == "ckpt":
-        if not args.ckpt:
-            raise SystemExit("--ckpt is required when --policy=ckpt")
-    else:
-        # baseline mode: strongly recommended to pass --ckpt so we can reuse its config,
-        # but we allow running without a ckpt only if your acpl.eval.protocol fallback
-        # can construct everything without config (rare).
-        if not args.ckpt:
-            raise SystemExit(
-                "--ckpt is required when --policy=baseline (we reuse ckpt['config'] for graph/task/T)."
-            )
+    # ckpt policy must have a checkpoint
+    if args.policy == "ckpt" and not args.ckpt:
+        raise SystemExit("--ckpt is required when --policy=ckpt")
+
+    # baseline mode: allow config-only runs if you added --config; otherwise require ckpt
+    if args.policy == "baseline" and not args.ckpt and not args.config:
+        raise SystemExit(
+            "--ckpt is required when --policy=baseline unless you provide --config "
+            "(baseline needs graph/task/T from config)."
+        )
 
     ckpt_path = _as_path(args.ckpt) if args.ckpt else None
+    if ckpt_path is None and args.config:
+        ckpt_path = _as_path(args.config)
+
+    if ckpt_path is None:
+        raise SystemExit("Provide --ckpt (recommended) or --config (baseline-only mode).")
+
     outdir = _as_path(args.outdir)
+
     seeds = _parse_seeds(args.seeds)
     overrides = _kv_overrides(args.override)
+
+    
+    # If user provided --config, treat it as the config-source override
+    # (even if --ckpt is also provided).
+    if args.config:
+        overrides = dict(overrides or {})
+        overrides["_eval_config_path"] = str(_as_path(args.config))
 
     baseline_coins_kwargs = _parse_baseline_coins_kwargs(args.baseline_coins or [])
     baseline_policy_kwargs = _parse_baseline_policy_kwargs(args.baseline_policy or [])
@@ -4688,13 +4905,13 @@ def main(argv: list[str] | None = None) -> None:
         plots=bool(args.plots),
         extra_overrides=overrides,
         policy=str(args.policy),
-        
+
         baseline_kind=str(args.baseline),
         baseline_coins_kwargs=baseline_coins_kwargs,
         baseline_policy_kwargs=baseline_policy_kwargs,
         report=bool(args.report),
         strict_ablations=bool(args.strict_ablations),
-    
+
         robust_sweep=bool(args.robust_sweep),
         robust_sweep_kinds=list(args.robust_sweep_kinds or []),
         robust_sweep_sigma=args.robust_sweep_sigma,
@@ -4702,17 +4919,15 @@ def main(argv: list[str] | None = None) -> None:
         robust_sweep_bootstrap=int(args.robust_sweep_bootstrap),
         robust_sweep_include_ablations=bool(args.robust_sweep_include_ablations),
         robust_sweep_max_plot_metrics=int(args.robust_sweep_max_plot_metrics),
-    
-    
+
         artifacts=(not bool(args.no_artifacts)),
         artifacts_embeddings=(not bool(args.no_embeddings)),
         artifacts_stats=(not bool(args.no_stats)),
         artifacts_embed_episodes=int(args.embeddings_episodes),
         artifacts_embed_seed=(int(args.embeddings_seed) if args.embeddings_seed is not None else None),
         artifacts_embeddings_max_nodes=int(args.embeddings_max_nodes),
-
-
     )
+
     
 
 
