@@ -35,7 +35,9 @@ import json
 import hashlib
 import copy
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import Enum
+
 
 import os
 from types import MethodType
@@ -92,6 +94,232 @@ def _json_dump(obj: Any) -> str:
 
     return json.dumps(obj, cls=_NpEncoder)
 
+# ----------------------------- Roles (embedded from acpl.eval.roles) -----------------------------
+# Purpose:
+#   - Standardize the eval output layout (directories + filenames)
+#   - Provide a machine-readable "roles manifest" that maps semantic roles -> paths
+#   - Improve thesis/CI defensibility by making artifacts discoverable and stable
+
+class EvalRole(str, Enum):
+    # Root-level canonical artifacts
+    META_JSON = "meta.json"
+    SUMMARY_JSON = "summary.json"
+    SUMMARY_CSV = "summary.csv"
+    ROLES_JSON = "roles.json"
+
+    # Top-level directories
+    RAW_DIR = "raw"
+    FIGS_DIR = "figs"
+    ARTIFACTS_DIR = "artifacts"
+    ROBUST_SWEEPS_DIR = "robust_sweeps"
+    REPORTS_DIR = "reports"  # best-effort / optional
+
+    # Common per-condition filenames (under raw/<cond>/)
+    COND_META_JSON = "condition_meta.json"
+    COND_LOGS_JSONL = "logs.jsonl"
+    COND_EVAL_CI_TXT = "eval_ci.txt"
+    COND_EVAL_CI_JSON = "eval_ci.json"
+    COND_EVAL_CI_SEED_TXT = "eval_ci_seed.txt"
+    COND_EVAL_CI_SEED_JSON = "eval_ci_seed.json"
+
+    # Common figs (under figs/)
+    FIG_NODES_SHARED = "nodes_shared.json"
+
+
+def _role_sanitize_component(s: str) -> str:
+    s = (s or "").strip()
+    out = []
+    for ch in s:
+        if ch.isalnum() or ch in ("-", "_", "."):
+            out.append(ch)
+        else:
+            out.append("_")
+    x = "".join(out)
+    while "__" in x:
+        x = x.replace("__", "_")
+    return x.strip("_") or "cond"
+
+
+@dataclass
+class EvalPaths:
+    """
+    Centralized path builder for eval outputs.
+
+    Backwards compatible with your current layout:
+      outdir/
+        meta.json
+        summary.json
+        summary.csv
+        roles.json
+        raw/<cond>/*
+        figs/*
+        artifacts/*
+        robust_sweeps/*
+    """
+    root: Path
+
+    def __post_init__(self):
+        self.root = _as_path(self.root)
+
+    # ---- directories ----
+    @property
+    def raw_dir(self) -> Path:
+        return self.root / EvalRole.RAW_DIR.value
+
+    @property
+    def figs_dir(self) -> Path:
+        return self.root / EvalRole.FIGS_DIR.value
+
+    @property
+    def artifacts_dir(self) -> Path:
+        return self.root / EvalRole.ARTIFACTS_DIR.value
+
+    @property
+    def robust_sweeps_dir(self) -> Path:
+        return self.root / EvalRole.ROBUST_SWEEPS_DIR.value
+
+    @property
+    def reports_dir(self) -> Path:
+        return self.root / EvalRole.REPORTS_DIR.value
+
+    def ensure_base(self) -> None:
+        _ensure_dir(self.root)
+        _ensure_dir(self.raw_dir)
+        _ensure_dir(self.figs_dir)
+        _ensure_dir(self.artifacts_dir)
+        # robust_sweeps + reports are optional; create lazily unless already needed
+
+    def ensure_robust_sweeps(self) -> Path:
+        return _ensure_dir(self.robust_sweeps_dir)
+
+    def ensure_reports(self) -> Path:
+        return _ensure_dir(self.reports_dir)
+
+    # ---- root files ----
+    @property
+    def meta_json(self) -> Path:
+        return self.root / EvalRole.META_JSON.value
+
+    @property
+    def summary_json(self) -> Path:
+        return self.root / EvalRole.SUMMARY_JSON.value
+
+    @property
+    def summary_csv(self) -> Path:
+        return self.root / EvalRole.SUMMARY_CSV.value
+
+    @property
+    def roles_json(self) -> Path:
+        return self.root / EvalRole.ROLES_JSON.value
+
+    # ---- per-condition ----
+    def cond_tag(self, cond: str) -> str:
+        return _role_sanitize_component(cond)
+
+    def cond_dir(self, cond: str) -> Path:
+        return _ensure_dir(self.raw_dir / self.cond_tag(cond))
+
+    def cond_file(self, cond: str, filename: str) -> Path:
+        return self.cond_dir(cond) / filename
+
+    # ---- fig helpers ----
+    def fig_file(self, name: str) -> Path:
+        return self.figs_dir / _role_sanitize_component(name)
+
+    def as_dict(self) -> dict[str, Any]:
+        # Relative paths (portable in CI artifacts)
+        return {
+            "root": str(self.root),
+            "meta_json": str(self.meta_json.relative_to(self.root)),
+            "summary_json": str(self.summary_json.relative_to(self.root)),
+            "summary_csv": str(self.summary_csv.relative_to(self.root)),
+            "roles_json": str(self.roles_json.relative_to(self.root)),
+            "raw_dir": str(self.raw_dir.relative_to(self.root)),
+            "figs_dir": str(self.figs_dir.relative_to(self.root)),
+            "artifacts_dir": str(self.artifacts_dir.relative_to(self.root)),
+            "robust_sweeps_dir": str(self.robust_sweeps_dir.relative_to(self.root)),
+            "reports_dir": str(self.reports_dir.relative_to(self.root)),
+        }
+
+
+def _sha256_file_small(path: Path, *, max_bytes: int = 128 * 1024 * 1024) -> str | None:
+    """
+    sha256 for provenance. To avoid huge overhead, only hash files up to max_bytes.
+    Returns None for unreadable or too-large files.
+    """
+    try:
+        st = path.stat()
+        if st.st_size > max_bytes:
+            return None
+        h = hashlib.sha256()
+        with path.open("rb") as f:
+            while True:
+                b = f.read(8 * 1024 * 1024)
+                if not b:
+                    break
+                h.update(b)
+        return h.hexdigest()
+    except Exception:
+        return None
+
+
+@dataclass
+class RoleEntry:
+    role: str
+    path: str                 # relative to eval root
+    exists: bool
+    size_bytes: int | None = None
+    sha256: str | None = None
+
+
+@dataclass
+class RolesManifest:
+    """
+    Machine-readable manifest:
+      role -> {path, size, sha256}
+    """
+    root: Path
+    entries: dict[str, RoleEntry] = field(default_factory=dict)
+
+    def add_path(self, role: str, path: Path, *, hash_small_files: bool = True) -> None:
+        p = _as_path(path)
+        exists = p.exists()
+        rel = str(p.resolve().relative_to(self.root.resolve())) if exists else str(p)
+        size = None
+        sha = None
+        if exists:
+            try:
+                size = int(p.stat().st_size)
+            except Exception:
+                size = None
+            if hash_small_files and p.is_file():
+                sha = _sha256_file_small(p)
+        self.entries[str(role)] = RoleEntry(
+            role=str(role),
+            path=rel,
+            exists=bool(exists),
+            size_bytes=size,
+            sha256=sha,
+        )
+
+    def add_dir(self, role: str, path: Path) -> None:
+        p = _as_path(path)
+        exists = p.exists() and p.is_dir()
+        rel = str(p.resolve().relative_to(self.root.resolve())) if exists else str(p)
+        self.entries[str(role)] = RoleEntry(
+            role=str(role),
+            path=rel,
+            exists=bool(exists),
+            size_bytes=None,
+            sha256=None,
+        )
+
+    def write(self, outpath: Path) -> None:
+        payload = {
+            "root": str(self.root),
+            "entries": {k: vars(v) for k, v in self.entries.items()},
+        }
+        _as_path(outpath).write_text(_json_dump(payload) + "\n", encoding="utf-8")
 
 
 def _git_info(repo_root: Path) -> dict[str, Any]:
@@ -3054,6 +3282,8 @@ def run_eval(
     plots: bool = False,
     extra_overrides: dict[str, Any] | None = None,
     *,
+
+    config_path: Path | None = None,   # <-- ADD THIS
     policy: str = "ckpt",
     baseline_kind: str = "hadamard",
     baseline_coins_kwargs: dict[str, Any] | None = None,
@@ -3108,8 +3338,8 @@ def run_eval(
       └── figs/                      # optional figures
     """
     outdir = _ensure_dir(outdir)
-    (outdir / "raw").mkdir(exist_ok=True, parents=True)
-    (outdir / "figs").mkdir(exist_ok=True, parents=True)
+    paths = EvalPaths(outdir)
+    paths.ensure_base()
 
 
     # Prefer the repo's protocol API used by scripts/train.py
@@ -3134,10 +3364,30 @@ def run_eval(
     # Load checkpoint (always recommended, even for baselines, to reuse config)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-    if ckpt_path is None:
-        raise ValueError("ckpt_path is None (unexpected).")
+    # ----------------- Config / checkpoint source of truth -----------------
+    # Cases:
+    #  A) ckpt_path provided            -> load checkpoint
+    #  B) ckpt_path omitted + baseline  -> load config_path (required)
+    #  C) ckpt_path provided but ckpt lacks config -> load config_path if provided
+    ckpt: dict[str, Any]
 
-    ckpt = _load_any_ckpt(ckpt_path)
+    if ckpt_path is not None:
+        ckpt = _load_any_ckpt(ckpt_path)
+
+        # If checkpoint has no usable config, allow --config to supply it.
+        if (not isinstance(ckpt.get("config", None), dict)) and (config_path is not None):
+            cfg0 = _load_config_file(config_path)
+            ckpt["config"] = cfg0
+
+    else:
+        # Config-only mode is allowed ONLY for baseline evaluations
+        if (policy or "").lower().strip() != "baseline":
+            raise ValueError("When --ckpt is omitted, you must use --policy baseline (config-only baseline eval).")
+        if config_path is None:
+            raise ValueError("Config-only mode requires --config PATH when --ckpt is omitted.")
+        cfg0 = _load_config_file(config_path)
+        ckpt = {"config": cfg0, "state_dict": None}
+
 
     trainer_native_ok = (
         (run_ci_eval is not None)
@@ -3599,7 +3849,9 @@ def run_eval(
 
     # Write meta
     meta = {
-        "checkpoint": str(ckpt_path),
+        "checkpoint": (str(ckpt_path) if ckpt_path is not None else None),
+        "config_path": (str(config_path) if config_path is not None else None),
+
 
         "policy": policy,
         "baseline_kind": baseline_kind if policy == "baseline" else None,
@@ -3640,12 +3892,30 @@ def run_eval(
             "max_plot_metrics": int(robust_sweep_max_plot_metrics),
         },
 
+        "artifacts_request": {
+            "artifacts": bool(artifacts),
+            "embeddings": bool(artifacts_embeddings),
+            "stats": bool(artifacts_stats),
+            "embeddings_episodes": int(artifacts_embed_episodes),
+            "embeddings_seed": (int(artifacts_embed_seed) if artifacts_embed_seed is not None else None),
+            "embeddings_max_nodes": int(artifacts_embeddings_max_nodes),
+        },
 
 
 
 
+            
     }
-    (outdir / "meta.json").write_text(_json_dump(meta))
+
+    
+    # include role layout for discoverability
+    try:
+        meta["roles_layout"] = paths.as_dict()
+        meta["roles_manifest"] = str(paths.roles_json.relative_to(paths.root))
+    except Exception:
+        pass
+
+    paths.meta_json.write_text(_json_dump(meta) + "\n", encoding="utf-8")
 
     # Helper to run a single condition (possibly with an ablation applied)
     def run_one_condition(
@@ -3656,7 +3926,7 @@ def run_eval(
         rollout_fn_override: Any | None = None,
         extra_meta: dict[str, Any] | None = None,
     ):
-        tag_dir = _ensure_dir(outdir / "raw" / condition_tag)
+        tag_dir = paths.cond_dir(condition_tag)
 
         # Choose overrides (or base)
         m_for_eval = model_override if model_override is not None else model
@@ -3676,7 +3946,9 @@ def run_eval(
             "baseline_kind": baseline_kind if policy == "baseline" else None,
             "ablation_meta": extra_meta or {},
         }
-        (tag_dir / "condition_meta.json").write_text(_json_dump(cond_meta), encoding="utf-8")
+        (paths.cond_file(condition_tag, EvalRole.COND_META_JSON.value)).write_text(
+            _json_dump(cond_meta) + "\n", encoding="utf-8"
+        )
 
         # Trainer-native protocol path
         if trainer_native_ok and callable(proto_entry):
@@ -3986,8 +4258,8 @@ def run_eval(
 
 
     # Write summaries
-    _write_csv(summaries_for_csv, outdir / "summary.csv")
-    (outdir / "summary.json").write_text(_json_dump(structured_out))
+    _write_csv(summaries_for_csv, paths.summary_csv)
+    paths.summary_json.write_text(_json_dump(structured_out) + "\n", encoding="utf-8")
 
 
 
@@ -4127,23 +4399,172 @@ def run_eval(
                         if len(nodes_shared) >= 12:
                             break
 
-                    # Persist node choice for thesis reproducibility
+                # Persist node choice for thesis reproducibility
+                try:
+                    nodes_payload = {
+                        "picked_from": base_tag,
+                        "forced_nodes": forced_nodes,
+                        "nodes_shared": nodes_shared,
+                        "seed_list": seed_list,
+                        "episodes": int(episodes),
+                        "ci_mode": meta0.get("ci_mode", None),
+                        "collector_meta": meta0,
+                    }
+                    (figdir / EvalRole.FIG_NODES_SHARED.value).write_text(
+                        _json_dump(nodes_payload) + "\n", encoding="utf-8"
+                    )
+                except Exception as e:
+                    print(f"[warn] could not write nodes_shared.json: {e}", file=sys.stderr)
+
+                # -------------------- Local, defensible plotting (no ddof/div0 traps) --------------------
+                import matplotlib
+                matplotlib.use("Agg", force=True)
+                import matplotlib.pyplot as plt
+
+                def _tv_to_uniform_curve(P: np.ndarray) -> np.ndarray:
+                    # P: (T+1, N)
+                    Nn = int(P.shape[1])
+                    u = 1.0 / max(Nn, 1)
+                    return 0.5 * np.sum(np.abs(P - u), axis=1)  # (T+1,)
+
+                def _ci_over_samples(x: np.ndarray, alpha: float = 0.05) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+                    """
+                    x: (K, T) samples.
+                    Returns mean, lo, hi (each (T,)).
+                    Uses compute_ci if available; else student-t-ish fallback.
+                    """
+                    x = np.asarray(x, dtype=float)
+                    mean = np.nanmean(x, axis=0)
+                    K = int(x.shape[0])
+                    if K < 2:
+                        return mean, mean, mean
+
+                    lo = np.empty_like(mean)
+                    hi = np.empty_like(mean)
+
+                    if compute_ci is not None:
+                        for t in range(x.shape[1]):
+                            col = x[:, t]
+                            col = col[np.isfinite(col)]
+                            if col.shape[0] < 2:
+                                lo[t] = mean[t]
+                                hi[t] = mean[t]
+                                continue
+                            ci = compute_ci(col.astype(float), method="student_t", alpha=float(alpha))
+                            lo[t] = float(ci.lo)
+                            hi[t] = float(ci.hi)
+                        return mean, lo, hi
+
+                    # fallback: normal approx (still avoids ddof warnings)
+                    std = np.nanstd(x, axis=0, ddof=1)
+                    se = std / np.sqrt(max(K, 1))
+                    z = 1.96  # 95% normal approx
+                    lo = mean - z * se
+                    hi = mean + z * se
+                    return mean, lo, hi
+
+                # Choose a small, interpretable node subset for Pt plots:
+                # include forced nodes first, then fill from nodes_shared.
+                nodes_show: list[int] = []
+                for v in (forced_nodes or []) + (nodes_shared or []):
+                    v = int(v)
+                    if v not in nodes_show:
+                        nodes_show.append(v)
+                    if len(nodes_show) >= 6:
+                        break
+
+                # Collect + plot for each condition
+                tv_overlay = []  # list of (cond, mean, lo, hi, meta)
+                for cond_tag, rr in plot_runners.items():
+                    mC = rr["model"]
+                    dlC = rr["dataloader_factory"]
+
+                    PtS, metaC = _collect_Pt_samples_for_plotting(
+                        model=mC,
+                        dataloader_factory=dlC,
+                        rollout_timeline_fn=rollout_tl,
+                        seeds=seed_list,
+                        episodes=int(episodes),
+                        ckpt_path=ckpt_path,
+                        artifacts_request=meta.get("artifacts_request", None),
+                    )  # (K, T+1, N)
+
+                    # Save raw plot inputs (defendable artifacts)
                     try:
-                        (figdir / "nodes_shared.json").write_text(
-                            _json_dump(
-                                {
-                                    "picked_from": base_tag,
-                                    "forced_nodes": forced_nodes,
-                                    "nodes_shared": nodes_shared,
-                                    "rule": "top-by-max(Pmean_over_time) on base condition; reused for all conditions",
-                                    "ci_mode_base": meta0.get("ci_mode", None),
-                                    "n_samples_base": meta0.get("n_samples", None),
-                                }
-                            ),
+                        npz_path = figdir / f"Pt_samples__{_sanitize_filename(cond_tag)}.npz"
+                        np.savez_compressed(npz_path, Pt_samples=PtS)
+                        (figdir / f"Pt_samples__{_sanitize_filename(cond_tag)}__meta.json").write_text(
+                            _json_dump({"cond": cond_tag, "meta": metaC}) + "\n",
                             encoding="utf-8",
                         )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[warn] could not save Pt_samples for {cond_tag}: {e}", file=sys.stderr)
+
+                    # --- TV-to-uniform curve (K replicates) ---
+                    tvS = np.stack([_tv_to_uniform_curve(PtS[k]) for k in range(PtS.shape[0])], axis=0)  # (K, T+1)
+                    tv_mean, tv_lo, tv_hi = _ci_over_samples(tvS, alpha=0.05)
+
+                    tv_overlay.append((cond_tag, tv_mean, tv_lo, tv_hi, metaC))
+
+                    # plot tv curve
+                    try:
+                        tgrid = np.arange(tv_mean.shape[0])
+                        plt.figure()
+                        plt.plot(tgrid, tv_mean, label="mean")
+                        if np.any(np.isfinite(tv_lo)) and np.any(np.isfinite(tv_hi)) and PtS.shape[0] >= 2:
+                            plt.fill_between(tgrid, tv_lo, tv_hi, alpha=0.25, label="95% CI")
+                        plt.title(f"TV-to-uniform — {cond_tag} ({metaC.get('ci_mode', 'samples')}-CI)")
+                        plt.xlabel("t")
+                        plt.ylabel("TV(P_t, Uniform)")
+                        plt.tight_layout()
+                        plt.savefig(figdir / f"tv_to_uniform__{_sanitize_filename(cond_tag)}.png", dpi=200)
+                        plt.close()
+                    except Exception as e:
+                        print(f"[warn] TV plot failed for {cond_tag}: {e}", file=sys.stderr)
+
+                    # --- Pt for selected nodes (mean + optional CI) ---
+                    try:
+                        # PtS: (K, T+1, N)
+                        plt.figure()
+                        tgrid = np.arange(PtS.shape[1])
+
+                        for v in nodes_show:
+                            v = int(v)
+                            if v < 0 or v >= PtS.shape[2]:
+                                continue
+                            yS = PtS[:, :, v]  # (K, T+1)
+                            y_mean, y_lo, y_hi = _ci_over_samples(yS, alpha=0.05)
+                            plt.plot(tgrid, y_mean, label=f"node {v}")
+                            # Only shade CI for a small number of lines (readable)
+                            if PtS.shape[0] >= 2 and len(nodes_show) <= 4:
+                                plt.fill_between(tgrid, y_lo, y_hi, alpha=0.15)
+
+                        plt.title(f"P_t at selected nodes — {cond_tag} ({metaC.get('ci_mode', 'samples')}-CI)")
+                        plt.xlabel("t")
+                        plt.ylabel("P(node)")
+                        plt.legend(loc="best", fontsize=8)
+                        plt.tight_layout()
+                        plt.savefig(figdir / f"pt_nodes__{_sanitize_filename(cond_tag)}.png", dpi=200)
+                        plt.close()
+                    except Exception as e:
+                        print(f"[warn] Pt(nodes) plot failed for {cond_tag}: {e}", file=sys.stderr)
+
+                # Overlay TV curves across conditions (base vs ablations)
+                try:
+                    if tv_overlay:
+                        plt.figure()
+                        tgrid = np.arange(tv_overlay[0][1].shape[0])
+                        for cond_tag, tv_mean, tv_lo, tv_hi, metaC in tv_overlay:
+                            plt.plot(tgrid, tv_mean, label=cond_tag)
+                        plt.title("TV-to-uniform overlay (means)")
+                        plt.xlabel("t")
+                        plt.ylabel("TV(P_t, Uniform)")
+                        plt.legend(loc="best", fontsize=8)
+                        plt.tight_layout()
+                        plt.savefig(figdir / "tv_to_uniform__overlay.png", dpi=200)
+                        plt.close()
+                except Exception as e:
+                    print(f"[warn] TV overlay plot failed: {e}", file=sys.stderr)
 
 
 
@@ -4311,269 +4732,67 @@ def run_eval(
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Run evaluation suites from saved checkpoints (Phase B7).",
+        description="Run evaluation suites from saved checkpoints.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    
-    
-    
-    
-    p.add_argument("--ckpt", type=str, required=False, help="Path to checkpoint file or directory (recommended).")
 
-
-
-     p.add_argument(
-         "--config",
-         type=str,
-         default=None,
-         help=(
-             "Optional config YAML/JSON path. If provided and --ckpt is omitted, "
-             "eval will run using this config (useful for baseline-only evaluations). "
-             "If --ckpt is provided, config is loaded from the checkpoint unless overridden via --override."
-         ),
-     )
-
-
-
+    # --- checkpoint/config selection ---
+    p.add_argument("--ckpt", type=str, default=None, help="Path to checkpoint file or directory.")
     p.add_argument(
-        "--policy",
+        "--config",
         type=str,
-        default="ckpt",
-        choices=("ckpt", "baseline"),
-        help="Which policy to evaluate: 'ckpt' loads the trained model; 'baseline' builds a baseline policy.",
-    )
-
-    p.add_argument(
-        "--baseline",
-        type=str,
-        default="hadamard",
-        help="Baseline kind (e.g., hadamard, grover, random, global_schedule).",
-    )
-
-    p.add_argument(
-        "--baseline_coins",
-        type=str,
-        nargs="*",
-        default=[],
-        help="Baseline coin schedule kwargs as key=val (e.g., seed=0 mode=time).",
-    )
-
-    p.add_argument(
-        "--baseline_policy",
-        type=str,
-        nargs="*",
-        default=[],
+        default=None,
         help=(
-            "Baseline policy wrapper kwargs as key=val (e.g., theta_scale=1.0 theta_noise_std=0.0 "
-            "embedding.mode=identity embedding.out_dim=32 embedding.normalize=true)."
+            "Optional YAML/JSON config path. Required for baseline-only eval when --ckpt is omitted. "
+            "If --ckpt is provided but lacks config, this can supply it."
         ),
     )
-    
-    
-    
-    
-    
-    
-    p.add_argument(
-        "--outdir", type=str, required=True, help="Directory to write evaluation artifacts."
-    )
+
+    # --- policy selection ---
+    p.add_argument("--policy", type=str, default="ckpt", choices=("ckpt", "baseline"))
+    p.add_argument("--baseline", type=str, default="hadamard", help="Baseline kind.")
+    p.add_argument("--baseline_coins", type=str, nargs="*", default=[], help="Baseline coins kwargs key=val ...")
+    p.add_argument("--baseline_policy", type=str, nargs="*", default=[], help="Baseline policy kwargs key=val ...")
+
+    # --- core eval ---
+    p.add_argument("--outdir", type=str, required=True, help="Directory to write evaluation artifacts.")
     p.add_argument("--suite", type=str, default="basic_valid", help="Evaluation suite name.")
-    p.add_argument("--device", type=str, default=None, help="Device to use: 'cuda' or 'cpu'.")
-    p.add_argument(
-        "--seeds",
-        type=str,
-        default="5",
-        help="Either an integer (e.g., '5' -> range(5)) or a comma-separated list (e.g., '0,1,2,5').",
-    )
-    p.add_argument(
-        "--episodes", type=int, default=128, help="Episodes per seed (if used by the suite)."
-    )
-    p.add_argument(
-        "--ablations",
-        type=str,
-        nargs="*",
-        default=[],
-        help="List of ablation names to evaluate (e.g., NoPE GlobalCoin TimeFrozen NodePermute).",
-    )
-    p.add_argument(
-        "--plots", action="store_true", help="Generate figures via acpl.eval.plots if available."
-    )
+    p.add_argument("--device", type=str, default=None, help="Device: cuda or cpu.")
+    p.add_argument("--seeds", type=str, default="5", help="Integer N or list like '0,1,2'.")
+    p.add_argument("--episodes", type=int, default=128, help="Episodes per seed.")
+    p.add_argument("--ablations", type=str, nargs="*", default=[], help="Ablations to run.")
+    p.add_argument("--plots", action="store_true", help="Generate plots (trainer-native only).")
+    p.add_argument("--report", action="store_true", help="Run reporting (best-effort).")
+    p.add_argument("--strict_ablations", action="store_true", help="Fail if any requested ablation cannot be built.")
 
-
-
-    p.add_argument(
-        "--report",
-        action="store_true",
-        help="Run acpl.eval.reporting (best-effort) after evaluation to produce additional tables/figures.",
-    )
-    p.add_argument(
-        "--strict_ablations",
-        action="store_true",
-        help="If set, any ablation build failure is a hard error (otherwise it is skipped with a warning).",
-    )
- 
-     # Overrides (trainer-style dotted overrides)
+    # --- trainer-style overrides ---
     p.add_argument(
         "--override",
         type=str,
         nargs="*",
         default=[],
-        help="Trainer-style overrides as key=val (supports dotted keys). Example: model.gnn.hidden=128 seed=123",
+        help="Overrides key=val (supports dotted keys). Example: model.gnn.hidden=128 seed=123",
     )
 
+    # --- robustness sweeps (Phase 6) ---
+    p.add_argument("--robust_sweep", action="store_true", help="Run robustness sigma sweeps (trainer-native only).")
+    p.add_argument("--robust_sweep_kinds", type=str, nargs="*", default=[], help="Kinds to sweep.")
+    p.add_argument("--robust_sweep_sigma", type=str, default=None, help="Override sigma grid.")
+    p.add_argument("--robust_sweep_trials", type=int, default=None, help="Override trials per sigma.")
+    p.add_argument("--robust_sweep_bootstrap", type=int, default=200, help="Bootstrap samples per trial.")
+    p.add_argument("--robust_sweep_include_ablations", action="store_true", help="Also sweep ablation conditions.")
+    p.add_argument("--robust_sweep_max_plot_metrics", type=int, default=6, help="Max metrics per sweep plot.")
 
-    # First-class artifacts (B7)
-    p.add_argument("--no_artifacts", action="store_true", help="Disable writing outdir/artifacts/*.")
-    p.add_argument("--no_embeddings", action="store_true", help="Disable embeddings artifacts (artifacts/embeddings/*).")
-    p.add_argument("--no_stats", action="store_true", help="Disable stats artifacts (artifacts/stats.json + stats_table.txt).")
-    p.add_argument(
-        "--embeddings_episodes",
-        type=int,
-        default=32,
-        help="Episodes per seed used to compute embedding artifacts (caps at --episodes).",
-    )
-    p.add_argument(
-        "--embeddings_seed",
-        type=int,
-        default=None,
-        help="If set, compute embedding artifacts using ONLY this seed id (faster quick checks).",
-    )
-    p.add_argument(
-        "--embeddings_max_nodes",
-        type=int,
-        default=4096,
-        help="Safety cap: skip embedding artifacts if N exceeds this value.",
-    )
-
-
-
-
-
-    p.add_argument(
-        "--report",
-        action="store_true",
-        help="Run acpl.eval.reporting on the produced eval directory (best-effort).",
-    )
-    p.add_argument(
-        "--strict_ablations",
-        action="store_true",
-        help="Fail the run if any requested ablation cannot be applied (recommended for thesis runs).",
-    )
-
-
-    p.add_argument(
-        "--robust_sweep",
-        action="store_true",
-        help=(
-            "Run robustness sigma sweeps defined in cfg['eval']['robustness'] "
-            "(writes outdir/robust_sweeps/*)."
-        ),
-    )
-    p.add_argument(
-        "--robust_sweep_kinds",
-        type=str,
-        nargs="*",
-        default=[],
-        help="Subset of kinds to sweep (default: edge_phase coin_dephase).",
-    )
-    p.add_argument(
-        "--robust_sweep_sigma",
-        type=str,
-        default=None,
-        help="Override sigma grid for ALL kinds: e.g. '0,0.05,0.1,0.2'.",
-    )
-    p.add_argument(
-        "--robust_sweep_trials",
-        type=int,
-        default=None,
-        help="Override number of disorder trials per sigma (default from YAML or 10).",
-    )
-    p.add_argument(
-        "--robust_sweep_bootstrap",
-        type=int,
-        default=200,
-        help="Bootstrap samples per trial (lower=faster).",
-    )
-    p.add_argument(
-        "--robust_sweep_include_ablations",
-        action="store_true",
-        help="Also sweep each ablation condition (expensive). Default: sweep base condition only.",
-    )
-    p.add_argument(
-        "--robust_sweep_max_plot_metrics",
-        type=int,
-        default=6,
-        help="Max number of metrics to include in each sweep plot.",
-    )
-
-
-
-    p.add_argument(
-         "--override",
-         type=str,
-         nargs="*",
-         default=[],
-         help="Extra key=val overrides passed to the evaluation protocol (e.g., task=search horizon=128).",
-    )
-
-
-
-
-    p.add_argument(
-        "--embeddings_max_nodes",
-         type=int,
-         default=4096,
-         help="Skip embeddings artifacts when probed graph has more than this many nodes (avoid OOM).",
-    )
- 
-     # Robustness sweeps (Phase 6)
-    p.add_argument(
-        "--robust_sweep",
-        action="store_true",
-        help="Enable robustness sigma sweeps (requires trainer-native eval path).",
-    )
-    p.add_argument(
-         "--robust_kinds",
-         type=str,
-         nargs="*",
-         default=[],
-         help="Disorder kinds to sweep (e.g., edge_phase coin_dephase). Default uses YAML or both.",
-    )
-    p.add_argument(
-         "--robust_sigmas",
-         type=str,
-         default=None,
-         help="Sigma grid override as comma/space list, e.g. '0,0.05,0.1,0.2' or '0 0.05 0.1'.",
-    )
-    p.add_argument(
-         "--robust_trials",
-         type=int,
-         default=None,
-         help="Trials per sigma (override YAML). Each trial uses a distinct disorder_seed.",
-    )
-    p.add_argument(
-        "--robust_bootstrap",
-        type=int,
-        default=200,
-        help="Bootstrap samples per trial for CI in sweeps (smaller=cheaper).",
-    )
-    p.add_argument(
-        "--robust_include_ablations",
-        action="store_true",
-        help="If set, also run robustness sweeps for ablation conditions (otherwise base condition only).",
-    )
-    p.add_argument(
-        "--robust_max_plot_metrics",
-        type=int,
-        default=6,
-        help="Max number of metrics to show on sweep plots (keep readability).",
-    )
-
-
-
-
+    # --- first-class artifacts (B7) ---
+    p.add_argument("--no_artifacts", action="store_true", help="Disable artifacts/*. outputs.")
+    p.add_argument("--no_embeddings", action="store_true", help="Disable artifacts/embeddings/* outputs.")
+    p.add_argument("--no_stats", action="store_true", help="Disable artifacts/stats.* outputs.")
+    p.add_argument("--embeddings_episodes", type=int, default=32, help="Episodes per seed for embeddings artifacts.")
+    p.add_argument("--embeddings_seed", type=int, default=None, help="If set, compute embeddings using only this seed.")
+    p.add_argument("--embeddings_max_nodes", type=int, default=4096, help="Skip embeddings if N exceeds this cap.")
 
     return p.parse_args(argv)
+
 
 
 
@@ -4682,23 +4901,52 @@ def _parse_seeds_arg(s: str) -> int | list[int]:
      return out
 
 
+
+
 def _load_config_file(path: Path) -> dict[str, Any]:
-     p = _as_path(path)
-     if not p.exists():
-         raise FileNotFoundError(f"Config file not found: {p}")
-     txt = p.read_text(encoding="utf-8")
-     # YAML preferred if available
-     if p.suffix.lower() in (".yml", ".yaml"):
-         try:
-             import yaml as _yaml
-             obj = _yaml.safe_load(txt)
-         except Exception as e:
-             raise RuntimeError(f"Failed to parse YAML config: {p} ({e})")
-     else:
-         obj = json.loads(txt)
-     if not isinstance(obj, dict):
-         raise TypeError(f"Config must be a dict at top-level: {p}")
-     return obj
+    """
+    Load YAML/JSON config for trainer-native eval and/or baseline-only eval.
+
+    Supports:
+      - .yaml/.yml via yaml.safe_load (if installed)
+      - .json via json.load
+      - directory paths that contain config.yaml/config.yml/config.json
+    """
+    p = _as_path(path)
+    if p.is_dir():
+        for nm in ("config.yaml", "config.yml", "config.json", "manifest.yaml", "manifest.yml"):
+            cand = p / nm
+            if cand.exists():
+                p = cand
+                break
+
+    if not p.exists() or not p.is_file():
+        raise FileNotFoundError(f"Config path not found: {p}")
+
+    suf = p.suffix.lower()
+    text = p.read_text(encoding="utf-8")
+
+    if suf in (".yaml", ".yml"):
+        try:
+            import yaml  # type: ignore
+        except Exception as e:
+            raise RuntimeError("YAML config requested but PyYAML is not installed (pip install pyyaml).") from e
+        obj = yaml.safe_load(text)
+    elif suf == ".json":
+        obj = json.loads(text)
+    else:
+        # best-effort: try yaml then json
+        try:
+            import yaml  # type: ignore
+            obj = yaml.safe_load(text)
+        except Exception:
+            obj = json.loads(text)
+
+    if not isinstance(obj, dict):
+        raise ValueError(f"Config must be a dict-like mapping; got {type(obj)} from {p}")
+    return obj
+
+
 
 
 def _parse_seeds(s: str) -> list[int]:
@@ -4858,77 +5106,149 @@ def _kv_overrides(pairs: list[str]) -> dict[str, Any]:
     return out
 
 
-def main(argv: list[str] | None = None) -> None:
-    args = _parse_args(argv)
+def _parse_json_dict(s: str | None) -> dict[str, Any]:
+    if not s:
+        return {}
+    ss = s.strip()
+    if not ss:
+        return {}
+    # JSON preferred
+    if (ss.startswith("{") and ss.endswith("}")) or (ss.startswith("[") and ss.endswith("]")):
+        obj = json.loads(ss)
+        if isinstance(obj, dict):
+            return obj
+        raise ValueError("Expected a JSON object/dict.")
+    # fallback: k=v,k2=v2
+    out: dict[str, Any] = {}
+    parts = [p.strip() for p in ss.split(",") if p.strip()]
+    for p in parts:
+        if "=" not in p:
+            out[p] = True
+            continue
+        k, v = p.split("=", 1)
+        k = k.strip()
+        v = v.strip()
+        # try numeric/bool
+        if v.lower() in ("true", "false"):
+            out[k] = (v.lower() == "true")
+        else:
+            try:
+                if "." in v:
+                    out[k] = float(v)
+                else:
+                    out[k] = int(v)
+            except Exception:
+                out[k] = v
+    return out
 
-    # ckpt policy must have a checkpoint
-    if args.policy == "ckpt" and not args.ckpt:
-        raise SystemExit("--ckpt is required when --policy=ckpt")
 
-    # baseline mode: allow config-only runs if you added --config; otherwise require ckpt
-    if args.policy == "baseline" and not args.ckpt and not args.config:
-        raise SystemExit(
-            "--ckpt is required when --policy=baseline unless you provide --config "
-            "(baseline needs graph/task/T from config)."
-        )
+def _parse_overrides_list(items: list[str] | None) -> dict[str, Any]:
+    """
+    Accept repeated --override key=value (trainer-style override applier is used when available).
+    Here we keep a dict to store them and pass into run_eval(extra_overrides=...).
+    """
+    out: dict[str, Any] = {}
+    for it in (items or []):
+        if "=" not in it:
+            out[it] = True
+            continue
+        k, v = it.split("=", 1)
+        out[k.strip()] = v.strip()
+    return out
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="ACPL eval driver (CI-style aggregation + ablations + plots + artifacts).")
+
+    ap.add_argument("--ckpt", type=str, default=None, help="Checkpoint path (file or run directory).")
+    ap.add_argument("--config", type=str, default=None, help="Config path (YAML/JSON). Required if --policy baseline without --ckpt.")
+    ap.add_argument("--outdir", type=str, required=True, help="Output directory for eval artifacts.")
+    ap.add_argument("--suite", type=str, default="basic_valid", help="Evaluation suite name.")
+    ap.add_argument("--device", type=str, default=None, help="cpu or cuda (default: auto).")
+
+    ap.add_argument("--seeds", type=int, default=5, help="Number of CI seeds (0..seeds-1).")
+    ap.add_argument("--episodes", type=int, default=128, help="Episodes per seed.")
+    ap.add_argument("--ablations", nargs="*", default=None, help="Ablations: NoPE GlobalCoin TimeFrozen NodePermute ...")
+    ap.add_argument("--plots", action="store_true", help="Generate figures (defendable CI).")
+    ap.add_argument("--report", action="store_true", help="Run acpl.eval.reporting (best-effort).")
+    ap.add_argument("--strict-ablations", action="store_true", help="Fail if any requested ablation cannot be applied.")
+
+    ap.add_argument("--policy", type=str, default="ckpt", choices=["ckpt", "baseline"], help="Use checkpoint policy or baseline.")
+    ap.add_argument("--baseline-kind", type=str, default="hadamard", help="Baseline kind (if --policy baseline).")
+    ap.add_argument("--baseline-coins-kwargs", type=str, default=None, help="JSON or k=v,k2=v2 for baseline coin generator.")
+    ap.add_argument("--baseline-policy-kwargs", type=str, default=None, help="JSON or k=v,k2=v2 for baseline policy wrapper.")
+
+    # Robust sweeps
+    ap.add_argument("--robust-sweep", action="store_true", help="Run robustness sigma sweeps (if disorder plumbing exists).")
+    ap.add_argument("--robust-sweep-kinds", nargs="*", default=None, help="Kinds: edge_phase coin_dephase (default both).")
+    ap.add_argument("--robust-sweep-sigma", type=str, default=None, help="Override sigma grid: '0,0.05,0.1'")
+    ap.add_argument("--robust-sweep-trials", type=int, default=None, help="Trials per sigma.")
+    ap.add_argument("--robust-sweep-bootstrap", type=int, default=200, help="Bootstrap samples per trial.")
+    ap.add_argument("--robust-sweep-include-ablations", action="store_true", help="Sweep ablation conditions too.")
+    ap.add_argument("--robust-sweep-max-plot-metrics", type=int, default=6, help="Max metrics in sweep plots.")
+
+    # First-class artifacts
+    ap.add_argument("--no-artifacts", action="store_true", help="Disable all artifacts (stats/embeddings).")
+    ap.add_argument("--no-artifacts-embeddings", action="store_true", help="Disable embeddings artifacts.")
+    ap.add_argument("--no-artifacts-stats", action="store_true", help="Disable stats artifacts.")
+    ap.add_argument("--artifacts-embed-episodes", type=int, default=32, help="Episodes used for embedding artifacts.")
+    ap.add_argument("--artifacts-embed-seed", type=int, default=None, help="Force a single seed for embedding artifacts.")
+    ap.add_argument("--artifacts-embeddings-max-nodes", type=int, default=4096, help="Skip embeddings if N exceeds this.")
+
+    ap.add_argument("--override", action="append", default=None, help="Extra override key=value (repeatable).")
+
+    args = ap.parse_args(argv)
 
     ckpt_path = _as_path(args.ckpt) if args.ckpt else None
-    if ckpt_path is None and args.config:
-        ckpt_path = _as_path(args.config)
-
-    if ckpt_path is None:
-        raise SystemExit("Provide --ckpt (recommended) or --config (baseline-only mode).")
-
+    config_path = _as_path(args.config) if args.config else None
     outdir = _as_path(args.outdir)
 
-    seeds = _parse_seeds(args.seeds)
-    overrides = _kv_overrides(args.override)
+    extra_overrides = _parse_overrides_list(args.override)
 
-    
-    # If user provided --config, treat it as the config-source override
-    # (even if --ckpt is also provided).
-    if args.config:
-        overrides = dict(overrides or {})
-        overrides["_eval_config_path"] = str(_as_path(args.config))
-
-    baseline_coins_kwargs = _parse_baseline_coins_kwargs(args.baseline_coins or [])
-    baseline_policy_kwargs = _parse_baseline_policy_kwargs(args.baseline_policy or [])
+    baseline_coins_kwargs = _parse_json_dict(args.baseline_coins_kwargs)
+    baseline_policy_kwargs = _parse_json_dict(args.baseline_policy_kwargs)
 
     run_eval(
         ckpt_path=ckpt_path,
+        config_path=config_path,
         outdir=outdir,
         suite=args.suite,
         device=args.device or ("cuda" if torch.cuda.is_available() else "cpu"),
-        seeds=seeds,
-        episodes=args.episodes,
-        ablations=args.ablations or [],
+        seeds=int(args.seeds),
+        episodes=int(args.episodes),
+        ablations=list(args.ablations or []),
         plots=bool(args.plots),
-        extra_overrides=overrides,
+        extra_overrides=extra_overrides or None,
         policy=str(args.policy),
-
-        baseline_kind=str(args.baseline),
-        baseline_coins_kwargs=baseline_coins_kwargs,
-        baseline_policy_kwargs=baseline_policy_kwargs,
+        baseline_kind=str(args.baseline_kind),
+        baseline_coins_kwargs=baseline_coins_kwargs or None,
+        baseline_policy_kwargs=baseline_policy_kwargs or None,
         report=bool(args.report),
         strict_ablations=bool(args.strict_ablations),
-
         robust_sweep=bool(args.robust_sweep),
-        robust_sweep_kinds=list(args.robust_sweep_kinds or []),
+        robust_sweep_kinds=list(args.robust_sweep_kinds or []) or None,
         robust_sweep_sigma=args.robust_sweep_sigma,
         robust_sweep_trials=args.robust_sweep_trials,
         robust_sweep_bootstrap=int(args.robust_sweep_bootstrap),
         robust_sweep_include_ablations=bool(args.robust_sweep_include_ablations),
         robust_sweep_max_plot_metrics=int(args.robust_sweep_max_plot_metrics),
-
         artifacts=(not bool(args.no_artifacts)),
-        artifacts_embeddings=(not bool(args.no_embeddings)),
-        artifacts_stats=(not bool(args.no_stats)),
-        artifacts_embed_episodes=int(args.embeddings_episodes),
-        artifacts_embed_seed=(int(args.embeddings_seed) if args.embeddings_seed is not None else None),
-        artifacts_embeddings_max_nodes=int(args.embeddings_max_nodes),
+        artifacts_embeddings=(not bool(args.no_artifacts_embeddings)),
+        artifacts_stats=(not bool(args.no_artifacts_stats)),
+        artifacts_embed_episodes=int(args.artifacts_embed_episodes),
+        artifacts_embed_seed=args.artifacts_embed_seed,
+        artifacts_embeddings_max_nodes=int(args.artifacts_embeddings_max_nodes),
     )
+    return 0
 
-    
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
+
+
+
 
 
 

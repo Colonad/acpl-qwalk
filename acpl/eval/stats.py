@@ -45,6 +45,19 @@ __all__ = [
     "finalize_stats",
     "augment_stats",
 
+
+    # attribution / masking helpers (deltas + bootstrap CI)
+    "BootstrapCI",
+    "DeltaSummary",
+    "bootstrap_ci",
+    "paired_deltas",
+    "summarize_delta",
+    "summarize_named_deltas",
+    "format_delta_table",
+    "cohens_d",
+    "hedges_g",
+
+
 ]
 
 
@@ -1056,4 +1069,591 @@ def finalize_stats(
 
     return processed
 
+# =============================================================================
+# Attribution / masking helpers: deltas + bootstrap CI
+# =============================================================================
+
+@dataclass(frozen=True)
+class BootstrapCI:
+    """
+    Bootstrap confidence interval for a scalar statistic.
+
+    All fields are JSON-serializable.
+
+    Notes:
+      - `stat` is the statistic on the *original* (finite-filtered) sample.
+      - CI bounds are computed from bootstrap replicates.
+      - If there are insufficient finite samples, fields may be NaN.
+    """
+
+    n: int
+    stat: float
+    low: float
+    high: float
+    alpha: float
+    method: Literal["percentile", "bca"]
+    n_boot: int
+    seed: int
+    finite_n: int
+    dropped_nonfinite_n: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DeltaSummary:
+    """
+    Paired/unpaired delta summary between a baseline sample and a perturbed/masked sample.
+
+    This is the "substructure masking analogue" helper:
+      - you run eval normally -> baseline metrics
+      - you run eval under a mask -> masked metrics
+      - this object summarizes the delta + CI for defendable reporting.
+
+    Fields:
+      base: MetricSummary over baseline sample
+      pert: MetricSummary over perturbed sample
+      delta: MetricSummary over (pert - base) if paired, else difference of means (as a 1-sample)
+      ci_mean_delta: BootstrapCI on mean(delta) (paired) or mean(pert) - mean(base) (unpaired via
+                    bootstrap on each sample + differencing)  [implemented as paired delta when possible]
+      rel_change_mean: (mean(pert) - mean(base)) / max(|mean(base)|, eps)
+    """
+
+    paired: bool
+    base: MetricSummary
+    pert: MetricSummary
+    delta: MetricSummary
+    ci_mean_delta: BootstrapCI | None
+    rel_change_mean: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "paired": bool(self.paired),
+            "base": self.base.to_dict(),
+            "pert": self.pert.to_dict(),
+            "delta": self.delta.to_dict(),
+            "ci_mean_delta": None if self.ci_mean_delta is None else self.ci_mean_delta.to_dict(),
+            "rel_change_mean": float(self.rel_change_mean),
+        }
+
+
+# ------------------------------
+# Internal numeric utilities
+# ------------------------------
+
+def _finite_1d(x: Any) -> tuple[np.ndarray, int]:
+    """
+    Convert to 1D float64 numpy array and filter non-finite values.
+
+    Returns: (finite_values, dropped_nonfinite_count)
+    """
+    arr = _to_1d_numpy(x)
+    finite_mask = np.isfinite(arr)
+    dropped = int((~finite_mask).sum())
+    return arr[finite_mask], dropped
+
+
+def _mean_np(x: np.ndarray) -> float:
+    return float(np.mean(x)) if x.size > 0 else float("nan")
+
+
+def _norm_cdf(z: float) -> float:
+    # Standard normal CDF via erf
+    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+
+def _norm_ppf(p: float) -> float:
+    """
+    Inverse standard normal CDF (probit), Acklam-style rational approximation.
+
+    Valid for p in (0,1). Raises for invalid p.
+    """
+    if not (0.0 < p < 1.0):
+        raise ValueError(f"p must be in (0,1), got {p}")
+
+    # Coefficients from Peter J. Acklam's approximation
+    a = [
+        -3.969683028665376e01,
+        2.209460984245205e02,
+        -2.759285104469687e02,
+        1.383577518672690e02,
+        -3.066479806614716e01,
+        2.506628277459239e00,
+    ]
+    b = [
+        -5.447609879822406e01,
+        1.615858368580409e02,
+        -1.556989798598866e02,
+        6.680131188771972e01,
+        -1.328068155288572e01,
+    ]
+    c = [
+        -7.784894002430293e-03,
+        -3.223964580411365e-01,
+        -2.400758277161838e00,
+        -2.549732539343734e00,
+        4.374664141464968e00,
+        2.938163982698783e00,
+    ]
+    d = [
+        7.784695709041462e-03,
+        3.224671290700398e-01,
+        2.445134137142996e00,
+        3.754408661907416e00,
+    ]
+
+    plow = 0.02425
+    phigh = 1.0 - plow
+
+    if p < plow:
+        q = math.sqrt(-2.0 * math.log(p))
+        num = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+        den = ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        return num / den
+
+    if p > phigh:
+        q = math.sqrt(-2.0 * math.log(1.0 - p))
+        num = -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+        den = ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        return num / den
+
+    q = p - 0.5
+    r = q * q
+    num = (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
+    den = (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+    return num / den
+
+
+def _bootstrap_reps(
+    x: np.ndarray,
+    *,
+    stat_fn: callable,
+    n_boot: int,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    n = int(x.size)
+    if n <= 0:
+        return np.asarray([], dtype=np.float64)
+    idx = rng.integers(0, n, size=(int(n_boot), n), endpoint=False)
+    xb = x[idx]  # (B, n)
+    # apply statistic along axis 1
+    return np.asarray([stat_fn(row) for row in xb], dtype=np.float64)
+
+
+def _jackknife_stats(x: np.ndarray, *, stat_fn: callable) -> np.ndarray:
+    n = int(x.size)
+    if n <= 1:
+        return np.asarray([], dtype=np.float64)
+    out = np.empty((n,), dtype=np.float64)
+    for i in range(n):
+        out[i] = float(stat_fn(np.delete(x, i)))
+    return out
+
+
+def bootstrap_ci(
+    samples: Any,
+    *,
+    stat: Literal["mean", "median"] | callable = "mean",
+    alpha: float = 0.05,
+    n_boot: int = 2000,
+    seed: int = 0,
+    method: Literal["percentile", "bca"] = "bca",
+) -> BootstrapCI:
+    """
+    Bootstrap CI for a scalar statistic on a 1D sample.
+
+    - Filters non-finite values first (NaN/Inf).
+    - Supports percentile and BCa intervals.
+    - Defaults to BCa (more defendable under skew / bias).
+
+    Returns BootstrapCI; if insufficient finite samples, CI bounds are NaN.
+    """
+    x, dropped = _finite_1d(samples)
+    n = int(_to_1d_numpy(samples).size)
+    finite_n = int(x.size)
+
+    if isinstance(stat, str):
+        if stat == "mean":
+            stat_fn = lambda a: float(np.mean(a)) if a.size > 0 else float("nan")
+        elif stat == "median":
+            stat_fn = lambda a: float(np.median(a)) if a.size > 0 else float("nan")
+        else:
+            raise ValueError(f"Unknown stat '{stat}'. Use 'mean', 'median', or a callable.")
+        stat_name = stat
+    else:
+        stat_fn = stat
+        stat_name = getattr(stat, "__name__", "stat")
+
+    if finite_n <= 0:
+        return BootstrapCI(
+            n=n,
+            stat=float("nan"),
+            low=float("nan"),
+            high=float("nan"),
+            alpha=float(alpha),
+            method=method,
+            n_boot=int(n_boot),
+            seed=int(seed),
+            finite_n=int(finite_n),
+            dropped_nonfinite_n=int(dropped),
+        )
+
+    theta_hat = float(stat_fn(x))
+
+    # If finite_n == 1, bootstrap is degenerate; CI is undefined -> NaN bounds
+    if finite_n <= 1 or n_boot <= 0:
+        return BootstrapCI(
+            n=n,
+            stat=float(theta_hat),
+            low=float("nan"),
+            high=float("nan"),
+            alpha=float(alpha),
+            method=method,
+            n_boot=int(n_boot),
+            seed=int(seed),
+            finite_n=int(finite_n),
+            dropped_nonfinite_n=int(dropped),
+        )
+
+    rng = np.random.default_rng(int(seed))
+    reps = _bootstrap_reps(x, stat_fn=stat_fn, n_boot=int(n_boot), rng=rng)
+    reps = reps[np.isfinite(reps)]
+    if reps.size == 0:
+        return BootstrapCI(
+            n=n,
+            stat=float(theta_hat),
+            low=float("nan"),
+            high=float("nan"),
+            alpha=float(alpha),
+            method=method,
+            n_boot=int(n_boot),
+            seed=int(seed),
+            finite_n=int(finite_n),
+            dropped_nonfinite_n=int(dropped),
+        )
+
+    reps.sort()
+    lo_p = float(alpha / 2.0)
+    hi_p = float(1.0 - alpha / 2.0)
+
+    def _pct(p: float) -> float:
+        # robust percentile with interpolation
+        return float(np.quantile(reps, p, method="linear"))
+
+    if method == "percentile":
+        low = _pct(lo_p)
+        high = _pct(hi_p)
+        return BootstrapCI(
+            n=n,
+            stat=float(theta_hat),
+            low=float(low),
+            high=float(high),
+            alpha=float(alpha),
+            method="percentile",
+            n_boot=int(n_boot),
+            seed=int(seed),
+            finite_n=int(finite_n),
+            dropped_nonfinite_n=int(dropped),
+        )
+
+    if method != "bca":
+        raise ValueError(f"Unknown bootstrap method '{method}' (use 'percentile' or 'bca').")
+
+    # BCa interval
+    # Bias-correction z0 from bootstrap distribution
+    prop_less = float(np.mean(reps < theta_hat))
+    # Guard against 0/1 which would send ppf to inf
+    prop_less = min(max(prop_less, 1e-12), 1.0 - 1e-12)
+    z0 = _norm_ppf(prop_less)
+
+    # Acceleration a from jackknife
+    jack = _jackknife_stats(x, stat_fn=stat_fn)
+    if jack.size == 0 or not np.isfinite(jack).all():
+        a = 0.0
+    else:
+        jack_mean = float(np.mean(jack))
+        num = float(np.sum((jack_mean - jack) ** 3))
+        den = float(6.0 * (np.sum((jack_mean - jack) ** 2) ** 1.5))
+        a = (num / den) if den > 0 else 0.0
+
+    def _bca_adj(p: float) -> float:
+        z = _norm_ppf(p)
+        adj = _norm_cdf(z0 + (z0 + z) / max(1e-12, (1.0 - a * (z0 + z))))
+        # clamp
+        return float(min(max(adj, 1e-12), 1.0 - 1e-12))
+
+    lo_adj = _bca_adj(lo_p)
+    hi_adj = _bca_adj(hi_p)
+
+    low = _pct(lo_adj)
+    high = _pct(hi_adj)
+
+    return BootstrapCI(
+        n=n,
+        stat=float(theta_hat),
+        low=float(low),
+        high=float(high),
+        alpha=float(alpha),
+        method="bca",
+        n_boot=int(n_boot),
+        seed=int(seed),
+        finite_n=int(finite_n),
+        dropped_nonfinite_n=int(dropped),
+    )
+
+
+def paired_deltas(base: Any, pert: Any) -> np.ndarray:
+    """
+    Compute paired deltas (pert - base) after converting to 1D arrays.
+
+    Rules:
+      - Both are flattened to 1D
+      - Non-finite entries are dropped *pairwise* (same indices removed from both)
+      - Lengths must match before filtering
+    """
+    a = _to_1d_numpy(base)
+    b = _to_1d_numpy(pert)
+    if a.size != b.size:
+        raise ValueError(f"Paired deltas require equal sizes. Got {a.size} vs {b.size}.")
+    finite = np.isfinite(a) & np.isfinite(b)
+    return (b[finite] - a[finite]).astype(np.float64, copy=False)
+
+
+def cohens_d(delta: Any, *, ddof: int = 1) -> float:
+    """
+    Cohen's d for paired deltas: mean(delta) / std(delta).
+
+    Returns NaN if insufficient samples or zero variance.
+    """
+    x, _ = _finite_1d(delta)
+    n = int(x.size)
+    if n <= 1:
+        return float("nan")
+    sd = float(np.std(x, ddof=ddof))
+    if sd <= 0:
+        return float("nan")
+    return float(np.mean(x) / sd)
+
+
+def hedges_g(delta: Any, *, ddof: int = 1) -> float:
+    """
+    Hedges' g for paired deltas (small-sample correction of Cohen's d).
+
+    g = J(n) * d, with J(n) = 1 - 3/(4n - 9)
+    """
+    x, _ = _finite_1d(delta)
+    n = int(x.size)
+    d = cohens_d(x, ddof=ddof)
+    if not math.isfinite(d) or n <= 1:
+        return float("nan")
+    J = 1.0 - (3.0 / max(1.0, (4.0 * n - 9.0)))
+    return float(J * d)
+
+
+def summarize_delta(
+    base: Any,
+    pert: Any,
+    *,
+    paired: bool = True,
+    eps: float = 1e-12,
+    ci: bool = True,
+    ci_alpha: float = 0.05,
+    ci_n_boot: int = 2000,
+    ci_seed: int = 0,
+    ci_method: Literal["percentile", "bca"] = "bca",
+    cfg: StatsEvalConfig | None = None,
+) -> DeltaSummary:
+    """
+    Summarize baseline vs perturbed samples.
+
+    - If paired=True, computes deltas elementwise (pert - base) with pairwise finite filtering.
+    - Computes MetricSummary for base, pert, delta.
+    - Optionally computes BootstrapCI for mean(delta).
+
+    This is the helper you want to call from evaluation when you compare:
+      ckpt_policy vs masked_policy
+      baseline vs ablation
+      clean vs disorder
+    """
+    if cfg is None:
+        cfg = StatsEvalConfig()
+
+    base_sum = summarize_samples(base, quantiles=cfg.quantiles)
+    pert_sum = summarize_samples(pert, quantiles=cfg.quantiles)
+
+    if paired:
+        d = paired_deltas(base, pert)
+        delta_sum = summarize_samples(d, quantiles=cfg.quantiles)
+        ci_obj = (
+            bootstrap_ci(
+                d,
+                stat="mean",
+                alpha=ci_alpha,
+                n_boot=ci_n_boot,
+                seed=ci_seed,
+                method=ci_method,
+            )
+            if ci
+            else None
+        )
+    else:
+        # Unpaired: still report a "delta sample" as difference of means (single value),
+        # but for CI we bootstrap the two means and subtract them.
+        a, da = _finite_1d(base)
+        b, db = _finite_1d(pert)
+
+        delta_mean = _mean_np(b) - _mean_np(a)
+        delta_sum = summarize_samples([delta_mean], quantiles=cfg.quantiles)
+
+        ci_obj = None
+        if ci:
+            rng = np.random.default_rng(int(ci_seed))
+            # bootstrap mean(a), mean(b) independently then subtract
+            rep_a = _bootstrap_reps(a, stat_fn=_mean_np, n_boot=int(ci_n_boot), rng=rng)
+            rep_b = _bootstrap_reps(b, stat_fn=_mean_np, n_boot=int(ci_n_boot), rng=rng)
+            reps = (rep_b - rep_a)
+            reps = reps[np.isfinite(reps)]
+            if reps.size > 0:
+                reps.sort()
+                lo = float(np.quantile(reps, ci_alpha / 2.0, method="linear"))
+                hi = float(np.quantile(reps, 1.0 - ci_alpha / 2.0, method="linear"))
+                ci_obj = BootstrapCI(
+                    n=int(_to_1d_numpy(base).size),
+                    stat=float(delta_mean),
+                    low=float(lo),
+                    high=float(hi),
+                    alpha=float(ci_alpha),
+                    method="percentile",
+                    n_boot=int(ci_n_boot),
+                    seed=int(ci_seed),
+                    finite_n=int(min(a.size, b.size)),
+                    dropped_nonfinite_n=int(da + db),
+                )
+
+    rel = float((pert_sum.mean - base_sum.mean) / max(abs(base_sum.mean), float(eps))) if base_sum.n > 0 else float("nan")
+
+    return DeltaSummary(
+        paired=bool(paired),
+        base=base_sum,
+        pert=pert_sum,
+        delta=delta_sum,
+        ci_mean_delta=ci_obj,
+        rel_change_mean=rel,
+    )
+
+
+def summarize_named_deltas(
+    base_metrics: Mapping[str, Any],
+    pert_metrics: Mapping[str, Any],
+    *,
+    paired: bool = True,
+    eps: float = 1e-12,
+    ci: bool = True,
+    ci_alpha: float = 0.05,
+    ci_n_boot: int = 2000,
+    ci_seed: int = 0,
+    ci_method: Literal["percentile", "bca"] = "bca",
+    cfg: StatsEvalConfig | None = None,
+    only_common_keys: bool = True,
+) -> dict[str, DeltaSummary]:
+    """
+    Compute DeltaSummary for many metrics in parallel.
+
+    If only_common_keys=True, only keys present in both mappings are used.
+    Otherwise, missing keys raise KeyError.
+    """
+    if cfg is None:
+        cfg = StatsEvalConfig()
+
+    keys = set(base_metrics.keys())
+    if only_common_keys:
+        keys = keys.intersection(set(pert_metrics.keys()))
+    else:
+        missing = keys.difference(set(pert_metrics.keys()))
+        if missing:
+            raise KeyError(f"pert_metrics missing keys: {sorted(missing)}")
+
+    out: dict[str, DeltaSummary] = {}
+    for k in sorted(keys):
+        out[k] = summarize_delta(
+            base_metrics[k],
+            pert_metrics[k],
+            paired=paired,
+            eps=eps,
+            ci=ci,
+            ci_alpha=ci_alpha,
+            ci_n_boot=ci_n_boot,
+            ci_seed=ci_seed,
+            ci_method=ci_method,
+            cfg=cfg,
+        )
+    return out
+
+
+def format_delta_table(
+    deltas: Mapping[str, DeltaSummary],
+    *,
+    cfg: StatsEvalConfig | None = None,
+    sort_by: Literal["name", "delta_mean", "abs_delta_mean", "rel_change"] = "name",
+    descending: bool = False,
+    show_ci: bool = True,
+) -> str:
+    """
+    Compact terminal table for delta summaries (good for CI logs and artifact previews).
+    """
+    if cfg is None:
+        cfg = StatsEvalConfig()
+
+    items = list(deltas.items())
+
+    def key_fn(kv: tuple[str, DeltaSummary]) -> Any:
+        name, ds = kv
+        if sort_by == "name":
+            return name
+        if sort_by == "delta_mean":
+            return ds.delta.mean
+        if sort_by == "abs_delta_mean":
+            return abs(ds.delta.mean)
+        if sort_by == "rel_change":
+            return ds.rel_change_mean
+        raise ValueError(f"Unknown sort_by={sort_by!r}")
+
+    items.sort(key=key_fn, reverse=descending)
+    if len(items) > cfg.table_max_rows:
+        items = items[: cfg.table_max_rows]
+
+    fmt = "{:" + cfg.table_float_fmt + "}"
+
+    if show_ci:
+        header = (
+            f"{'metric':<28}  {'base_mean':>12}  {'pert_mean':>12}  "
+            f"{'d_mean':>12}  {'d_CI_low':>12}  {'d_CI_high':>12}  {'rel%':>10}"
+        )
+    else:
+        header = (
+            f"{'metric':<28}  {'base_mean':>12}  {'pert_mean':>12}  "
+            f"{'d_mean':>12}  {'rel%':>10}"
+        )
+
+    lines = [header, "-" * len(header)]
+    for name, ds in items:
+        rel_pct = 100.0 * ds.rel_change_mean if math.isfinite(ds.rel_change_mean) else float("nan")
+        if show_ci and ds.ci_mean_delta is not None:
+            lines.append(
+                f"{name:<28}  "
+                f"{fmt.format(ds.base.mean):>12}  {fmt.format(ds.pert.mean):>12}  "
+                f"{fmt.format(ds.delta.mean):>12}  "
+                f"{fmt.format(ds.ci_mean_delta.low):>12}  {fmt.format(ds.ci_mean_delta.high):>12}  "
+                f"{fmt.format(rel_pct):>10}"
+            )
+        else:
+            lines.append(
+                f"{name:<28}  "
+                f"{fmt.format(ds.base.mean):>12}  {fmt.format(ds.pert.mean):>12}  "
+                f"{fmt.format(ds.delta.mean):>12}  "
+                f"{fmt.format(rel_pct):>10}"
+            )
+
+    return "\n".join(lines)
 
