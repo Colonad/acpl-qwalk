@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 import matplotlib
 import numpy as np
@@ -61,6 +62,34 @@ def ensure_numpy(x: np.ndarray | torch.Tensor) -> np.ndarray:
     if isinstance(x, torch.Tensor):
         return x.detach().cpu().numpy()
     raise TypeError(f"Unsupported type: {type(x)}")
+
+
+def _coerce_path(p: str | Path | None) -> str | None:
+    if p is None:
+        return None
+    return str(p)
+
+
+def _maybe_mkdir_for_file(path_str: str) -> None:
+    try:
+        Path(path_str).parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        # If this fails, matplotlib will raise on save anyway; keep plotting robust.
+        pass
+
+
+def _savefig(fig, savepath: str | Path | None, *, close: bool = False) -> None:
+    sp = _coerce_path(savepath)
+    if not sp:
+        return
+    _maybe_mkdir_for_file(sp)
+    fig.savefig(sp, bbox_inches="tight")
+    if close:
+        try:
+            import matplotlib.pyplot as plt  # local import to respect backend
+            plt.close(fig)
+        except Exception:
+            pass
 
 
 
@@ -182,9 +211,6 @@ def mean_ci(x, axis=0, conf: float = 0.95):
     stderr = np.sqrt(stderr2)
 
     z = z_value(conf)
-    lo = mean - z * stderr
-    hi = mean + z * stderr
-
     # Collapse CI if n<=1; if n==0 keep NaNs
     lo = np.where(n > 1, lo, mean)
     hi = np.where(n > 1, hi, mean)
@@ -195,6 +221,58 @@ def mean_ci(x, axis=0, conf: float = 0.95):
 
 
 
+def _t_crit_lookup(conf: float, df: np.ndarray) -> np.ndarray:
+    """
+    Conservative CI critical value without SciPy.
+
+    - For common conf in {0.90,0.95,0.99} and df<=30, use tabulated t critical values.
+    - Otherwise fall back to z critical value.
+    """
+    z = z_value(conf)
+    out = np.full_like(df, z, dtype=np.float64)
+
+    # Two-sided t critical values for conf in {0.90, 0.95, 0.99}
+    t_tables: dict[float, list[float]] = {
+        0.90: [
+            0.0,
+            6.313751515, 2.919985580, 2.353363435, 2.131846786, 2.015048373,
+            1.943180281, 1.894578605, 1.859548038, 1.833112933, 1.812461123,
+            1.795884819, 1.782287556, 1.770933396, 1.761310136, 1.753050356,
+            1.745883676, 1.739606726, 1.734063607, 1.729132812, 1.724718243,
+            1.720742903, 1.717144374, 1.713871528, 1.710882080, 1.708140761,
+            1.705617920, 1.703288446, 1.701130934, 1.699127027, 1.697260894,
+        ],
+        0.95: [
+            0.0,
+            12.706204736, 4.302652730, 3.182446305, 2.776445105, 2.570581836,
+            2.446911851, 2.364624251, 2.306004135, 2.262157163, 2.228138852,
+            2.200985160, 2.178812830, 2.160368657, 2.144786688, 2.131449546,
+            2.119905299, 2.109815578, 2.100922040, 2.093024054, 2.085963447,
+            2.079613845, 2.073873068, 2.068657610, 2.063898562, 2.059538553,
+            2.055529439, 2.051830516, 2.048407142, 2.045229642, 2.042272456,
+        ],
+        0.99: [
+            0.0,
+            63.656741162, 9.924843201, 5.840909310, 4.604094871, 4.032142983,
+            3.707428021, 3.499483297, 3.355387331, 3.249835544, 3.169272673,
+            3.105806516, 3.054539589, 3.012275839, 2.976842734, 2.946712883,
+            2.920781622, 2.898230519, 2.878440473, 2.860934606, 2.845339709,
+            2.831359558, 2.818756060, 2.807335684, 2.796939505, 2.787435814,
+            2.778714534, 2.770682958, 2.763262455, 2.756385903, 2.749995653,
+        ],
+    }
+
+    if conf not in t_tables:
+        return out
+
+    table = np.asarray(t_tables[conf], dtype=np.float64)
+    max_df = table.shape[0] - 1
+
+    mask = (df >= 1) & (df <= max_df)
+    if np.any(mask):
+        out[mask] = table[df[mask]]
+
+    return out
 
 
 # --------------------------------------------------------------------------------------
@@ -211,7 +289,8 @@ def _pick_nodes_for_timelines(
       - else pick `topk` nodes by mass at final time T-1
       - fallback to all nodes if N<=topk or topk is None
     """
-    T, N = Pt.shape
+    if N <= 0:
+        return []
     if nodes is not None:
         idx = list(nodes)
         if not all(0 <= i < N for i in idx):
@@ -278,6 +357,12 @@ def plot_position_timelines(
     nodes_to_plot = _pick_nodes_for_timelines(Pm.mean(axis=0), topk=topk, nodes=nodes)
     K = len(nodes_to_plot)
 
+
+
+    if K == 0:
+        raise ValueError("No nodes selected to plot (graph has N=0 or selection empty).")
+
+
     # layout
     cols = min(4, K)
     rows = int(np.ceil(K / cols))
@@ -326,6 +411,56 @@ def plot_position_timelines(
     return fig, axs
 
 
+
+
+
+
+
+def _looks_like_Pt_matrix(A: np.ndarray) -> bool:
+    """
+    Heuristic to decide if a 2D array is Pt (T,N) vs TV curves (S,T).
+
+    - If row sums are close to 1 and values are mostly within [0,1], treat as Pt.
+    - Handles complex amplitudes by testing on |A|^2.
+    """
+    if A.ndim != 2 or A.size == 0:
+        return False
+
+    B = A
+    if np.iscomplexobj(B):
+        B = np.abs(B) ** 2
+    B = B.astype(np.float64, copy=False)
+    B = np.where(np.isfinite(B), B, np.nan)
+
+    mn = np.nanmin(B)
+    mx = np.nanmax(B)
+    if mn < -1e-3:
+        return False
+    if mx > 1.5:
+        return False
+
+    row_sums = np.nansum(np.where(np.isnan(B), 0.0, np.clip(B, 0.0, None)), axis=-1)
+    if row_sums.size == 0:
+        return False
+    med = float(np.nanmedian(row_sums))
+    return abs(med - 1.0) <= 0.05
+
+
+def _clean_tv(tv: np.ndarray) -> np.ndarray:
+    tv = np.asarray(tv, dtype=np.float64)
+    tv = np.where(np.isfinite(tv), tv, np.nan)
+    # Clip only tiny numerical overshoots; keep big anomalies visible.
+    eps = 1e-9
+    tv = np.where(tv < -eps, tv, np.maximum(tv, 0.0))
+    tv = np.where(tv > 1.0 + eps, tv, np.minimum(tv, 1.0))
+    return tv
+
+
+
+
+
+
+
 # --------------------------------------------------------------------------------------
 #                                  Plot: TV curves
 # --------------------------------------------------------------------------------------
@@ -337,7 +472,8 @@ def plot_tv_curves(
     logy: bool = False,
     style: PlotStyle | None = None,
     title: str | None = "Total Variation to uniform vs time",
-    savepath: str | None = None,
+    savepath: str | Path | None = None,
+    close: bool = False,
 ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """
     Plot total-variation distance TV(P_t, U) along the horizon.
@@ -367,21 +503,19 @@ def plot_tv_curves(
     A = ensure_numpy(Pt)
 
     # Accept either:
-    #  - Pt probabilities: (T,N) or (S,T,N)
+    #  - Pt probabilities/amplitudes: (T,N) or (S,T,N)
     #  - tv curves directly: (T,) or (S,T)
     if A.ndim == 1:
-        tv = np.asarray(A, dtype=np.float64)
+        tv = _clean_tv(A)
     elif A.ndim == 2:
-        # Heuristic: if rows sum ~ 1, treat as Pt (T,N). Otherwise treat as tv (S,T).
-        row_sums = np.sum(np.where(np.isfinite(A), A, 0.0), axis=-1)
-        if np.allclose(row_sums, 1.0, atol=1e-3, rtol=1e-3):
-            P = _as_probabilities(A)
-            tv = tv_curve(P)
+        if _looks_like_Pt_matrix(A):
+            tv = tv_curve(_as_probabilities(A))
         else:
-            tv = np.asarray(A, dtype=np.float64)
+            tv = _clean_tv(A)
+    elif A.ndim == 3:
+        tv = tv_curve(_as_probabilities(A))
     else:
-        P = _as_probabilities(A)
-        tv = tv_curve(P)
+        raise ValueError(f"Expected (T,), (S,T), (T,N) or (S,T,N); got {A.shape}.")
 
 
 
@@ -412,9 +546,8 @@ def plot_tv_curves(
 
     if st.tight_layout:
         fig.tight_layout()
-    if savepath:
-        fig.savefig(savepath, bbox_inches="tight")
-    return fig, ax
+    _savefig(fig, savepath, close=close)
+    return fig, axs
 
 
 # --------------------------------------------------------------------------------------
@@ -464,7 +597,8 @@ def plot_robustness_sweep(
     fig, ax = plt.subplots(1, 1, figsize=st.figsize, dpi=st.dpi)
 
     for name, arr in metrics.items():
-        Y = ensure_numpy(arr).astype(np.float64)
+        Y = np.where(np.isfinite(ensure_numpy(arr)), ensure_numpy(arr), np.nan).astype(np.float64)
+
         if Y.ndim == 1:
             if Y.shape[0] != M:
                 raise ValueError(
@@ -493,9 +627,9 @@ def plot_robustness_sweep(
 
     if st.tight_layout:
         fig.tight_layout()
-    if savepath:
-        fig.savefig(savepath, bbox_inches="tight")
+    _savefig(fig, savepath, close=close)
     return fig, ax
+
 
 
 # --------------------------------------------------------------------------------------
