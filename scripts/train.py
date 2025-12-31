@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # scripts/train.py
 from __future__ import annotations
 

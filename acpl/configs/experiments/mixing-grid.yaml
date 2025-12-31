@@ -56,7 +56,7 @@ data:
   family: "grid-2d"
 
   grid:
-    boundary: "periodic"
+    boundary: "open"
     # (Optional) coordinate normalization used in features; kept here as provenance
     coords_normalize: true
 
