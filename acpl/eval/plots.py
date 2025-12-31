@@ -85,6 +85,19 @@ def ensure_numpy(x: np.ndarray | torch.Tensor | Sequence[np.ndarray | torch.Tens
             raise ValueError(f"ensure_numpy: cannot stack sequence; shapes={shapes}") from e
     raise TypeError(f"Unsupported type: {type(x)}")
 
+def sanitize_token(s: str) -> str:
+    s = (s or "").strip()
+    s = "".join(ch if (ch.isalnum() or ch in ("-", "_", ".")) else "_" for ch in s)
+    while "__" in s:
+        s = s.replace("__", "_")
+    return s.strip("_") or "x"
+
+def figs_savepath(evaldir: str | Path, kind: str, cond: str = "_ALL_", *tags: str, ext: str = ".png") -> Path:
+    evaldir = Path(evaldir)
+    figdir = evaldir / "figs"
+    figdir.mkdir(parents=True, exist_ok=True)
+    stem = "__".join([sanitize_token(kind), sanitize_token(cond), *[sanitize_token(t) for t in tags if t]])
+    return figdir / f"{stem}{ext}"
 
 
 def _coerce_path(p: str | Path | None) -> str | None:
@@ -319,56 +332,14 @@ def mean_ci(x, axis: int = 0, conf: float = 0.95):
 
 def _t_crit_lookup(conf: float, df: np.ndarray) -> np.ndarray:
     """
-    Conservative CI critical value without SciPy.
+    Compatibility alias: compute two-sided critical values for a CI.
 
-    - For common conf in {0.90,0.95,0.99} and df<=30, use tabulated t critical values.
-    - Otherwise fall back to z critical value.
+    IMPORTANT:
+    - This function is about *statistical critical values* (t or z), not training results.
+    - We avoid hardcoded lookup tables; use SciPy when available, otherwise fall back to z.
     """
-    z = z_value(conf)
-    out = np.full_like(df, z, dtype=np.float64)
+    return _t_crit(conf, df)
 
-    # Two-sided t critical values for conf in {0.90, 0.95, 0.99}
-    t_tables: dict[float, list[float]] = {
-        0.90: [
-            0.0,
-            6.313751515, 2.919985580, 2.353363435, 2.131846786, 2.015048373,
-            1.943180281, 1.894578605, 1.859548038, 1.833112933, 1.812461123,
-            1.795884819, 1.782287556, 1.770933396, 1.761310136, 1.753050356,
-            1.745883676, 1.739606726, 1.734063607, 1.729132812, 1.724718243,
-            1.720742903, 1.717144374, 1.713871528, 1.710882080, 1.708140761,
-            1.705617920, 1.703288446, 1.701130934, 1.699127027, 1.697260894,
-        ],
-        0.95: [
-            0.0,
-            12.706204736, 4.302652730, 3.182446305, 2.776445105, 2.570581836,
-            2.446911851, 2.364624251, 2.306004135, 2.262157163, 2.228138852,
-            2.200985160, 2.178812830, 2.160368657, 2.144786688, 2.131449546,
-            2.119905299, 2.109815578, 2.100922040, 2.093024054, 2.085963447,
-            2.079613845, 2.073873068, 2.068657610, 2.063898562, 2.059538553,
-            2.055529439, 2.051830516, 2.048407142, 2.045229642, 2.042272456,
-        ],
-        0.99: [
-            0.0,
-            63.656741162, 9.924843201, 5.840909310, 4.604094871, 4.032142983,
-            3.707428021, 3.499483297, 3.355387331, 3.249835544, 3.169272673,
-            3.105806516, 3.054539589, 3.012275839, 2.976842734, 2.946712883,
-            2.920781622, 2.898230519, 2.878440473, 2.860934606, 2.845339709,
-            2.831359558, 2.818756060, 2.807335684, 2.796939505, 2.787435814,
-            2.778714534, 2.770682958, 2.763262455, 2.756385903, 2.749995653,
-        ],
-    }
-
-    if conf not in t_tables:
-        return out
-
-    table = np.asarray(t_tables[conf], dtype=np.float64)
-    max_df = table.shape[0] - 1
-
-    mask = (df >= 1) & (df <= max_df)
-    if np.any(mask):
-        out[mask] = table[df[mask]]
-
-    return out
 
 
 # --------------------------------------------------------------------------------------

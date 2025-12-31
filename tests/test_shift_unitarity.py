@@ -306,7 +306,7 @@ def test_random_er_graphs_unitarity_and_involution(N, p, seed):
 
 
 def test_shift_on_available_device():
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     pairs = [(0, 1), (1, 2), (2, 3), (3, 0)]
     pm = build_portmap(pairs, num_nodes=4, coalesce=False)
     S = build_shift(pm)

@@ -44,8 +44,10 @@ __all__ = [
     "CacheStats",
     # CI reproducibility (new)
     "make_eval_manifest",
+    "read_eval_index",
     "read_eval_manifest",
     "verify_manifest",
+
 ]
 
 
@@ -780,6 +782,72 @@ def _git_head_info() -> dict[str, Any]:
     return out
 
 
+
+
+# ----------------------------- eval index helpers -----------------------------
+
+_EVAL_INDEX_CANDIDATES = (
+    "index.json",
+    "eval_index.json",
+    "index.jsonl",
+    "eval_index.jsonl",
+)
+
+
+def _resolve_eval_index_path(p: str | Path) -> Path:
+    """
+    Accept either:
+      - a file path to an index (json/jsonl), OR
+      - a directory that contains a known index filename.
+    """
+    path = Path(p)
+    if path.is_dir():
+        for name in _EVAL_INDEX_CANDIDATES:
+            cand = path / name
+            if cand.exists():
+                return cand
+        raise FileNotFoundError(
+            f"[manifest] No eval index found in directory: {path}\n"
+            f"Tried: {', '.join(_EVAL_INDEX_CANDIDATES)}"
+        )
+    if not path.exists():
+        raise FileNotFoundError(f"[manifest] Eval index path does not exist: {path}")
+    return path
+
+
+def read_eval_index(p: str | Path) -> dict[str, Any]:
+    """
+    Read an evaluation index from JSON or JSONL.
+
+    - .json must decode to a dict
+    - .jsonl:
+        * if exactly one dict row exists -> return that dict
+        * else -> return {"rows": [...]} (rows are parsed JSON objects)
+    """
+    path = _resolve_eval_index_path(p)
+    suf = path.suffix.lower()
+
+    if suf == ".jsonl":
+        rows: list[Any] = []
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                s = line.strip()
+                if not s:
+                    continue
+                rows.append(json.loads(s))
+        if len(rows) == 1 and isinstance(rows[0], dict):
+            return rows[0]
+        return {"rows": rows}
+
+    with path.open("r", encoding="utf-8") as f:
+        obj = json.load(f)
+    if not isinstance(obj, dict):
+        raise ValueError(f"[manifest] Expected JSON object/dict in {path}, got {type(obj).__name__}")
+    return obj
+
+
+
+
 def make_eval_manifest(
     config: Mapping[str, Any],
     *,
@@ -964,61 +1032,118 @@ def verify_manifest(
 ) -> bool:
     """
     Validate that:
+      - index.json schema_version is supported
       - index.json manifest_hex matches each entry's manifest_hex
-      - each entry is self-consistent w.r.t. route_triplet(...) given (graph_id, task_id, base_seed)
-      - required fields are present and correctly typed
+      - the JSONL file digests match index.json (blake2b_256 + sha256)
+      - entries have required fields for the current schema:
+            manifest_hex, split, global_idx, episode_seed
+      - (optional) if seed_rule is the public blake2b rule, episode_seed matches it
     """
-    manifest_dir = Path(manifest_dir)
-    idx = read_eval_index(manifest_dir)
-    man_hex = str(idx.get("manifest_hex", ""))
+    ok = True
 
-    if not man_hex:
-        msg = "index.json missing manifest_hex"
+    def _bad(msg: str) -> None:
+        nonlocal ok
+        ok = False
         if strict:
             raise ValueError(msg)
-        return False
 
-    entries = read_eval_manifest(manifest_dir, split)
+    # Resolve index path (tests pass .../index.json)
+    index_path = _resolve_eval_index_path(manifest_dir)
+    idx = read_eval_index(index_path)
 
-    ok = True
+    if idx.get("schema_version") != 1:
+        _bad(f"Unsupported schema_version in index: {idx.get('schema_version')!r}")
+        return ok
+
+    splits_meta = idx.get("splits", {})
+    if not isinstance(splits_meta, dict) or str(split) not in splits_meta:
+        _bad(f"Split {split!r} not listed in index.json")
+        return ok
+
+    man_hex = str(idx.get("manifest_hex", "")).strip()
+    if not man_hex:
+        _bad("index.json missing manifest_hex")
+        return ok
+
+    sp_meta = splits_meta[str(split)]
+    if not isinstance(sp_meta, dict):
+        _bad(f"index.json splits[{split!r}] must be a dict")
+        return ok
+
+    rel = sp_meta.get("file", None)
+    if not isinstance(rel, str) or not rel.strip():
+        _bad(f"index.json splits[{split!r}] missing/invalid 'file'")
+        return ok
+
+    jsonl_path = index_path.parent / rel
+    if not jsonl_path.exists():
+        _bad(f"Missing JSONL for split {split!r}: {jsonl_path}")
+        return ok
+
+    # Verify digests
+    want_b2 = sp_meta.get("blake2b_256", None)
+    want_sh = sp_meta.get("sha256", None)
+    got_b2, got_sh = _file_digests(jsonl_path)
+
+    if isinstance(want_b2, str) and want_b2 and got_b2 != want_b2:
+        _bad(f"Digest mismatch (blake2b_256) for {jsonl_path.name}: index={want_b2} got={got_b2}")
+    if isinstance(want_sh, str) and want_sh and got_sh != want_sh:
+        _bad(f"Digest mismatch (sha256) for {jsonl_path.name}: index={want_sh} got={got_sh}")
+
+    # Load entries (this already checks schema_version + split existence)
+    entries = read_eval_manifest(index_path, split)
+
+    # Verify count if present
+    want_count = sp_meta.get("count", None)
+    if want_count is not None:
+        try:
+            if int(want_count) != len(entries):
+                _bad(f"Count mismatch for split {split!r}: index={int(want_count)} file={len(entries)}")
+        except Exception:
+            _bad(f"index.json splits[{split!r}]['count'] must be int-like, got {want_count!r}")
+
+    # Per-entry checks
+    seen_global: set[int] = set()
+    seed_rule = str(idx.get("seed_rule", "")).strip()
+
     for e in entries:
-        # 1) manifest hex must match
-        if str(e.get("manifest_hex", "")) != man_hex:
-            ok = False
-            msg = f"manifest_hex mismatch: entry={e.get('manifest_hex')} index={man_hex}"
-            if strict:
-                raise ValueError(msg)
+        if str(e.get("manifest_hex", "")).strip() != man_hex:
+            _bad(f"manifest_hex mismatch: entry={e.get('manifest_hex')} index={man_hex}")
 
-        # 2) required fields
-        for k in ("graph_id", "task_id", "base_seed", "episode_seed", "split"):
-            if k not in e:
-                ok = False
-                if strict:
-                    raise ValueError(f"missing required key {k!r} in entry: {e}")
+        if str(e.get("split", "")).strip() != str(split):
+            _bad(f"split mismatch: entry={e.get('split')!r} expected={split!r}")
 
-        # If required keys missing and not strict, skip deeper checks
-        if not all(k in e for k in ("graph_id", "task_id", "base_seed", "episode_seed", "split")):
+        if "global_idx" not in e:
+            _bad(f"missing required key 'global_idx' in entry: {e}")
+            continue
+        if "episode_seed" not in e:
+            _bad(f"missing required key 'episode_seed' in entry: {e}")
             continue
 
-        # 3) route_triplet consistency
-        g_id = int(e["graph_id"])
-        t_id = int(e["task_id"])
-        base_seed = int(e["base_seed"])
-        split2, ep_seed = route_triplet(graph_id=g_id, task_id=t_id, base_seed=base_seed)
+        try:
+            gidx = int(e["global_idx"])
+        except Exception:
+            _bad(f"global_idx must be int-like, got {e.get('global_idx')!r}")
+            continue
 
-        if str(split2) != str(e["split"]):
-            ok = False
-            msg = f"split mismatch: route_triplet={split2} entry={e['split']}"
-            if strict:
-                raise ValueError(msg)
+        try:
+            epseed = int(e["episode_seed"])
+        except Exception:
+            _bad(f"episode_seed must be int-like, got {e.get('episode_seed')!r}")
+            continue
 
-        if int(ep_seed) != int(e["episode_seed"]):
-            ok = False
-            msg = f"episode_seed mismatch: route_triplet={ep_seed} entry={e['episode_seed']}"
-            if strict:
-                raise ValueError(msg)
+        if gidx in seen_global:
+            _bad(f"duplicate global_idx={gidx} in {jsonl_path.name}")
+        seen_global.add(gidx)
+
+        # If using the public seed rule, verify epseed matches it
+        if seed_rule == "blake2b8(manifest_hex|split|global_idx) mod 2^32":
+            expect = _derive_episode_seed(man_hex, str(split), gidx)
+            if epseed != int(expect):
+                _bad(f"episode_seed mismatch at global_idx={gidx}: expect={expect} got={epseed}")
 
     return ok
+
 
 
 

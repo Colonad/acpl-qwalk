@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from .segment import segment_sum
 
 import torch
 import torch.nn as nn
@@ -88,6 +89,71 @@ def _add_self_loops(
     return ei, ew
 
 
+
+
+
+def _segment_sum_det(values: torch.Tensor, index: torch.Tensor, num_segments: int) -> torch.Tensor:
+    """
+    Deterministic segment sum over `index` (like scatter_add / bincount(weights=...))
+    implemented via stable sort + prefix sums (no atomics).
+
+    values: (E,) or (E, F)
+    index:  (E,) long
+    returns: (num_segments,) or (num_segments, F)
+    """
+    if index.numel() == 0:
+        out_shape = (num_segments,) + tuple(values.shape[1:])
+        return torch.zeros(out_shape, device=values.device, dtype=values.dtype)
+
+    if index.dtype != torch.long:
+        index = index.to(torch.long)
+
+    E = int(index.numel())
+    device = index.device
+
+    # Force stability without relying on argsort(stable=True):
+    # sort by (index, original_position)
+    pos = torch.arange(E, device=device, dtype=torch.int64)
+    key = index.to(torch.int64) * (E + 1) + pos
+    order = torch.argsort(key)
+
+    idx = index.index_select(0, order)
+    vals = values.index_select(0, order)
+
+    squeeze_1d = False
+    if vals.ndim == 1:
+        vals = vals.unsqueeze(1)
+        squeeze_1d = True
+
+    # Accumulate in fp64 for extra numerical stability (helps tight allclose tests).
+    if vals.dtype in (torch.float16, torch.bfloat16, torch.float32):
+        acc_dtype = torch.float64
+    else:
+        acc_dtype = vals.dtype
+
+    cs = vals.to(acc_dtype).cumsum(dim=0)  # (E, F)
+    cs = torch.cat([torch.zeros_like(cs[:1]), cs], dim=0)  # (E+1, F)
+
+    # segment starts where idx changes
+    change = torch.ones(E, device=device, dtype=torch.bool)
+    change[1:] = idx[1:] != idx[:-1]
+    start = torch.nonzero(change, as_tuple=False).flatten()  # (S,)
+    end = torch.empty_like(start)
+    end[:-1] = start[1:]
+    end[-1] = E
+
+    seg = cs.index_select(0, end) - cs.index_select(0, start)  # (S, F)
+    out = torch.zeros((num_segments, seg.shape[1]), device=device, dtype=seg.dtype)
+    out.index_copy_(0, idx.index_select(0, start), seg)
+
+    out = out.to(values.dtype)
+    if squeeze_1d:
+        out = out.squeeze(1)
+    return out
+
+
+
+
 def _normalize_renorm(
     edge_index: torch.Tensor,
     edge_weight: torch.Tensor | None,
@@ -101,7 +167,13 @@ def _normalize_renorm(
     row = ei[0]
     col = ei[1]
 
-    deg = torch.bincount(row, weights=ew, minlength=num_nodes).to(torch.float32)
+    # NOTE: torch.bincount(..., weights=...) uses atomics on CUDA -> nondeterministic.
+    # Use deterministic segment sum on CUDA to satisfy tight equivariance/grad tests.
+    if ew.is_cuda:
+        deg = _segment_sum_det(ew, row, num_nodes).to(torch.float32)
+    else:
+        deg = torch.bincount(row, weights=ew, minlength=num_nodes).to(torch.float32)
+
     deg_inv_sqrt = (deg + eps).pow(-0.5)
 
     norm_w = ew * deg_inv_sqrt[row] * deg_inv_sqrt[col]
@@ -110,37 +182,20 @@ def _normalize_renorm(
 
 @_compile_disable
 def _spmm(ei: torch.Tensor, ew: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-    """
-    Sparse COO matmul: (N×N)_sparse @ (N×F)_dense.
+    N = int(x.size(0))
 
-    Important: torch.sparse.mm on CUDA does NOT support float16,
-    and autocast may try to run it in half. We therefore:
-      - upcast inputs to float32,
-      - disable autocast just for this op,
-      - cast back to the original dtype of x afterwards.
-    """
-    n = x.size(0)
-    device = x.device
-    orig_dtype = x.dtype
+    # Ensure indices live on the same device as x
+    row = ei[0].to(device=x.device)
+    col = ei[1].to(device=x.device)
 
-    # Always compute in float32 for the sparse matmul
-    x32 = x.to(torch.float32)
-    ew32 = ew.to(torch.float32)
+    ew = ew.to(device=x.device, dtype=x.dtype)
+    msg = x.index_select(0, col) * ew.unsqueeze(-1)  # [E, F]
 
-    A = torch.sparse_coo_tensor(ei, ew32, size=(n, n), device=device).coalesce()
+    # segment_sum uses index_add_ (atomics) on CUDA -> nondeterministic.
+    if msg.is_cuda:
+        return _segment_sum_det(msg, row, N)
+    return segment_sum(msg, row, N)
 
-    if device.type == "cuda":
-        # Run sparse.mm outside autocast to prevent it from going to half
-        with _autocast_ctx("cuda", enabled=False):
-            out32 = torch.sparse.mm(A, x32)
-    else:
-        out32 = torch.sparse.mm(A, x32)
-
-
-    # Cast back to the original dtype (fp16/bf16/etc.) if needed
-    if orig_dtype != torch.float32:
-        return out32.to(orig_dtype)
-    return out32
 
 
 

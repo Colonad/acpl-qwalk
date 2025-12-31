@@ -59,6 +59,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal
+from .segment import segment_sum
 
 import torch
 from torch import nn
@@ -133,21 +134,11 @@ def _add_self_loops(edge_index: torch.Tensor, num_nodes: int) -> torch.Tensor:
 
 
 def _segment_mean(src: torch.Tensor, index: torch.Tensor, num_nodes: int) -> torch.Tensor:
-    """
-    Compute mean over incoming edges per target node with stable degree handling.
-    src:   [E, D]
-    index: [E] (dst indices)
-    Return: [N, D]
-    """
-    N, D = num_nodes, src.size(-1)
-    out = src.new_zeros((N, D))
-    out.index_add_(0, index, src)
-    deg = src.new_zeros((N,), dtype=torch.long)
-    deg.index_add_(0, index, torch.ones_like(index, dtype=torch.long))
-    # avoid divide-by-zero; will be handled by add_self_loops or clamped
-    deg = deg.clamp_min(1).to(out.dtype)
-    out = out / deg.unsqueeze(-1)
-    return out
+    s = segment_sum(src, index, num_nodes)  # [N, D]
+    ones = torch.ones((index.numel(), 1), device=src.device, dtype=src.dtype)
+    c = segment_sum(ones, index, num_nodes).clamp_min(1.0)  # [N,1]
+    return s / c
+
 
 
 # ---------- GraphSAGE convolution (mean) ----------

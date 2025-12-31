@@ -178,10 +178,10 @@ def test_dtype_coverage_and_alias(dtype):
 
 
 def test_shift_on_available_device_and_trace_simplex():
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     pairs = [(0, 1), (1, 2), (2, 3), (3, 0)]
     pm = build_portmap(pairs, num_nodes=4, coalesce=False)
-    S = build_shift(pm).to_sparse()
+    S = build_shift(pm).to_sparse(device=device, dtype=torch.complex64)
 
     A = pm.src.numel()
     psi = _rand_complex_vec((A,), seed=77, device=device)

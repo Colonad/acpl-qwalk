@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 import math
+from .segment import segment_sum
 
 import torch
 from torch import Tensor, nn
@@ -73,19 +74,17 @@ def _add_self_loops(edge_index: Tensor, num_nodes: int) -> Tensor:
 # -----------------------------------------------------------------------------
 
 
-def _segment_sum(src: Tensor, index: Tensor, n_nodes: int) -> Tensor:
-    out = torch.zeros(n_nodes, src.size(-1), device=src.device, dtype=src.dtype)
-    out.index_add_(0, index, src)
-    return out
+def _segment_sum(src: torch.Tensor, index: torch.Tensor, n_nodes: int) -> torch.Tensor:
+    return segment_sum(src, index, n_nodes)
 
 
-def _segment_count(index: Tensor, n_nodes: int, *, device=None, dtype=None) -> Tensor:
-    device = device if device is not None else index.device
-    dtype = dtype if dtype is not None else torch.float32
-    ones = torch.ones(index.size(0), 1, device=device, dtype=dtype)
-    out = torch.zeros(n_nodes, 1, device=device, dtype=dtype)
-    out.index_add_(0, index, ones)
-    return out
+def _segment_count(index: torch.Tensor, n_nodes: int, *, device=None, dtype=None) -> torch.Tensor:
+    dev = device if device is not None else index.device
+    dt = dtype if dtype is not None else torch.float32
+    ones = torch.ones((index.numel(), 1), device=dev, dtype=dt)
+    return segment_sum(ones, index.to(dev), n_nodes)
+
+
 
 
 def _segment_mean(src: Tensor, index: Tensor, n_nodes: int) -> Tensor:

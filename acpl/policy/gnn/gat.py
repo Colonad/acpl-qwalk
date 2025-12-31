@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from .segment import segment_sum
 
 import torch
 from torch import Tensor, nn
@@ -240,7 +241,7 @@ class GATConv(nn.Module):
         # Message passing: out_i = sum_{j in N(i)} alpha_ji * x_src(j)
         m = x_src * alpha.unsqueeze(-1)  # [E, H, D]
         out = torch.zeros_like(x_proj)
-        out.index_add_(0, dst, m)  # sum over incoming edges grouped by dst
+        out = segment_sum(m, dst, N)  # sum over incoming edges grouped by dst
 
         # Concat or average heads
         if self.concat:

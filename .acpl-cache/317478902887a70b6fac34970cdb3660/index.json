@@ -1,20 +1,30 @@
 {
-  "created_unix": 1760842806,
+  "created_unix": 1767157371,
+  "generator": {
+    "module": "acpl.data.generator",
+    "qualname": "EpisodeGenerator"
+  },
+  "git": {
+    "dirty": true,
+    "head": "ceb718062b773c9d79978744857704cc2b1d0a49"
+  },
   "manifest_hex": "317478902887a70b6fac34970cdb3660",
-  "rules": "phase_b2_default_v1",
+  "manifest_hex_algo": "EpisodeGenerator.manifest_hexdigest",
+  "python": "3.11.9 (main, Apr 19 2024, 16:48:06) [GCC 11.2.0]",
   "schema_version": 1,
+  "seed_rule": "EpisodeGenerator.export_eval_index",
   "splits": {
     "test": {
-      "blake2b_256": "6c27207d641fb7509a790f2150f6c5ff08cb4a45ce27dd89d1c14858d722c0ce",
+      "blake2b_256": "b5c8214b70c2eead9f5ed28c7e5b37a2c894689993e30f07599e88bf8d22861e",
       "count": 128,
       "file": "test.jsonl",
-      "sha256": "f0ca03a53bc5b0814678f1d3799e7873c00ef707b020b8b32b5a01c2c2617370"
+      "sha256": "7482e4ad5ea3c24deed338e4a328d71af5d5b003a18b1b396d13fe8471c1d934"
     },
     "val": {
-      "blake2b_256": "7ddf6a6e63d6c9c1b8ec49f692635af51c55776087d37922c8b0bb31c6251668",
-      "count": 64,
+      "blake2b_256": "e10147d583c8eb41ea35cf932278db423dea1fe21de519aea5cafae36b6ae262",
+      "count": 128,
       "file": "val.jsonl",
-      "sha256": "32736d389216d95b7ab0591a351bea6c1673422be3d0dd4b668bd9a5c0e79473"
+      "sha256": "659dd9237d049409d796cab96c18bf0c840d3fe9eb5a24028376201411335eeb"
     }
   }
 }

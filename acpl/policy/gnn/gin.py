@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 import math
+from .segment import segment_sum
+
 
 import torch
 from torch import Tensor, nn
@@ -232,7 +234,7 @@ class GINConv(nn.Module):
 
         # Sum aggregation of incoming messages per destination node
         agg = torch.zeros_like(x)  # [N, C_in]
-        agg.index_add_(0, dst, msg)
+        agg = segment_sum(msg, dst, N)
 
         # Combine self and neighborhood with learnable epsilon
         out = (1.0 + self.eps) * x + agg  # [N, C_in]

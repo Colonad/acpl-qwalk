@@ -743,9 +743,11 @@ def _degree_scores(edge_index: torch.Tensor, N: int, *, undirected: bool = True)
     dst = ei[1]
     deg = torch.zeros((N,), dtype=torch.float32, device=src.device)
     if src.numel() > 0:
-        deg.scatter_add_(0, src, torch.ones_like(src, dtype=torch.float32))
+        ones = torch.ones((src.numel(),), device=src.device, dtype=torch.float32)
+        deg.index_add_(0, src.to(torch.long), ones)
         if undirected:
-            deg.scatter_add_(0, dst, torch.ones_like(dst, dtype=torch.float32))
+            ones2 = torch.ones((dst.numel(),), device=dst.device, dtype=torch.float32)
+            deg.index_add_(0, dst.to(torch.long), ones2)
     return deg
 
 

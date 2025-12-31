@@ -141,7 +141,7 @@ def aggregate_mark_success(
     if batch_vec.numel() != P.numel():
         raise ValueError("batch length must match P length in ragged mode.")
     success = torch.zeros(G, device=P.device, dtype=P.dtype)
-    success.scatter_add_(0, batch_vec, P * mask_flat.to(P))
+    success.index_add_(0, batch_vec.to(torch.long), P * mask_flat.to(P))
     if reduce == "none":
         return success
     if reduce == "sum":

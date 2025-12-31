@@ -370,6 +370,12 @@ def _parse_figure_stem(stem: str) -> ParsedFigureName:
         return ParsedFigureName(kind=kind, cond_safe="_ALL_", tags=(), stem=stem)
 
     cond_safe = parts[1] or "_ALL_"
+
+    # Normalize common "all-conditions" sentinel used by some writers
+    if cond_safe.casefold() == "all":
+        cond_safe = "_ALL_"
+
+
     tags = tuple(p for p in parts[2:] if p)
     return ParsedFigureName(kind=kind, cond_safe=cond_safe, tags=tags, stem=stem)
 
@@ -711,6 +717,27 @@ def _pick_existing_by_ext(stem_base: Path) -> Path | None:
             return p
     return None
 
+def _pick_existing_by_ext_casefold(figdir: Path, stem: str) -> Path | None:
+    """
+    Case-insensitive variant of _pick_existing_by_ext, scoped to a directory.
+    """
+    figdir = figdir.resolve()
+    direct = _pick_existing_by_ext(figdir / stem)
+    if direct is not None:
+        return direct
+
+    if not figdir.exists() or not figdir.is_dir():
+        return None
+
+    stem_cf = stem.casefold()
+    for p in figdir.iterdir():
+        if not p.is_file():
+            continue
+        if p.suffix.lower() not in _SUPPORTED_EXTS:
+            continue
+        if p.stem.casefold() == stem_cf:
+            return p
+    return None
 
 def _choose_base_condition(evaldir: Path, *, requested: str | None) -> str:
     """
@@ -772,10 +799,20 @@ def _discover_mask_sensitivity_figs(evaldir: Path) -> list[Path]:
         if r.is_dir():
             for p in r.rglob("*"):
                 if p.is_file() and p.suffix.lower() in _SUPPORTED_EXTS:
-                    # keep only likely mask plots unless we're already in figs/
+                    
                     name = p.name.lower()
-                    if ("mask" in name) or ("sensitivity" in name) or (r.name == "figs"):
+                    stem = p.stem.lower()
+
+                    is_mask_family = (
+                        stem.startswith("mask__")
+                        or stem.startswith("mask_sensitivity__")
+                        or ("mask" in name)
+                        or ("sensitivity" in name)
+                    )
+
+                    if is_mask_family:
                         out.append(p)
+
     # deterministic
     out = sorted(set(out), key=lambda p: str(p))
     return out
@@ -849,7 +886,7 @@ def bundle_paper_figures(
         cond_safe = _sanitize(cond)
         # match eval naming patterns: <kind>__<safe>.<ext>
         for kind in canonical_kinds:
-            src = _pick_existing_by_ext(evaldir / "figs" / f"{kind}__{cond_safe}")
+            src = _pick_existing_by_ext_casefold(evaldir / "figs", f"{kind}__{cond_safe}")
             if src is None:
                 continue
             try:
