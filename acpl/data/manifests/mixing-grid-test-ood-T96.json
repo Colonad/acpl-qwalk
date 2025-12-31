@@ -12,7 +12,7 @@
   "counts": {
     "n_episodes": 150
   },
-  "created_at_utc": "2025-12-22T02:23:44+00:00",
+  "created_at_utc": "2025-12-31T23:27:33+00:00",
   "episodes": [
     {
       "episode_id": "0b7e90844c15bb6ce9eba765bc18842e",
@@ -4066,7 +4066,7 @@
     }
   ],
   "experiment_name": "mixing-grid",
-  "fingerprint_sha16": "fb22535fecda575135dd4cedad9e45ea",
+  "fingerprint_sha16": "22742d44a1937e826440f7bccadc3fd3",
   "horizon_T": 96,
   "meta": {
     "build": {
@@ -4081,16 +4081,16 @@
     },
     "experiment_name": "mixing-grid",
     "family": "grid-2d",
-    "generated_at_utc": "2025-12-22T02:23:44+00:00",
+    "generated_at_utc": "2025-12-31T23:27:33+00:00",
     "schema_version": "acpl.manifest.v1",
-    "source_config_path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/mixing-grid.yaml",
-    "source_config_sha16": "0f229145f046f1adbb5db519779c35ae",
+    "source_config_path": "/home/tobi/acpl-qwalk/acpl/configs/experiments/mixing-grid.yaml",
+    "source_config_sha16": "5ae90c0cde09334061fc9bb5de3f02c9",
     "task_name": "mixing"
   },
   "schema_version": "acpl.manifest.v1",
   "source_config": {
-    "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/mixing-grid.yaml",
-    "sha16": "0f229145f046f1adbb5db519779c35ae"
+    "path": "/home/tobi/acpl-qwalk/acpl/configs/experiments/mixing-grid.yaml",
+    "sha16": "5ae90c0cde09334061fc9bb5de3f02c9"
   },
   "split": "test_ood"
 }

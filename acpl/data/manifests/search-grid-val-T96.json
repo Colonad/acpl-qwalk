@@ -13,7 +13,7 @@
   "counts": {
     "n_episodes": 120
   },
-  "created_at_utc": "2025-12-22T02:23:45+00:00",
+  "created_at_utc": "2025-12-31T23:27:27+00:00",
   "episodes": [
     {
       "episode_id": "00eed1a614f006044d5fb60be56acf13",
@@ -3513,15 +3513,15 @@
     },
     "experiment_name": "search-grid",
     "family": "grid-2d",
-    "generated_at_utc": "2025-12-22T02:23:45+00:00",
+    "generated_at_utc": "2025-12-31T23:27:27+00:00",
     "schema_version": "acpl.manifest.v1",
-    "source_config_path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/search-grid.yaml",
+    "source_config_path": "/home/tobi/acpl-qwalk/acpl/configs/experiments/search-grid.yaml",
     "source_config_sha16": "76c641d5d647679288bbf623f76dc308",
     "task_name": "search"
   },
   "schema_version": "acpl.manifest.v1",
   "source_config": {
-    "path": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/acpl/configs/experiments/search-grid.yaml",
+    "path": "/home/tobi/acpl-qwalk/acpl/configs/experiments/search-grid.yaml",
     "sha16": "76c641d5d647679288bbf623f76dc308"
   },
   "split": "val"
