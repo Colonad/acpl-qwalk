@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 import math
 import random
+import zlib
 
 import torch
 import torch.nn as nn
@@ -64,12 +65,23 @@ class EvalConfig:
 
     seeds: list[int] = field(default_factory=list)
     n_seeds: int = 10
-    device: str = "cuda"
+    # Optional override. If empty, we use loop_cfg.device (so CLI/device flags keep working).
+    device: str = ""
+
     progress_bar: bool = True
 
     ci_method: str = "bootstrap"  # "student" or "bootstrap"
     ci_alpha: float = 0.05
     bootstrap_samples: int = 2000
+    # Make CI computation deterministic / comparable across runs (esp. bootstrap).
+    # If None -> use global RNG state (not recommended for “defendable” CI).
+    bootstrap_seed: int | None = 0
+
+    # Compute CI on CPU even if evaluation runs on GPU (more stable + avoids GPU RNG nondeterminism).
+    ci_on_cpu: bool = True
+
+    # In addition to pooled CI over all episodes, also compute CI over per-seed means (“across seeds”).
+    include_seed_mean_ci: bool = True
 
     keep_per_seed_means: bool = True
 
@@ -92,50 +104,12 @@ def _student_interval(
     samples: torch.Tensor, alpha: float
 ) -> tuple[float, float, float, float, int]:
     """
-    Student-t (or normal for large n) CI on the mean.
+    Student-t CI on the mean (exact t-quantile via torch.distributions.StudentT).
 
     Returns
     -------
     (mean, lo, hi, stderr, n)
     """
-    if samples.numel() == 0:
-        return float("nan"), float("nan"), float("nan"), float("nan"), 0
-
-    x = samples.to(torch.float64)
-    n = int(x.numel())
-    mean = float(x.mean().item())
-
-    # Unbiased sample std; handle n==1
-    s = float(x.std(unbiased=True).item()) if n > 1 else 0.0
-    stderr = s / math.sqrt(max(n, 1))
-
-    # For small n, use Student-t; for large n, z is fine.
-    # We avoid scipy; use Normal icdf as an approximation to t-quantile when n>30.
-    # For n<=30, inflate by sqrt((n-1)/(n-3)) heuristically if n>3 (conservative).
-    z = float(torch.distributions.Normal(0, 1).icdf(torch.tensor(1 - alpha / 2)).item())
-    if 3 < n <= 30:
-        z *= math.sqrt((n - 1) / (n - 3))
-
-    half_width = z * stderr
-    return mean, mean - half_width, mean + half_width, stderr, n
-
-
-def _bootstrap_interval(
-    samples: torch.Tensor,
-    alpha: float,
-    B: int,
-) -> tuple[float, float, float, float, int]:
-    
-    """
-    Percentile bootstrap CI on the mean, with B resamples.
-
-    Returns
-    -------
-    (mean, lo, hi, stderr, n)
-    """
-
-
-
     if samples.numel() == 0:
         return float("nan"), float("nan"), float("nan"), float("nan"), 0
 
@@ -146,8 +120,55 @@ def _bootstrap_interval(
     if n == 1:
         return mean, mean, mean, 0.0, 1
 
-    idx = torch.randint(0, n, size=(B, n), device=x.device)
-    boot_means = x[idx].mean(dim=1)
+    # Unbiased sample std
+    s = float(x.std(unbiased=True).item())
+    stderr = s / math.sqrt(n)
+
+    # Exact Student-t quantile with df=n-1
+    tdist = torch.distributions.StudentT(df=n - 1)
+    tcrit = float(tdist.icdf(torch.tensor(1 - alpha / 2, dtype=torch.float64)).item())
+    half_width = tcrit * stderr
+
+    return mean, mean - half_width, mean + half_width, stderr, n
+
+
+
+def _bootstrap_interval(
+    samples: torch.Tensor,
+    alpha: float,
+    B: int,
+    *,
+    generator: torch.Generator | None = None,
+    chunk_size: int = 256,
+) -> tuple[float, float, float, float, int]:
+    """
+    Percentile bootstrap CI on the mean, with B resamples.
+
+    Returns
+    -------
+    (mean, lo, hi, stderr, n)
+    """
+    if samples.numel() == 0:
+        return float("nan"), float("nan"), float("nan"), float("nan"), 0
+
+    x = samples.to(torch.float64)
+    n = int(x.numel())
+    mean = float(x.mean().item())
+
+    if n == 1:
+        return mean, mean, mean, 0.0, 1
+
+    if generator is None:
+        generator = torch.Generator(device=x.device)
+
+    # Chunked bootstrap to reduce peak memory: build boot_means in pieces
+    means_chunks: list[torch.Tensor] = []
+    for start in range(0, B, chunk_size):
+        b = min(chunk_size, B - start)
+        idx = torch.randint(0, n, size=(b, n), device=x.device, generator=generator)
+        means_chunks.append(x[idx].mean(dim=1))
+
+    boot_means = torch.cat(means_chunks, dim=0)
 
     q_lo = float(alpha / 2)
     q_hi = float(1 - alpha / 2)
@@ -159,25 +180,73 @@ def _bootstrap_interval(
 
 
 
+
 def compute_ci(
-    samples: torch.Tensor,
+    samples,
     *,
     method: str = "bootstrap",
     alpha: float = 0.05,
     bootstrap_samples: int = 2000,
+    bootstrap_seed: int | None = None,
+    ci_on_cpu: bool = True,
 ) -> CISummary:
+
     """
     Compute mean ± CI for a 1-D tensor of samples.
     """
-    method = method.lower()
+    # Normalize CI method names (plots/configs may use aliases like "student_t")
+    method = str(method).strip().lower()
+    method = method.replace("-", "_")
+
+    if method in {"student_t", "studentt", "t", "t_ci", "t_interval", "student"}:
+        method = "student"
+
+
+
+    # Accept numpy arrays / lists (plots often operate in numpy) → normalize to torch.Tensor
+    if not isinstance(samples, torch.Tensor):
+        samples = torch.as_tensor(samples)
+
+    # Ensure 1-D (CI expects a vector of samples)
+    if samples.ndim > 1:
+        samples = samples.reshape(-1)
+
+    samples = samples.to(torch.float64)
+
+    if ci_on_cpu:
+        samples = samples.detach().to("cpu")
+    else:
+        samples = samples.detach()
+
+
+    
+
+
+
     if method == "student":
         m, lo, hi, se, n = _student_interval(samples, alpha)
     elif method == "bootstrap":
-        m, lo, hi, se, n = _bootstrap_interval(samples, alpha, bootstrap_samples)
+        gen = None
+        if bootstrap_seed is not None:
+            gen = torch.Generator(device=samples.device)
+            gen.manual_seed(int(bootstrap_seed))
+        m, lo, hi, se, n = _bootstrap_interval(
+            samples, alpha, bootstrap_samples, generator=gen
+        )
+
     else:
         raise ValueError(f"Unknown ci_method: {method}")
     return CISummary(mean=m, lo=lo, hi=hi, stderr=se, n=n)
 
+def _mix_bootstrap_seed(base: int | None, metric_key: str) -> int | None:
+    """
+    Deterministically mix a user-provided base seed with a metric key.
+    Avoids “same bootstrap indices for every metric”.
+    """
+    if base is None:
+        return None
+    h = zlib.crc32(metric_key.encode("utf-8")) & 0xFFFFFFFF
+    return int((int(base) + h) & 0x7FFFFFFF)
 
 # --------------------------------------------------------------------------------------
 #                          CI-style evaluation over seeds
@@ -195,6 +264,12 @@ def _seed_everything(seed: int) -> None:
     except Exception:
         pass
 
+    # Determinism knobs (safe for eval; won’t crash if cudnn not present)
+    try:  # pragma: no cover
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    except Exception:
+        pass
 
 def run_ci_eval(
     *,
@@ -242,7 +317,14 @@ def run_ci_eval(
     if not seeds:
         seeds = list(range(eval_cfg.n_seeds))
 
-    device = torch.device(loop_cfg.device)
+    device_str = (eval_cfg.device or "").strip()
+    if not device_str:
+        device_str = (loop_cfg.device or "").strip()
+
+
+    if not device_str:
+        device_str = "cpu"
+    device = torch.device(device_str)
     model.eval()
     model.to(device)
 
@@ -250,6 +332,12 @@ def run_ci_eval(
     pooled: dict[str, list[float]] = {}
     # Optionally, per-seed means (for reporting)
     per_seed: dict[int, dict[str, list[float]]] = {}
+
+
+    # For “across-seed” CI: track per-seed means without needing to retain everything
+    seed_sum: dict[int, dict[str, float]] = {}
+    seed_cnt: dict[int, dict[str, int]] = {}
+
 
     # Main loop over seeds
     outer_iter = seeds
@@ -259,6 +347,11 @@ def run_ci_eval(
     for sd in outer_iter:
         _seed_everything(int(sd))
         dl = dataloader_factory(int(sd))
+
+
+        seed_sum[sd] = {}
+        seed_cnt[sd] = {}
+
 
         # Lazily create a metric pack based on the first batch's aux
         metric_pack: MetricPack | None = None
@@ -299,35 +392,75 @@ def run_ci_eval(
             # Append to pooled buffers
             for k, v in scalars.items():
                 pooled.setdefault(k, []).append(v)
+
+                # seed-mean book-keeping
+                seed_sum[sd][k] = seed_sum[sd].get(k, 0.0) + float(v)
+                seed_cnt[sd][k] = seed_cnt[sd].get(k, 0) + 1
+
                 if eval_cfg.keep_per_seed_means:
                     per_seed[sd].setdefault(k, []).append(v)
+
 
     # Compute CI summaries
     results: dict[str, dict[str, CISummary]] = {}
 
     # All-seed pooled CI
     for k, arr in pooled.items():
-        t = torch.tensor(arr, dtype=torch.float64, device=device)
+        t = torch.tensor(arr, dtype=torch.float64)
         results.setdefault(k, {})
+        bs = _mix_bootstrap_seed(eval_cfg.bootstrap_seed, k)
         results[k]["all"] = compute_ci(
             t,
             method=eval_cfg.ci_method,
             alpha=eval_cfg.ci_alpha,
             bootstrap_samples=eval_cfg.bootstrap_samples,
+            bootstrap_seed=bs,
+            ci_on_cpu=eval_cfg.ci_on_cpu,
         )
+
+
+    # CI over per-seed means (the usual “multi-seed” aggregate people expect)
+    if getattr(eval_cfg, "include_seed_mean_ci", True):
+        for k in pooled.keys():
+            means: list[float] = []
+            for sd in seeds:
+                if k in seed_sum.get(sd, {}) and seed_cnt[sd].get(k, 0) > 0:
+                    means.append(seed_sum[sd][k] / seed_cnt[sd][k])
+
+
+            if len(means) == 0:
+                continue
+
+
+            t = torch.tensor(means, dtype=torch.float64)
+            bs = _mix_bootstrap_seed(eval_cfg.bootstrap_seed, f"seed_mean::{k}")
+            results.setdefault(k, {})
+            results[k]["seed_mean"] = compute_ci(
+                t,
+                method=eval_cfg.ci_method,
+                alpha=eval_cfg.ci_alpha,
+                bootstrap_samples=eval_cfg.bootstrap_samples,
+                bootstrap_seed=bs,
+                ci_on_cpu=eval_cfg.ci_on_cpu,
+            )
+
 
     # Per-seed means (then CI over *within-seed* episode samples)
     if eval_cfg.keep_per_seed_means:
         for sd, d in per_seed.items():
             for k, arr in d.items():
-                t = torch.tensor(arr, dtype=torch.float64, device=device)
+                t = torch.tensor(arr, dtype=torch.float64)
                 results.setdefault(k, {})
+                bs = _mix_bootstrap_seed(eval_cfg.bootstrap_seed, f"seed={sd}::{k}")
                 results[k][f"seed={sd}"] = compute_ci(
                     t,
                     method=eval_cfg.ci_method,
                     alpha=eval_cfg.ci_alpha,
                     bootstrap_samples=eval_cfg.bootstrap_samples,
+                    bootstrap_seed=bs,
+                    ci_on_cpu=eval_cfg.ci_on_cpu,
                 )
+
 
     # Optional structured logging → also persists to JSONL/TB/W&B via MetricLogger
     if logger is not None and step is not None:
@@ -374,6 +507,14 @@ def summarize_results(
         all_ci = results[k].get("all")
         if all_ci is not None:
             lines.append(f"{k}: {_fmt_ci(all_ci, conf)}")
+        
+        
+        seed_ci = results[k].get("seed_mean")
+        if seed_ci is not None:
+            lines.append(f"  seed_mean: {_fmt_ci(seed_ci, conf)}")
+        
+        
+        
         if show_per_seed:
             # Show per-seed summaries in numeric seed order if present
             seeds = [x for x in results[k].keys() if x.startswith("seed=")]

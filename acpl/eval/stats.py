@@ -54,6 +54,10 @@ __all__ = [
     "summarize_delta",
     "summarize_named_deltas",
     "format_delta_table",
+
+  "summarize_mask_sensitivity",
+  "format_mask_sensitivity_table",
+
     "cohens_d",
     "hedges_g",
 
@@ -1657,3 +1661,56 @@ def format_delta_table(
 
     return "\n".join(lines)
 
+def summarize_mask_sensitivity(
+    baseline: Any,
+    masked: Mapping[str, Any],
+    *,
+    cfg: StatsEvalConfig | None = None,
+    paired: bool = True,
+) -> dict[str, DeltaSummary]:
+    """
+    Convenience helper for "mask sweep" experiments.
+
+    Parameters
+    ----------
+    baseline:
+        1D-like collection of baseline metrics (typically per-seed means).
+    masked:
+        Mapping mask_name -> 1D-like metrics under that mask (same semantics as baseline).
+    cfg:
+        Controls bootstrap configuration, numeric tolerances, etc.
+    paired:
+        If True, treat baseline[i] and masked[i] as paired observations (recommended if same seeds).
+
+    Returns
+    -------
+    dict[str, DeltaSummary]
+        Per-mask DeltaSummary vs baseline.
+    """
+    if cfg is None:
+        cfg = StatsEvalConfig()
+
+    out: dict[str, DeltaSummary] = {}
+    for name, pert in masked.items():
+        out[name] = summarize_delta(baseline, pert, cfg=cfg, paired=paired)
+    return out
+
+
+def format_mask_sensitivity_table(
+    deltas: Mapping[str, DeltaSummary],
+    *,
+    cfg: StatsEvalConfig | None = None,
+    sort_by: Literal["name", "delta_mean", "abs_delta_mean", "rel_change"] = "abs_delta_mean",
+    descending: bool = True,
+    show_ci: bool = True,
+) -> str:
+    """
+    Small wrapper so eval.py can standardize mask-sweep reporting.
+    """
+    return format_delta_table(
+        deltas,
+        cfg=cfg,
+        sort_by=sort_by,
+        descending=descending,
+        show_ci=show_ci,
+    )

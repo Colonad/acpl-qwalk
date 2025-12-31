@@ -9,6 +9,15 @@ import matplotlib
 import numpy as np
 import torch
 
+from statistics import NormalDist
+
+# Prefer SciPy for defensible statistical intervals when available.
+try:  # pragma: no cover
+    from scipy import stats as _sp_stats  # type: ignore
+except Exception:  # pragma: no cover
+    _sp_stats = None
+
+
 __all__ = [
     "PlotStyle",
     "ensure_numpy",
@@ -17,6 +26,7 @@ __all__ = [
     "plot_position_timelines",
     "plot_tv_curves",
     "plot_robustness_sweep",
+    "plot_mean_pt_ci_across_episodes",
 ]
 
 
@@ -53,15 +63,28 @@ class PlotStyle:
     tight_layout: bool = True
 
 
-def ensure_numpy(x: np.ndarray | torch.Tensor) -> np.ndarray:
+def ensure_numpy(x: np.ndarray | torch.Tensor | Sequence[np.ndarray | torch.Tensor]) -> np.ndarray:
     """
-    Accept torch/numpy and return a CPU numpy array (no copy if already numpy).
+    Accept torch/numpy (or a sequence of them) and return a CPU numpy array.
+
+    - If x is a sequence of arrays/tensors with same shape, stacks on axis=0.
+      This is the common case for "K episodes" or "S seeds" collections.
     """
     if isinstance(x, np.ndarray):
         return x
     if isinstance(x, torch.Tensor):
         return x.detach().cpu().numpy()
+    if isinstance(x, (list, tuple)):
+        if len(x) == 0:
+            raise ValueError("ensure_numpy: got an empty sequence.")
+        arrs = [ensure_numpy(a) for a in x]
+        try:
+            return np.stack(arrs, axis=0)
+        except Exception as e:
+            shapes = [getattr(a, "shape", None) for a in arrs]
+            raise ValueError(f"ensure_numpy: cannot stack sequence; shapes={shapes}") from e
     raise TypeError(f"Unsupported type: {type(x)}")
+
 
 
 def _coerce_path(p: str | Path | None) -> str | None:
@@ -143,6 +166,35 @@ def _uniform(N: int) -> np.ndarray:
     return np.full((N,), 1.0 / max(1, N), dtype=np.float64)
 
 
+
+def plot_mean_pt_ci_across_episodes(
+    Pt_samples: np.ndarray | torch.Tensor | Sequence[np.ndarray | torch.Tensor],
+    *,
+    suite: str,
+    policy: str,
+    topk: int = 12,
+    nodes: Sequence[int] | None = None,
+    style: PlotStyle | None = None,
+    savepath: str | Path | None = None,
+    close: bool = False,
+):
+    P = _as_probabilities(Pt_samples)
+    if P.ndim < 2:
+        raise ValueError(f"Expected trailing (T,N), got {P.shape}")
+    K = int(np.prod(P.shape[:-2])) if P.ndim > 2 else 1
+    title = f"{suite} — {policy} — mean Pt — CI across episodes (K={K})"
+    return plot_position_timelines(
+        Pt_samples,
+        nodes=nodes,
+        topk=topk,
+        style=style,
+        title=title,
+        savepath=savepath,
+        close=close,
+    )
+
+
+
 def tv_curve(Pt: np.ndarray | torch.Tensor) -> np.ndarray:
     r"""
     Compute TV distance to uniform for each time t.
@@ -171,51 +223,95 @@ def tv_curve(Pt: np.ndarray | torch.Tensor) -> np.ndarray:
         raise ValueError(f"Expected (T,N) or (S,T,N), got shape {P.shape}.")
 
 
-def mean_ci(x, axis=0, conf: float = 0.95):
-    """
-    Mean +/- normal-approx CI along `axis`.
+def _two_sided_p(conf: float) -> float:
+    # two-sided CI => upper quantile p = 1 - alpha/2 = 0.5 + conf/2
+    return 0.5 + 0.5 * conf
 
-    - Safe for n=0/1 (no ddof warnings).
-    - If n<=1, CI collapses to the mean (i.e., "no uncertainty estimate available").
+
+def _z_crit(conf: float) -> float:
+    # No lookup tables: compute via NormalDist (stdlib).
+    p = _two_sided_p(conf)
+    return float(NormalDist().inv_cdf(p))
+
+
+def _t_crit(conf: float, df: np.ndarray) -> np.ndarray:
+    """
+    Compute two-sided t critical values for given df.
+
+    Uses SciPy if available; otherwise falls back to z critical values.
+    """
+    df = np.asarray(df, dtype=np.float64)
+    z = _z_crit(conf)
+
+    if _sp_stats is None:
+        return np.full_like(df, z, dtype=np.float64)
+
+    p = _two_sided_p(conf)
+    # SciPy supports vectorized df.
+    out = _sp_stats.t.ppf(p, np.maximum(df, 1.0))
+    out = np.asarray(out, dtype=np.float64)
+
+    # For df < 1, fallback to z (undefined t).
+    out = np.where(df >= 1.0, out, z)
+    return out
+
+
+def mean_ci(x, axis: int = 0, conf: float = 0.95):
+    """
+    Mean +/- CI along `axis`, robust for NaNs and n<=1.
+
+    - Uses Student-t critical values when SciPy is available (recommended).
+    - Falls back to normal critical values otherwise.
+    - If n<=1: CI collapses to mean (no uncertainty estimate possible).
+    - If n==0: returns NaNs.
+
     Returns: mean, lo, hi
     """
     if not (0.0 < conf < 1.0):
         raise ValueError(f"conf must be in (0,1); got {conf}")
 
     x = np.asarray(x, dtype=np.float64)
-    x = np.where(np.isfinite(x), x, np.nan)
+    finite = np.isfinite(x)
 
-    valid = ~np.isnan(x)
-    n = np.sum(valid, axis=axis)  # shape = reduced shape
+    n = finite.sum(axis=axis)  # reduced shape
 
-    # mean (no "empty slice" warnings)
-    sum_keep = np.nansum(x, axis=axis, keepdims=True)
-    n_keep = np.sum(valid, axis=axis, keepdims=True)
-    mean_keep = np.divide(sum_keep, n_keep, out=np.zeros_like(sum_keep), where=n_keep > 0)
+    # Mean without "empty slice" warnings
+    x0 = np.where(finite, x, 0.0)
+    sum_keep = x0.sum(axis=axis, keepdims=True)
+    n_keep = finite.sum(axis=axis, keepdims=True).astype(np.float64)
+
+    mean_keep = np.divide(
+        sum_keep,
+        n_keep,
+        out=np.full_like(sum_keep, np.nan, dtype=np.float64),
+        where=n_keep > 0,
+    )
+
+    # Squeeze only the reduced axis (we intentionally support axis:int here)
     mean = np.squeeze(mean_keep, axis=axis)
-    mean = np.where(n > 0, mean, np.nan)
 
-    # population variance var0 = E[(x-mean)^2] with ddof=0 (no warnings)
-    diff = np.where(valid, x - mean_keep, 0.0)
-    ssq = np.sum(diff * diff, axis=axis)
-    var0 = np.divide(ssq, n, out=np.zeros_like(ssq), where=n > 0)
+    # Unbiased sample variance: ssq/(n-1) for n>1
+    diff = np.where(finite, x - mean_keep, 0.0)
+    ssq = (diff * diff).sum(axis=axis)
 
-    # unbiased correction for sample variance only where n>1
-    factor = np.zeros_like(var0, dtype=np.float64)
-    np.divide(n, (n - 1), out=factor, where=n > 1)  # <- no divide-by-zero warnings
-    var = var0 * factor
+    denom = (n - 1).astype(np.float64)
+    var = np.divide(ssq, denom, out=np.zeros_like(ssq, dtype=np.float64), where=n > 1)
 
-    # stderr = sqrt(var / n) only where n>1
-    stderr2 = np.zeros_like(var, dtype=np.float64)
-    np.divide(var, n, out=stderr2, where=n > 1)
-    stderr = np.sqrt(stderr2)
+    # Standard error: sqrt(var/n) for n>1
+    se2 = np.divide(var, n, out=np.zeros_like(var, dtype=np.float64), where=n > 1)
+    se = np.sqrt(se2)
 
-    z = z_value(conf)
-    # Collapse CI if n<=1; if n==0 keep NaNs
-    lo = np.where(n > 1, lo, mean)
-    hi = np.where(n > 1, hi, mean)
+    # Critical value (t if possible)
+    tcrit = _t_crit(conf, df=(n - 1).astype(np.float64))
+
+    half = tcrit * se
+    lo = np.where(n > 1, mean - half, mean)
+    hi = np.where(n > 1, mean + half, mean)
+
+    # If n==0, keep NaNs
     lo = np.where(n > 0, lo, np.nan)
     hi = np.where(n > 0, hi, np.nan)
+    mean = np.where(n > 0, mean, np.nan)
 
     return mean, lo, hi
 
@@ -284,27 +380,38 @@ def _pick_nodes_for_timelines(
     Pt: np.ndarray, topk: int | None, nodes: Sequence[int] | None
 ) -> list[int]:
     """
-    Choose which nodes to display:
-      - if `nodes` provided: use as-is (validated)
-      - else pick `topk` nodes by mass at final time T-1
-      - fallback to all nodes if N<=topk or topk is None
+    Choose which nodes to display.
+
+    Pt: expected shape (T, N) (probabilities).
+    - if `nodes` provided: use as-is (validated)
+    - else pick `topk` nodes by "ever prominent" score (max over time)
+      which is more stable than final-time mass for mixing-like regimes.
     """
-    if N <= 0:
+    Pt = np.asarray(Pt)
+    if Pt.ndim != 2:
+        raise ValueError(f"_pick_nodes_for_timelines expected (T,N), got {Pt.shape}")
+    T, N = Pt.shape
+    if N <= 0 or T <= 0:
         return []
+
     if nodes is not None:
         idx = list(nodes)
-        if not all(0 <= i < N for i in idx):
-            raise ValueError("nodes indices out of range.")
-        return idx
+        if not all(isinstance(i, (int, np.integer)) for i in idx):
+            raise TypeError("nodes must be integer indices.")
+        if not all(0 <= int(i) < N for i in idx):
+            raise ValueError(f"nodes indices out of range for N={N}.")
+        return [int(i) for i in idx]
+
     if (topk is None) or (topk >= N):
         return list(range(N))
 
+    # Robust for mixing/spreading: choose nodes that ever get large probability.
+    score = np.nanmax(Pt, axis=0)  # (N,)
+    score = np.where(np.isfinite(score), score, -np.inf)
+    idx = np.argsort(-score)[: int(topk)].tolist()
+    return [int(i) for i in idx]
 
-    # For mixing / spreading, final-time mass is often ~uniform and unstable.
-    # Pick nodes that ever become prominent (max over time) for a more representative timeline.
-    score = Pt.max(axis=0)  # (N,)
-    idx = np.argsort(-score)[:topk].tolist()
-    return idx
+
 
 
 
@@ -316,7 +423,9 @@ def plot_position_timelines(
     sharey: bool = True,
     style: PlotStyle | None = None,
     title: str | None = "Position probabilities over time",
-    savepath: str | None = None,
+    savepath: str | Path | None = None,
+    close: bool = False,
+
 ) -> tuple[matplotlib.figure.Figure, np.ndarray]:
     """
     Plot P_t[v] as a timeline for selected nodes.
@@ -343,15 +452,18 @@ def plot_position_timelines(
     st = style or PlotStyle()
     P = _as_probabilities(Pt)
 
-    # Normalize shapes
+    # Normalize shapes: accept (T,N) OR (S,T,N) OR (anything..., T, N)
+    if P.ndim < 2:
+        raise ValueError(f"Expected at least 2D with trailing (T,N), got {P.shape}.")
+
+    T, N = P.shape[-2], P.shape[-1]
+
     if P.ndim == 2:
-        T, N = P.shape
-        Pm = P[None, ...]  # (1,T,N)
-    elif P.ndim == 3:
-        S, T, N = P.shape
-        Pm = P
+        Pm = P.reshape(1, T, N)  # (1,T,N)
     else:
-        raise ValueError(f"Expected (T,N) or (S,T,N), got {P.shape}.")
+        # flatten all leading dims into a single sample axis
+        S = int(np.prod(P.shape[:-2]))
+        Pm = P.reshape(S, T, N)  # (S,T,N)
 
     # pick nodes to show
     nodes_to_plot = _pick_nodes_for_timelines(Pm.mean(axis=0), topk=topk, nodes=nodes)
@@ -382,13 +494,14 @@ def plot_position_timelines(
         r, c = divmod(j, cols)
         ax = axs[r, c]
 
-        if P.ndim == 2:
-            ax.plot(tgrid, P[:, v], lw=1.8)
+        if Pm.shape[0] <= 1:
+            ax.plot(tgrid, Pm[0, :, v], lw=1.8)
         else:
-            # mean ± CI
-            m, lo, hi = mean_ci(Pm[..., v], axis=0, conf=0.95)
+            # mean ± CI across samples (episodes and/or seeds)
+            m, lo, hi = mean_ci(Pm[:, :, v], axis=0, conf=0.95)
             ax.plot(tgrid, m, lw=1.8)
             ax.fill_between(tgrid, lo, hi, alpha=st.alpha_ci, linewidth=0)
+
 
         ax.set_xlabel("t", fontsize=st.label_size)
         ax.set_ylabel(f"P[v={v}]", fontsize=st.label_size)
@@ -406,9 +519,9 @@ def plot_position_timelines(
     if st.tight_layout:
         fig.tight_layout(rect=(0, 0, 1, 0.96 if title else 1))
 
-    if savepath:
-        fig.savefig(savepath, bbox_inches="tight")
+    _savefig(fig, savepath, close=close)
     return fig, axs
+
 
 
 
@@ -546,8 +659,11 @@ def plot_tv_curves(
 
     if st.tight_layout:
         fig.tight_layout()
+
     _savefig(fig, savepath, close=close)
-    return fig, axs
+    return fig, ax
+
+
 
 
 # --------------------------------------------------------------------------------------
@@ -565,8 +681,10 @@ def plot_robustness_sweep(
     xlabel: str = "noise level",
     ylabel: str = "metric",
     legend_loc: str = "best",
-    savepath: str | None = None,
+    savepath: str | Path | None = None,
+    close: bool = False,
 ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
+
     """
     Plot metrics over a 1-D robustness parameter (e.g., dephasing p, static edge noise σ).
 
@@ -632,47 +750,4 @@ def plot_robustness_sweep(
 
 
 
-# --------------------------------------------------------------------------------------
-#                  Minimal fallback for z-values (no scipy dependency)
-# --------------------------------------------------------------------------------------
 
-
-class scipy_stats_fallback:
-    """
-    Provide z-values for common confidence levels without importing scipy.
-    """
-
-    _lookup = {
-        0.80: 1.2815515655446004,
-        0.85: 1.4395314709384563,
-        0.90: 1.6448536269514722,
-        0.95: 1.959963984540054,
-        0.975: 2.241402727604947,  # 2-sided 95% per-side (rare)
-        0.98: 2.3263478740408408,
-        0.99: 2.5758293035489004,
-        0.999: 3.2905267314919255,
-    }
-
-    @classmethod
-    def z_value(cls, conf: float) -> float:
-        # nearest level if not exact
-        if conf in cls._lookup:
-            return cls._lookup[conf]
-        # linear interpolate between the two nearest common points
-        keys = sorted(cls._lookup.keys())
-        if conf <= keys[0]:
-            return cls._lookup[keys[0]]
-        if conf >= keys[-1]:
-            return cls._lookup[keys[-1]]
-        for i in range(len(keys) - 1):
-            if keys[i] <= conf <= keys[i + 1]:
-                a, b = keys[i], keys[i + 1]
-                wa = (b - conf) / (b - a)
-                wb = 1.0 - wa
-                return wa * cls._lookup[a] + wb * cls._lookup[b]
-        return cls._lookup[0.95]  # safe default
-
-
-# expose helper
-def z_value(conf: float) -> float:
-    return scipy_stats_fallback.z_value(conf)

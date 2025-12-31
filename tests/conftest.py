@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from acpl.data.generator import EpisodeGenerator
+from acpl.eval.reporting import read_eval_index
 
 # Project imports
 from acpl.data.manifest import (

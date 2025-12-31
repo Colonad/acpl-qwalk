@@ -31,6 +31,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+
+
+
 import argparse
 import csv
 import datetime as _dt
@@ -38,7 +41,19 @@ import json
 import os
 import re
 import sys
-
+__all__ = [
+    "read_eval_index",
+    "load_eval_run",
+    "select_key_metrics",
+    "build_markdown_report",
+    "write_markdown_report",
+    "build_latex_table",
+    "write_latex_table",
+    "write_csv_wide",
+    "write_csv_long",
+    "build_report_template",
+    "write_report_template",
+]
 
 # ----------------------------- small IO helpers -----------------------------
 
@@ -87,6 +102,69 @@ def _sanitize_filename(s: str) -> str:
     s = re.sub(r"[^a-zA-Z0-9._-]+", "_", s)
     s = re.sub(r"__+", "_", s).strip("_")
     return s or "cond"
+
+
+
+
+# ----------------------------- eval index helpers -----------------------------
+
+_EVAL_INDEX_CANDIDATES = (
+    "eval_index.json",
+    "index.json",
+    "eval_index.jsonl",
+    "index.jsonl",
+)
+
+
+def _resolve_eval_index_path(p: str | os.PathLike) -> Path:
+    """
+    Accept either:
+      - a file path to an index (json/jsonl), OR
+      - a directory that contains a known index filename.
+    """
+    path = _as_path(p)
+    if path.is_dir():
+        for name in _EVAL_INDEX_CANDIDATES:
+            cand = path / name
+            if cand.exists():
+                return cand
+        raise FileNotFoundError(
+            f"[reporting] No eval index found in directory: {path}\n"
+            f"Tried: {', '.join(_EVAL_INDEX_CANDIDATES)}"
+        )
+    if not path.exists():
+        raise FileNotFoundError(f"[reporting] Eval index path does not exist: {path}")
+    return path
+
+
+def read_eval_index(p: str | os.PathLike) -> dict[str, Any]:
+    """
+    Read an evaluation index from JSON or JSONL.
+
+    - .json must decode to a dict
+    - .jsonl:
+        * if exactly one dict row exists -> return that dict
+        * else -> return {"rows": [...]} (rows are parsed JSON objects)
+    """
+    path = _resolve_eval_index_path(p)
+    suf = path.suffix.lower()
+
+    if suf == ".jsonl":
+        rows: list[Any] = []
+        for line in _read_text(path).splitlines():
+            s = line.strip()
+            if not s:
+                continue
+            rows.append(json.loads(s))
+        if len(rows) == 1 and isinstance(rows[0], dict):
+            return rows[0]
+        return {"rows": rows}
+
+    obj = json.loads(_read_text(path))
+    if not isinstance(obj, dict):
+        raise ValueError(f"[reporting] Expected JSON object/dict in {path}, got {type(obj).__name__}")
+    return obj
+
 
 
 # ----------------------------- core dataclasses -----------------------------

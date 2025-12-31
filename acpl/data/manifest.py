@@ -957,99 +957,69 @@ def read_eval_manifest(index_path: str | os.PathLike, split: SplitName) -> list[
 
 
 def verify_manifest(
-    index_path: str | os.PathLike, split: SplitName, *, strict: bool = True
+    manifest_dir: str | Path,
+    split: SplitName,
+    *,
+    strict: bool = True,
 ) -> bool:
     """
-    Verify that digests in index.json match the actual JSONL content and that manifest_hex
-    in entries matches index's manifest_hex. In 'strict' mode, raises on any failure;
-    otherwise returns False.
+    Validate that:
+      - index.json manifest_hex matches each entry's manifest_hex
+      - each entry is self-consistent w.r.t. route_triplet(...) given (graph_id, task_id, base_seed)
+      - required fields are present and correctly typed
     """
-    idx = Path(index_path)
-    base = idx.parent
-    index = json.loads(idx.read_text(encoding="utf-8"))
+    manifest_dir = Path(manifest_dir)
+    idx = read_eval_index(manifest_dir)
+    man_hex = str(idx.get("manifest_hex", ""))
 
-    man_hex = index.get("manifest_hex")
     if not man_hex:
+        msg = "index.json missing manifest_hex"
         if strict:
-            raise ValueError("index.json missing 'manifest_hex'")
+            raise ValueError(msg)
         return False
 
-    srec = index.get("splits", {}).get(split)
-    if not srec:
-        if strict:
-            raise ValueError(f"index.json missing split entry for {split}")
-        return False
+    entries = read_eval_manifest(manifest_dir, split)
 
-    jsonl_path = base / srec["file"]
-    if not jsonl_path.exists():
-        if strict:
-            raise FileNotFoundError(f"Missing {jsonl_path}")
-        return False
+    ok = True
+    for e in entries:
+        # 1) manifest hex must match
+        if str(e.get("manifest_hex", "")) != man_hex:
+            ok = False
+            msg = f"manifest_hex mismatch: entry={e.get('manifest_hex')} index={man_hex}"
+            if strict:
+                raise ValueError(msg)
 
-    b2, sh = _file_digests(jsonl_path)
-    ok = (b2 == srec.get("blake2b_256")) and (sh == srec.get("sha256"))
+        # 2) required fields
+        for k in ("graph_id", "task_id", "base_seed", "episode_seed", "split"):
+            if k not in e:
+                ok = False
+                if strict:
+                    raise ValueError(f"missing required key {k!r} in entry: {e}")
 
-    if not ok and strict:
-        raise ValueError("Digest mismatch for JSONL manifest")
+        # If required keys missing and not strict, skip deeper checks
+        if not all(k in e for k in ("graph_id", "task_id", "base_seed", "episode_seed", "split")):
+            continue
 
-    # Validate manifest_hex inside entries
-    for e in read_eval_manifest(index_path, split):
-        if e.get("manifest_hex") != man_hex:
-            
-            # Validate entries are self-consistent and audit-friendly
-            entries = read_eval_manifest(index_path, split)
+        # 3) route_triplet consistency
+        g_id = int(e["graph_id"])
+        t_id = int(e["task_id"])
+        base_seed = int(e["base_seed"])
+        split2, ep_seed = route_triplet(graph_id=g_id, task_id=t_id, base_seed=base_seed)
 
-            # Required keys (family/size/task are allowed to be None/empty)
-            required = {"manifest_hex", "split", "global_idx", "episode_seed"}
-            seen_idx: set[int] = set()
+        if str(split2) != str(e["split"]):
+            ok = False
+            msg = f"split mismatch: route_triplet={split2} entry={e['split']}"
+            if strict:
+                raise ValueError(msg)
 
-            seed_rule = str(index.get("seed_rule", ""))
-
-            for e in entries:
-                if not isinstance(e, dict):
-                    if strict:
-                        raise ValueError("Malformed JSONL entry (not an object)")
-                    return False
-
-                missing = required - set(e.keys())
-                if missing:
-                    if strict:
-                        raise ValueError(f"JSONL entry missing keys: {sorted(missing)}")
-                    return False
-
-                if e.get("manifest_hex") != man_hex:
-                    if strict:
-                        raise ValueError("Entry manifest_hex does not match index manifest_hex")
-                    return False
-
-                if str(e.get("split")) != str(split):
-                    if strict:
-                        raise ValueError("Entry split does not match requested split")
-                    return False
-
-                try:
-                    gidx = int(e.get("global_idx"))
-                    epseed = int(e.get("episode_seed"))
-                except Exception:
-                    if strict:
-                        raise ValueError("Entry global_idx/episode_seed must be integers")
-                    return False
-
-                if gidx in seen_idx:
-                    if strict:
-                        raise ValueError(f"Duplicate global_idx detected: {gidx}")
-                    return False
-                seen_idx.add(gidx)
-
-                # If we used the public seed rule fallback, we can *fully* verify seeds.
-                if seed_rule.startswith("blake2b8("):
-                    expected = _derive_episode_seed(str(man_hex), str(split), gidx)
-                    if int(epseed) != int(expected):
-                        if strict:
-                            raise ValueError(f"episode_seed mismatch at global_idx={gidx}: got {epseed}, expected {expected}")
-                        return False
+        if int(ep_seed) != int(e["episode_seed"]):
+            ok = False
+            msg = f"episode_seed mismatch: route_triplet={ep_seed} entry={e['episode_seed']}"
+            if strict:
+                raise ValueError(msg)
 
     return ok
+
 
 
 

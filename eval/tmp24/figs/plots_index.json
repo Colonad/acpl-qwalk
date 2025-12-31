@@ -1,0 +1,1 @@
+{"conditions": {"ckpt_policy": {"ci_mode": "episodes", "K": 10, "T": 64, "N": 64, "files": ["plotdata__ckpt_policy.npz", "tv_to_uniform__ckpt_policy.png", "max_prob__ckpt_policy.png", "final_topk__ckpt_policy.png"]}}}

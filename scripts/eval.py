@@ -38,6 +38,8 @@ import math
 from dataclasses import dataclass, field
 from enum import Enum
 
+import inspect
+import re
 
 import os
 from types import MethodType
@@ -49,6 +51,8 @@ from typing import Any
 
 import pickle
 import re
+import traceback
+import statistics
 
 import platform
 import time
@@ -93,6 +97,33 @@ def _json_dump(obj: Any) -> str:
             return super().default(o)
 
     return json.dumps(obj, cls=_NpEncoder)
+
+
+
+def _load_config_file(path: Path) -> dict[str, Any]:
+    """
+    Load YAML/JSON config file into a dict.
+    """
+    p = _as_path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Config file not found: {p}")
+    txt = p.read_text(encoding="utf-8")
+
+    suf = p.suffix.lower()
+    if suf in (".yaml", ".yml"):
+        try:
+            import yaml as _yaml  # optional dependency
+        except Exception as e:
+            raise RuntimeError("YAML config requested but PyYAML is not installed.") from e
+        cfg = _yaml.safe_load(txt)
+    else:
+        cfg = json.loads(txt)
+
+    if not isinstance(cfg, dict):
+        raise TypeError(f"Config must parse to a dict, got {type(cfg)} from {p}")
+    return cfg
+
+
 
 # ----------------------------- Roles (embedded from acpl.eval.roles) -----------------------------
 # Purpose:
@@ -1807,6 +1838,272 @@ def _run_robustness_sweeps(
     return summary_out
 
 
+# --------------------------- Mask sensitivity sweeps ---------------------------
+
+@dataclass(frozen=True)
+class MaskSensitivitySpec:
+    kind: str
+    fracs: list[float]
+    mask_value: float = 0.0
+    keep_degree: bool = True
+    keep_last_indicator: bool = True
+    per_episode: bool = True   # True => resample mask each episode; False => fixed mask per seed
+
+
+def _normalize_device_str(dev: str) -> str:
+    d = (dev or "").strip().lower()
+    if d in ("gpu", "cuda", "cuda:0", "cuda0", "nvidia"):
+        return "cuda"
+    return dev
+
+
+def _parse_bool(x: Any, default: bool = False) -> bool:
+    if x is None:
+        return default
+    if isinstance(x, bool):
+        return x
+    s = str(x).strip().lower()
+    if s in ("1", "true", "t", "yes", "y", "on"):
+        return True
+    if s in ("0", "false", "f", "no", "n", "off"):
+        return False
+    return default
+
+
+def _parse_mask_sensitivity_spec(spec: str) -> MaskSensitivitySpec:
+    """
+    Spec grammar (single string):
+      "<kind>:frac=0,0.05,0.1[, ...][;mask_value=0][;keep_degree=1][;keep_last_indicator=1][;per_episode=1]"
+
+    Example:
+      "random:frac=0,0.05,0.10,0.20,0.30"
+      "random:frac=0.1,0.2;keep_degree=1;per_episode=1"
+    """
+    s = (spec or "").strip()
+    if not s:
+        raise ValueError("Empty --mask-sensitivity spec.")
+
+
+
+    # Backwards-compat:
+    #   --mask-sensitivity 0.2
+    #   --mask-sensitivity "frac=0,0.1,0.2"
+    sl = s.lower()
+    if ":" not in s:
+        # "frac=..." without an explicit kind -> assume random
+        if sl.startswith(("frac=", "fracs=")):
+            s = "random:" + s
+        else:
+            # bare float -> single-frac random mask
+            try:
+                f = float(s)
+                f = float(max(0.0, min(1.0, f)))
+                return MaskSensitivitySpec(kind="random", fracs=[f])
+            except Exception:
+                pass
+
+
+    if ":" in s:
+        kind, rest = s.split(":", 1)
+    else:
+        kind, rest = s, ""
+
+    kind = kind.strip().lower()
+    if not kind:
+        raise ValueError(f"Invalid --mask-sensitivity spec (missing kind): {spec!r}")
+
+    kv: dict[str, str] = {}
+    rest = rest.strip()
+    if rest:
+        # use ';' as kv separator so commas remain available for lists
+        parts = [p.strip() for p in rest.split(";") if p.strip()]
+        for p in parts:
+            if "=" not in p:
+                raise ValueError(f"Invalid mask-sensitivity kv token (expected k=v): {p!r}")
+            k, v = p.split("=", 1)
+            kv[k.strip().lower()] = v.strip()
+
+    if "frac" not in kv:
+        raise ValueError(f"--mask-sensitivity missing required key 'frac=': {spec!r}")
+
+    fracs = _as_float_list(kv.get("frac", ""))
+    fracs = [float(f) for f in fracs if math.isfinite(float(f)) and float(f) >= 0.0 and float(f) <= 1.0]
+    if not fracs:
+        raise ValueError(f"--mask-sensitivity produced empty frac list: {spec!r}")
+
+    mask_value = float(kv.get("mask_value", 0.0)) if kv.get("mask_value", "") != "" else 0.0
+    keep_degree = _parse_bool(kv.get("keep_degree", None), default=True)
+    keep_last_indicator = _parse_bool(kv.get("keep_last_indicator", None), default=True)
+    per_episode = _parse_bool(kv.get("per_episode", None), default=True)
+
+    return MaskSensitivitySpec(
+        kind=kind,
+        fracs=fracs,
+        mask_value=float(mask_value),
+        keep_degree=bool(keep_degree),
+        keep_last_indicator=bool(keep_last_indicator),
+        per_episode=bool(per_episode),
+    )
+
+
+def _frac_tag(frac: float) -> str:
+    # filename-friendly stable tag
+    s = f"{float(frac):.4g}"
+    s = s.replace(".", "p")
+    s = s.replace("-", "m")
+    return s
+
+
+def _apply_node_feature_mask(
+    X: torch.Tensor,
+    *,
+    node_idx: np.ndarray,
+    mask_value: float,
+    keep_degree: bool,
+    keep_last_indicator: bool,
+) -> torch.Tensor:
+    """
+    Mask selected nodes in X (N,F) or (B,N,F) by setting feature columns to mask_value.
+    By default we keep degree channel 0 and keep last indicator channel (if present).
+    """
+    if not isinstance(X, torch.Tensor):
+        return X
+    if X.ndim not in (2, 3):
+        return X
+
+    Y = X.clone()
+    F = int(Y.shape[-1])
+    if F <= 0:
+        return Y
+
+    # columns to mask
+    start_col = 1 if keep_degree else 0
+    end_col = F
+    if keep_last_indicator and F >= 3:
+        end_col = F - 1  # keep last channel
+
+    if start_col >= end_col:
+        return Y  # nothing to mask
+
+    # build boolean mask over nodes
+    N = int(Y.shape[-2])
+    if node_idx.size == 0:
+        return Y
+    node_idx = node_idx[(node_idx >= 0) & (node_idx < N)]
+    if node_idx.size == 0:
+        return Y
+
+    if Y.ndim == 2:
+        Y[node_idx, start_col:end_col] = float(mask_value)
+    else:
+        # (B,N,F)
+        Y[:, node_idx, start_col:end_col] = float(mask_value)
+
+    return Y
+
+
+def _wrap_dataloader_for_mask_sensitivity(
+    base_factory,
+    *,
+    spec: MaskSensitivitySpec,
+    frac: float,
+    manifest_hex: str,
+    cond_tag: str,
+):
+    """
+    Returns a dataloader_factory(seed_i) iterator that masks X for a deterministic subset of nodes.
+
+    Determinism:
+      - uses _stable_seed_u64(... manifest_hex, cond_tag, seed_i, episode_idx, frac ...)
+      - per_episode=True => re-sample each episode (more statistically meaningful)
+      - per_episode=False => fixed mask per seed (useful as a control)
+    """
+    frac = float(frac)
+
+    def wrapped_factory(seed_i: int):
+        it = base_factory(int(seed_i))
+        ep = 0
+
+        # precompute fixed nodes if requested
+        fixed_nodes = None
+        if not spec.per_episode:
+            # need N: probe first batch
+            it0 = iter(it)
+            first = next(it0)
+            if not isinstance(first, Mapping) or not isinstance(first.get("X", None), torch.Tensor):
+                # give back what we consumed, but we can’t mask reliably
+                yield first
+                for b in it0:
+                    yield b
+                return
+            X0 = first["X"]
+            N = int(X0.shape[-2])
+            k = int(math.floor(frac * N + 1e-12))
+            k = max(0, min(N, k))
+            seed_u32 = int(_stable_seed_u64("mask_sens", manifest_hex, cond_tag, "fixed", int(seed_i), frac) & 0xFFFFFFFF)
+            rng = np.random.RandomState(seed_u32)
+            fixed_nodes = rng.choice(N, size=k, replace=False) if k > 0 else np.zeros((0,), dtype=np.int64)
+
+            # now process first batch
+            b = dict(first)
+            b["X"] = _apply_node_feature_mask(
+                b["X"],
+                node_idx=fixed_nodes,
+                mask_value=spec.mask_value,
+                keep_degree=spec.keep_degree,
+                keep_last_indicator=spec.keep_last_indicator,
+            )
+            yield b
+
+            for batch in it0:
+                if not isinstance(batch, Mapping):
+                    yield batch
+                    continue
+                bb = dict(batch)
+                X = bb.get("X", None)
+                if isinstance(X, torch.Tensor):
+                    bb["X"] = _apply_node_feature_mask(
+                        X,
+                        node_idx=fixed_nodes,
+                        mask_value=spec.mask_value,
+                        keep_degree=spec.keep_degree,
+                        keep_last_indicator=spec.keep_last_indicator,
+                    )
+                yield bb
+            return
+
+        # per-episode resampling
+        for batch in it:
+            if not isinstance(batch, Mapping):
+                yield batch
+                ep += 1
+                continue
+            X = batch.get("X", None)
+            if not isinstance(X, torch.Tensor):
+                yield batch
+                ep += 1
+                continue
+
+            N = int(X.shape[-2])
+            k = int(math.floor(frac * N + 1e-12))
+            k = max(0, min(N, k))
+
+            seed_u32 = int(_stable_seed_u64("mask_sens", manifest_hex, cond_tag, int(seed_i), int(ep), frac) & 0xFFFFFFFF)
+            rng = np.random.RandomState(seed_u32)
+            nodes = rng.choice(N, size=k, replace=False) if k > 0 else np.zeros((0,), dtype=np.int64)
+
+            bb = dict(batch)
+            bb["X"] = _apply_node_feature_mask(
+                X,
+                node_idx=nodes,
+                mask_value=spec.mask_value,
+                keep_degree=spec.keep_degree,
+                keep_last_indicator=spec.keep_last_indicator,
+            )
+            yield bb
+            ep += 1
+
+    return wrapped_factory
 
 
 # ----------------------- First-class artifacts: stats + embeddings -----------------------
@@ -2778,6 +3075,94 @@ def _sanitize_filename(s: str) -> str:
     return x.strip("_") or "cond"
 
 
+
+
+def _broadcast_time_node(x: torch.Tensor, *, T: int, N: int) -> torch.Tensor:
+    """
+    Normalize ablation outputs to (T, N, ...).
+    Accepts:
+      - (T,N,...) => ok
+      - (T,...)   => broadcast over N
+      - (N,...)   => broadcast over T
+      - (...)     => broadcast over (T,N)
+    """
+    if not isinstance(x, torch.Tensor):
+        return x
+    if x.ndim >= 2 and x.shape[0] == T and x.shape[1] == N:
+        return x
+    # (T, ...)
+    if x.ndim >= 1 and x.shape[0] == T:
+        return x.unsqueeze(1).expand((T, N, *x.shape[1:]))
+    # (N, ...)
+    if x.ndim >= 1 and x.shape[0] == N:
+        return x.unsqueeze(0).expand((T, N, *x.shape[1:]))
+    # scalar / (...): expand
+    return x.view((1,) * 0 + x.shape).expand((T, N, *x.shape))
+
+
+def _su2_from_theta_best_effort(th: Any, model: torch.nn.Module, theta: torch.Tensor) -> torch.Tensor:
+    """
+    Convert theta (T,N,P) -> SU2 coins (T,N,2,2).
+    Tries:
+      - model._su2_from_euler_batch(theta)
+      - th.su2_from_euler_batch(theta)
+      - th.su2_from_euler(theta) (less common)
+    """
+    # 1) model method
+    fn = getattr(model, "_su2_from_euler_batch", None)
+    if callable(fn):
+        out = fn(theta)
+        if isinstance(out, torch.Tensor) and out.ndim == 4 and out.shape[-1] == out.shape[-2] == 2:
+            return out
+
+    # 2) train helper method(s)
+    for nm in ("su2_from_euler_batch", "su2_from_euler", "coins_su2_from_euler"):
+        fn2 = getattr(th, nm, None)
+        if callable(fn2):
+            try:
+                out = fn2(theta)
+                if isinstance(out, torch.Tensor) and out.ndim == 4 and out.shape[-1] == out.shape[-2] == 2:
+                    return out
+            except Exception:
+                pass
+
+    raise RuntimeError(
+        "Could not convert SU2 theta->coins for plotting. "
+        "Need model._su2_from_euler_batch(theta) or th.su2_from_euler_batch(theta)."
+    )
+
+
+def _ensure_su2_coin_tensor(coins: torch.Tensor, *, T: int, N: int) -> torch.Tensor:
+    """
+    Normalize SU2 coin tensor to (T,N,2,2).
+    Accepts common ablation variants:
+      - (T,N,2,2) ok
+      - (T,2,2)   => broadcast over N
+      - (N,2,2)   => broadcast over T
+      - (2,2)     => broadcast over (T,N)
+      - (1,N,2,2) or (T,1,2,2) broadcast
+    """
+    if not isinstance(coins, torch.Tensor):
+        raise TypeError("coins must be a torch.Tensor")
+    if coins.ndim == 4 and coins.shape[0] == T and coins.shape[1] == N:
+        return coins
+    if coins.ndim == 4 and coins.shape[0] == 1 and coins.shape[1] == N:
+        return coins.expand(T, N, 2, 2)
+    if coins.ndim == 4 and coins.shape[0] == T and coins.shape[1] == 1:
+        return coins.expand(T, N, 2, 2)
+    if coins.ndim == 3 and coins.shape[0] == T and coins.shape[-1] == coins.shape[-2] == 2:
+        return coins.unsqueeze(1).expand(T, N, 2, 2)
+    if coins.ndim == 3 and coins.shape[0] == N and coins.shape[-1] == coins.shape[-2] == 2:
+        return coins.unsqueeze(0).expand(T, N, 2, 2)
+    if coins.ndim == 2 and coins.shape[-1] == coins.shape[-2] == 2:
+        return coins.view(1, 1, 2, 2).expand(T, N, 2, 2)
+    raise RuntimeError(f"Unsupported SU2 coins shape for plotting: {tuple(coins.shape)}")
+
+
+
+
+
+
 def _make_rollout_timeline_fn(
     th: Any,
     *,
@@ -2838,10 +3223,14 @@ def _make_rollout_timeline_fn(
         try:
             out = model(X, edge_index, T=T)
             if isinstance(out, torch.Tensor):
-                if out.ndim == 3 and hasattr(model, "_su2_from_euler_batch"):
-                    coins = model._su2_from_euler_batch(out)  # theta -> SU2 coins
+                if out.ndim == 3:
+                    # theta -> coins
+                    theta = _broadcast_time_node(out, T=T, N=pm.num_nodes)
+                    coins = _su2_from_theta_best_effort(th, model, theta)
                 elif out.ndim == 4 and out.shape[-1] == out.shape[-2] == 2:
-                    coins = out  # already SU2 coins
+                    # already coins, but may be (T,2,2) or (N,2,2)
+                    coins = _ensure_su2_coin_tensor(out, T=T, N=pm.num_nodes)
+
         except Exception:
             coins = None
 
@@ -2857,6 +3246,10 @@ def _make_rollout_timeline_fn(
 
         Pt = torch.empty((T + 1, pm.num_nodes), device=psi.device, dtype=torch.float32)
         Pt[0] = partial_trace_coin(psi, pm).to(torch.float32)
+        
+        coins = _ensure_su2_coin_tensor(coins, T=T, N=pm.num_nodes)
+
+        
         for t in range(T):
             psi = _step_su2(psi, pm, coins[t], shift=shift)
             Pt[t + 1] = partial_trace_coin(psi, pm).to(torch.float32)
@@ -2887,7 +3280,8 @@ def _make_rollout_timeline_fn(
             else:
                 raise RuntimeError("Any-degree plotting needs model.forward(...) -> theta OR model.coins_anydeg(...).")
                 
-        
+        theta = _broadcast_time_node(theta, T=T, N=pm.num_nodes)
+
         
         
         
@@ -3299,6 +3693,7 @@ def run_eval(
     robust_sweep_include_ablations: bool = False,
     robust_sweep_max_plot_metrics: int = 6,
 
+    mask_sensitivity: list[str] | None = None,
 
     # First-class artifacts (B7)
     artifacts: bool = True,
@@ -3363,6 +3758,7 @@ def run_eval(
 
     # Load checkpoint (always recommended, even for baselines, to reuse config)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    device = _normalize_device_str(device)
 
     # ----------------- Config / checkpoint source of truth -----------------
     # Cases:
@@ -3793,6 +4189,71 @@ def run_eval(
             
             title_suffix = f"{coin_family.upper()} (any degree)"
 
+
+
+
+        # --------------------------- Build condition runners ---------------------------
+        base_tag = ("ckpt_policy" if policy != "baseline" else f"baseline_{_sanitize_filename(baseline_kind)}")
+
+        cond_runners: dict[str, dict[str, Any]] = {
+            base_tag: {
+                "model": model,
+                "dataloader_factory": _make_eval_iter,
+                "rollout_fn": rollout_fn,
+                "meta": {
+                    "policy": policy,
+                    "baseline_kind": baseline_kind if policy == "baseline" else None,
+                    "title_suffix": title_suffix,
+                },
+            }
+        }
+
+# ---- Ablations -> expand conditions ----
+if ablations and abl_mod is not None:
+    for a in ablations:
+        canon = _normalize_ablation_name(a)
+        try:
+            bundle = _build_ablation_bundle(
+                abl_mod,
+                ablation=canon,
+                base_tag=base_tag,
+                model=model,
+                dataloader_factory=_make_eval_iter,
+                rollout_fn=rollout_fn,
+                cfg=cfg,
+                device=torch_device,
+            )
+        except Exception as e:
+            bundle = None
+            if strict_ablations:
+                raise
+
+        # Special-case: NoPE fallback (still meaningful + defendable)
+        if bundle is None and canon == "NoPE":
+            bundle = _fallback_nope_bundle(
+                base_tag=base_tag,
+                model=model,
+                dataloader_factory=_make_eval_iter,
+                rollout_fn=rollout_fn,
+                cfg=cfg,
+            )
+
+        if bundle is None:
+            msg = f"[warn] ablation '{canon}' could not be applied; skipping."
+            if strict_ablations:
+                raise RuntimeError(msg)
+            print(msg, file=sys.stderr)
+            continue
+
+        cond_runners[bundle.tag] = {
+            "model": bundle.model,
+            "dataloader_factory": bundle.dataloader_factory,
+            "rollout_fn": bundle.rollout_fn,
+            "meta": dict(bundle.meta or {}),
+        }
+
+
+
         # --- protocol configs ---
         if isinstance(seeds, int):
             seed_list = list(range(seeds))
@@ -3861,6 +4322,7 @@ def run_eval(
 
         "ablations_canonical": [_normalize_ablation_name(a) for a in (ablations or [])],
 
+        "mask_sensitivity_request": list(mask_sensitivity or []),
 
 
         "device": device,
@@ -4011,7 +4473,29 @@ def run_eval(
                             except Exception:
                                 pass
                     if len(seed_means) >= 2:
-                        ci_seed = compute_ci(np.asarray(seed_means, dtype=float), method="student_t", alpha=eval_cfg.ci_alpha)
+
+
+                        def _tcrit_95_or_normal(df: int, alpha: float) -> float:
+                            try:
+                                from scipy.stats import t as _t
+                                return float(_t.ppf(1.0 - alpha / 2.0, df))
+                            except Exception:
+                                # normal approx if scipy not available
+                                import statistics
+                                return float(statistics.NormalDist().inv_cdf(1.0 - alpha / 2.0))
+
+                        def _seed_level_t_ci(seed_means: list[float], alpha: float) -> dict[str, float] | None:
+                            n = len(seed_means)
+                            if n < 2:
+                                return None
+                            mu = float(sum(seed_means) / n)
+                            # sample std
+                            var = sum((x - mu) ** 2 for x in seed_means) / (n - 1)
+                            sd = math.sqrt(max(var, 0.0))
+                            se = sd / math.sqrt(n)
+                            tc = _tcrit_95_or_normal(n - 1, alpha)
+                            return {"mean": mu, "lo": mu - tc * se, "hi": mu + tc * se, "stderr": se, "n": float(n)}
+
                         seed_ci_payload[str(metric)] = _ci_to_dict(ci_seed)
 
                 if seed_ci_payload:
@@ -4100,6 +4584,38 @@ def run_eval(
     row = {"cond": base_tag}
     row.update({f"metric.{k}": v for k, v in base_summary.items()})
     summaries_for_csv.append(row)
+
+
+
+
+
+
+    if artifacts and (artifacts_stats or artifacts_embeddings):
+        # pick which seeds/episodes to use for embeddings/stat artifacts
+        art_seeds = (
+            [int(artifacts_embed_seed)]
+            if artifacts_embed_seed is not None
+            else list(seed_list)
+        )
+        art_eps = int(max(1, min(int(artifacts_embed_episodes), int(episodes))))
+
+        _write_first_class_artifacts(
+            outdir=outdir,
+            cfg=cfg,
+            conditions=cond_runners,
+            structured_out=structured_out,
+            seeds=art_seeds,
+            episodes=art_eps,
+            device=torch_device,
+            T_default=T,
+            max_nodes=int(artifacts_embeddings_max_nodes),
+            want_embeddings=bool(artifacts_embeddings),
+            want_stats=bool(artifacts_stats),
+            emb_mod=emb_mod,
+            stats_mod=stats_mod,
+        )
+
+
 
 
     # Ablations (causality checks)
@@ -4210,6 +4726,63 @@ def run_eval(
             summaries_for_csv.append(row)
 
 
+    # -------------------- Mask sensitivity (feature masking) --------------------
+    if mask_sensitivity:
+        if not trainer_native_ok:
+            print("[warn] --mask-sensitivity is only supported in trainer-native eval path; skipping.", file=sys.stderr)
+        else:
+            for spec_str in mask_sensitivity:
+                try:
+                    spec = _parse_mask_sensitivity_spec(spec_str)
+                except Exception as e:
+                    print(f"[warn] invalid --mask-sensitivity spec {spec_str!r}: {e}", file=sys.stderr)
+                    continue
+
+                # We already evaluate the unmasked base condition; skip frac==0 duplicates.
+                for frac in spec.fracs:
+                    if float(frac) <= 0.0:
+                        continue
+
+                    cond_tag = f"{base_tag}__mask_{spec.kind}_frac{_frac_tag(frac)}"
+                    masked_factory = _wrap_dataloader_for_mask_sensitivity(
+                        _make_eval_iter,
+                        spec=spec,
+                        frac=float(frac),
+                        manifest_hex=str(manifest_hex),
+                        cond_tag=cond_tag,
+                    )
+
+                    res = run_one_condition(
+                        cond_tag,
+                        dataloader_factory_override=masked_factory,
+                        rollout_fn_override=rollout_fn,
+                        extra_meta={
+                            "mask_sensitivity": {
+                                "spec": spec_str,
+                                "kind": spec.kind,
+                                "frac": float(frac),
+                                "mask_value": float(spec.mask_value),
+                                "keep_degree": bool(spec.keep_degree),
+                                "keep_last_indicator": bool(spec.keep_last_indicator),
+                                "per_episode": bool(spec.per_episode),
+                            }
+                        },
+                    )
+
+                    structured_out["conditions"][cond_tag] = res or {}
+
+                    # CSV row
+                    summ = (res or {}).get("summary", {})
+                    row = {"cond": cond_tag}
+                    row.update({f"metric.{k}": v for k, v in (summ or {}).items()})
+                    summaries_for_csv.append(row)
+
+                    # Plots + artifacts use this mapping
+                    plot_runners[cond_tag] = {
+                        "model": model,
+                        "dataloader_factory": masked_factory,
+                        "meta": {"mask_sensitivity": {"spec": spec_str, "frac": float(frac)}},
+                    }
 
     # ---------------- Robustness sweeps (Phase 6) ----------------
     if trainer_native_ok and bool(robust_sweep):
@@ -4314,17 +4887,19 @@ def run_eval(
             print(f"[warn] artifact generation failed: {type(e).__name__}: {e}", file=sys.stderr)
 
 
-    if plots and plot_mod is not None:
+        # ---------------- Plots (defendable; robust fallbacks) ----------------
+    if plots:
         if not trainer_native_ok:
             print("[warn] plots requested, but trainer-native eval path is unavailable; skipping plots.", file=sys.stderr)
         else:
             try:
-                figdir = _ensure_dir(outdir / "figs")
+                figdir = _ensure_dir(paths.figs_dir)
 
                 # Build a timeline rollout strictly for plotting.
-                theta_scale = float((cfg.get("coin", {}) or {}).get("theta_scale", 1.0)) if "cfg" in locals() else 1.0
-                theta_noise_std = float((cfg.get("coin", {}) or {}).get("theta_noise_std", 0.0)) if "cfg" in locals() else 0.0
-                rollout_tl = _make_rollout_timeline_fn(
+                theta_scale = float((cfg.get("coin", {}) or {}).get("theta_scale", 1.0)) if isinstance(cfg, dict) else 1.0
+                theta_noise_std = float((cfg.get("coin", {}) or {}).get("theta_noise_std", 0.0)) if isinstance(cfg, dict) else 0.0
+
+                rollout_timeline_fn = _make_rollout_timeline_fn(
                     th,
                     pm=pm,
                     shift=shift,
@@ -4337,377 +4912,169 @@ def run_eval(
                     theta_noise_std=theta_noise_std,
                 )
 
+                # ---- Minimal, signature-independent plotting fallback ----
+                def _tcrit(df: int, alpha: float) -> float:
+                    # Prefer SciPy if available; else use normal approx / small table for 95%
+                    try:
+                        from scipy.stats import t as _t
+                        return float(_t.ppf(1.0 - alpha / 2.0, df))
+                    except Exception:
+                        # 95% two-sided table for df=1..30
+                        if abs(alpha - 0.05) < 1e-12 and 1 <= df <= 30:
+                            t95 = {
+                                1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365,
+                                8: 2.306, 9: 2.262, 10: 2.228, 11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145,
+                                15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086, 21: 2.080,
+                                22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056, 27: 2.052, 28: 2.048,
+                                29: 2.045, 30: 2.042,
+                            }
+                            return t95[df]
+                        # normal approx
+                        z = statistics.NormalDist().inv_cdf(1.0 - alpha / 2.0)
+                        return float(z)
 
-                # ---------------- Plotting conventions (defendable) ----------------
-                # 1) CI mode:
-                #    - multi-seed: CI across seeds (per-seed mean over episodes)
-                #    - single-seed: CI across episodes (avoids n=1 ddof warnings)
-                if len(seed_list) < 2:
-                    print(
-                        "[warn] plots: only one seed provided; using CI across episodes (not across seeds). "
-                        "Run >=2 seeds for seed-level CI plots.",
-                        file=sys.stderr,
-                    )
-
-                # 2) Choose ONE node set ONCE (from base condition), reuse across all conditions.
-                forced_nodes: list[int] = []
-                try:
-                    start_node = int(payload.get("start_node", 0))
-                    forced_nodes.append(start_node)
-                except Exception:
-                    pass
-                try:
-                    t = payload.get("targets", None)
-                    if isinstance(t, torch.Tensor) and t.numel() > 0:
-                        forced_nodes.extend([int(v) for v in t.detach().cpu().tolist()])
-                except Exception:
-                    pass
-                # dedup preserving order
-                _seen = set()
-                forced_nodes = [v for v in forced_nodes if (v not in _seen and not _seen.add(v))]
-
-                nodes_shared: list[int] | None = None
-
-                # Compute nodes_shared from the BASE condition only (stable comparisons).
-                if base_tag in plot_runners:
-                    rr0 = plot_runners[base_tag]
-                    m0 = rr0["model"]
-                    dl0 = rr0["dataloader_factory"]
-
-                    Pt0, meta0 = _collect_Pt_samples_for_plotting(
-                        model=m0,
-                        dataloader_factory=dl0,
-                        rollout_timeline_fn=rollout_tl,
-                        seeds=seed_list,
-                        episodes=int(episodes),
-
-                        ckpt_path=ckpt_path,
-                        artifacts_request=meta.get("artifacts_request", None),
-                    )
-
-                    # Need at least 1 sample to pick nodes; (>=2 only matters for CI shading)
-                    Pmean0 = Pt0.mean(axis=0)  # (T+1, N)
-                    score0 = Pmean0.max(axis=0)  # (N,)
-                    order0 = np.argsort(-score0).tolist()
-                    Nn0 = int(Pmean0.shape[1])
-
-                    nodes_shared = []
-                    for v in forced_nodes + order0:
-                        v = int(v)
-                        if 0 <= v < Nn0 and v not in nodes_shared:
-                            nodes_shared.append(v)
-                        if len(nodes_shared) >= 12:
-                            break
-
-                # Persist node choice for thesis reproducibility
-                try:
-                    nodes_payload = {
-                        "picked_from": base_tag,
-                        "forced_nodes": forced_nodes,
-                        "nodes_shared": nodes_shared,
-                        "seed_list": seed_list,
-                        "episodes": int(episodes),
-                        "ci_mode": meta0.get("ci_mode", None),
-                        "collector_meta": meta0,
-                    }
-                    (figdir / EvalRole.FIG_NODES_SHARED.value).write_text(
-                        _json_dump(nodes_payload) + "\n", encoding="utf-8"
-                    )
-                except Exception as e:
-                    print(f"[warn] could not write nodes_shared.json: {e}", file=sys.stderr)
-
-                # -------------------- Local, defensible plotting (no ddof/div0 traps) --------------------
-                import matplotlib
-                matplotlib.use("Agg", force=True)
-                import matplotlib.pyplot as plt
-
-                def _tv_to_uniform_curve(P: np.ndarray) -> np.ndarray:
-                    # P: (T+1, N)
-                    Nn = int(P.shape[1])
-                    u = 1.0 / max(Nn, 1)
-                    return 0.5 * np.sum(np.abs(P - u), axis=1)  # (T+1,)
-
-                def _ci_over_samples(x: np.ndarray, alpha: float = 0.05) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-                    """
-                    x: (K, T) samples.
-                    Returns mean, lo, hi (each (T,)).
-                    Uses compute_ci if available; else student-t-ish fallback.
-                    """
-                    x = np.asarray(x, dtype=float)
-                    mean = np.nanmean(x, axis=0)
-                    K = int(x.shape[0])
+                def _curve_mean_ci(curves: np.ndarray, alpha: float) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
+                    curves = np.asarray(curves, dtype=float)
+                    mu = np.nanmean(curves, axis=0)
+                    K = int(curves.shape[0])
                     if K < 2:
-                        return mean, mean, mean
+                        return mu, None, None
+                    sd = np.nanstd(curves, axis=0, ddof=1)
+                    se = sd / max(np.sqrt(K), 1.0)
+                    tc = _tcrit(K - 1, alpha)
+                    lo = mu - tc * se
+                    hi = mu + tc * se
+                    return mu, lo, hi
 
-                    lo = np.empty_like(mean)
-                    hi = np.empty_like(mean)
+                def _tv_to_uniform(Pt: np.ndarray) -> np.ndarray:
+                    # Pt: (T+1, N)
+                    Nn = Pt.shape[1]
+                    u = 1.0 / max(Nn, 1)
+                    return 0.5 * np.sum(np.abs(Pt - u), axis=1)
 
-                    if compute_ci is not None:
-                        for t in range(x.shape[1]):
-                            col = x[:, t]
-                            col = col[np.isfinite(col)]
-                            if col.shape[0] < 2:
-                                lo[t] = mean[t]
-                                hi[t] = mean[t]
-                                continue
-                            ci = compute_ci(col.astype(float), method="student_t", alpha=float(alpha))
-                            lo[t] = float(ci.lo)
-                            hi[t] = float(ci.hi)
-                        return mean, lo, hi
+                def _max_prob(Pt: np.ndarray) -> np.ndarray:
+                    return np.max(Pt, axis=1)
 
-                    # fallback: normal approx (still avoids ddof warnings)
-                    std = np.nanstd(x, axis=0, ddof=1)
-                    se = std / np.sqrt(max(K, 1))
-                    z = 1.96  # 95% normal approx
-                    lo = mean - z * se
-                    hi = mean + z * se
-                    return mean, lo, hi
+                def _save_curve_png(savepath: Path, mean: np.ndarray, lo: np.ndarray | None, hi: np.ndarray | None,
+                                    *, title: str, ylabel: str) -> None:
+                    import matplotlib
+                    matplotlib.use("Agg", force=True)
+                    import matplotlib.pyplot as plt
+                    x = np.arange(mean.shape[0], dtype=float)
+                    plt.figure()
+                    plt.plot(x, mean)
+                    if lo is not None and hi is not None:
+                        plt.fill_between(x, lo, hi, alpha=0.2)
+                    plt.title(title)
+                    plt.xlabel("t")
+                    plt.ylabel(ylabel)
+                    plt.tight_layout()
+                    plt.savefig(savepath, dpi=200)
+                    plt.close()
 
-                # Choose a small, interpretable node subset for Pt plots:
-                # include forced nodes first, then fill from nodes_shared.
-                nodes_show: list[int] = []
-                for v in (forced_nodes or []) + (nodes_shared or []):
-                    v = int(v)
-                    if v not in nodes_show:
-                        nodes_show.append(v)
-                    if len(nodes_show) >= 6:
-                        break
+                def _save_final_topk_png(savepath: Path, Pt_mean: np.ndarray, *, k: int = 32, title: str = "") -> None:
+                    import matplotlib
+                    matplotlib.use("Agg", force=True)
+                    import matplotlib.pyplot as plt
+                    p = Pt_mean[-1]  # final time (N,)
+                    Nn = p.shape[0]
+                    kk = int(min(k, Nn))
+                    idx = np.argsort(-p)[:kk]
+                    vals = p[idx]
+                    plt.figure()
+                    plt.plot(np.arange(kk), vals)
+                    plt.title(title or f"Top-{kk} probs at final time")
+                    plt.xlabel("rank")
+                    plt.ylabel("p")
+                    plt.tight_layout()
+                    plt.savefig(savepath, dpi=200)
+                    plt.close()
 
-                # Collect + plot for each condition
-                tv_overlay = []  # list of (cond, mean, lo, hi, meta)
-                for cond_tag, rr in plot_runners.items():
-                    mC = rr["model"]
-                    dlC = rr["dataloader_factory"]
-
-                    PtS, metaC = _collect_Pt_samples_for_plotting(
-                        model=mC,
-                        dataloader_factory=dlC,
-                        rollout_timeline_fn=rollout_tl,
-                        seeds=seed_list,
-                        episodes=int(episodes),
-                        ckpt_path=ckpt_path,
-                        artifacts_request=meta.get("artifacts_request", None),
-                    )  # (K, T+1, N)
-
-                    # Save raw plot inputs (defendable artifacts)
-                    try:
-                        npz_path = figdir / f"Pt_samples__{_sanitize_filename(cond_tag)}.npz"
-                        np.savez_compressed(npz_path, Pt_samples=PtS)
-                        (figdir / f"Pt_samples__{_sanitize_filename(cond_tag)}__meta.json").write_text(
-                            _json_dump({"cond": cond_tag, "meta": metaC}) + "\n",
-                            encoding="utf-8",
-                        )
-                    except Exception as e:
-                        print(f"[warn] could not save Pt_samples for {cond_tag}: {e}", file=sys.stderr)
-
-                    # --- TV-to-uniform curve (K replicates) ---
-                    tvS = np.stack([_tv_to_uniform_curve(PtS[k]) for k in range(PtS.shape[0])], axis=0)  # (K, T+1)
-                    tv_mean, tv_lo, tv_hi = _ci_over_samples(tvS, alpha=0.05)
-
-                    tv_overlay.append((cond_tag, tv_mean, tv_lo, tv_hi, metaC))
-
-                    # plot tv curve
-                    try:
-                        tgrid = np.arange(tv_mean.shape[0])
-                        plt.figure()
-                        plt.plot(tgrid, tv_mean, label="mean")
-                        if np.any(np.isfinite(tv_lo)) and np.any(np.isfinite(tv_hi)) and PtS.shape[0] >= 2:
-                            plt.fill_between(tgrid, tv_lo, tv_hi, alpha=0.25, label="95% CI")
-                        plt.title(f"TV-to-uniform — {cond_tag} ({metaC.get('ci_mode', 'samples')}-CI)")
-                        plt.xlabel("t")
-                        plt.ylabel("TV(P_t, Uniform)")
-                        plt.tight_layout()
-                        plt.savefig(figdir / f"tv_to_uniform__{_sanitize_filename(cond_tag)}.png", dpi=200)
-                        plt.close()
-                    except Exception as e:
-                        print(f"[warn] TV plot failed for {cond_tag}: {e}", file=sys.stderr)
-
-                    # --- Pt for selected nodes (mean + optional CI) ---
-                    try:
-                        # PtS: (K, T+1, N)
-                        plt.figure()
-                        tgrid = np.arange(PtS.shape[1])
-
-                        for v in nodes_show:
-                            v = int(v)
-                            if v < 0 or v >= PtS.shape[2]:
-                                continue
-                            yS = PtS[:, :, v]  # (K, T+1)
-                            y_mean, y_lo, y_hi = _ci_over_samples(yS, alpha=0.05)
-                            plt.plot(tgrid, y_mean, label=f"node {v}")
-                            # Only shade CI for a small number of lines (readable)
-                            if PtS.shape[0] >= 2 and len(nodes_show) <= 4:
-                                plt.fill_between(tgrid, y_lo, y_hi, alpha=0.15)
-
-                        plt.title(f"P_t at selected nodes — {cond_tag} ({metaC.get('ci_mode', 'samples')}-CI)")
-                        plt.xlabel("t")
-                        plt.ylabel("P(node)")
-                        plt.legend(loc="best", fontsize=8)
-                        plt.tight_layout()
-                        plt.savefig(figdir / f"pt_nodes__{_sanitize_filename(cond_tag)}.png", dpi=200)
-                        plt.close()
-                    except Exception as e:
-                        print(f"[warn] Pt(nodes) plot failed for {cond_tag}: {e}", file=sys.stderr)
-
-                # Overlay TV curves across conditions (base vs ablations)
-                try:
-                    if tv_overlay:
-                        plt.figure()
-                        tgrid = np.arange(tv_overlay[0][1].shape[0])
-                        for cond_tag, tv_mean, tv_lo, tv_hi, metaC in tv_overlay:
-                            plt.plot(tgrid, tv_mean, label=cond_tag)
-                        plt.title("TV-to-uniform overlay (means)")
-                        plt.xlabel("t")
-                        plt.ylabel("TV(P_t, Uniform)")
-                        plt.legend(loc="best", fontsize=8)
-                        plt.tight_layout()
-                        plt.savefig(figdir / "tv_to_uniform__overlay.png", dpi=200)
-                        plt.close()
-                except Exception as e:
-                    print(f"[warn] TV overlay plot failed: {e}", file=sys.stderr)
-
-
-
-
+                # Collect plots per condition
+                plots_index: dict[str, Any] = {"conditions": {}}
+                alpha = float(eval_cfg.ci_alpha) if "eval_cfg" in locals() else 0.05
 
                 for cond_tag, rr in plot_runners.items():
-                    safe = _sanitize_filename(cond_tag)
-
                     m = rr["model"]
                     dl = rr["dataloader_factory"]
-                    meta_rr = rr.get("meta", {}) if isinstance(rr, dict) else {}
 
-                    # Default: use base timeline rollout
-                    rollout_tl_used = rollout_tl
-
-                    # Optional: if ablations module provides an ablation_cfg + rollout_with_ablation,
-                    # wrap the timeline rollout so plotting exactly matches the ablation semantics.
-                    if abl_mod is not None and isinstance(meta_rr, Mapping):
-                        ab_cfg_dict = meta_rr.get("ablation_cfg", None)
-                        if (
-                            isinstance(ab_cfg_dict, Mapping)
-                            and hasattr(abl_mod, "AblationConfig")
-                            and hasattr(abl_mod, "rollout_with_ablation")
-                        ):
-                            try:
-                                ctor = getattr(abl_mod, "AblationConfig")
-                                sig = inspect.signature(ctor)
-                                allowed = set(sig.parameters.keys())
-                                kwargs_cfg = {k: ab_cfg_dict[k] for k in ab_cfg_dict.keys() if k in allowed}
-                                ab_cfg = ctor(**kwargs_cfg)
-
-                                def _rollout_tl_wrapped(model0: torch.nn.Module, batch0: Mapping[str, Any]) -> torch.Tensor:
-                                    # rollout_with_ablation expects rollout_fn -> (P, aux)
-                                    def _inner_rollout(mm: torch.nn.Module, bb: dict) -> tuple[torch.Tensor, dict]:
-                                        return rollout_tl(mm, bb), {}
-
-                                    P_out, _aux = abl_mod.rollout_with_ablation(
-                                        base_policy=model0,
-                                        rollout_fn=_inner_rollout,
-                                        batch=dict(batch0),
-                                        cfg=ab_cfg,
-                                    )
-                                    return P_out
-
-                                rollout_tl_used = _rollout_tl_wrapped
-                            except Exception as e:
-                                print(f"[warn] plotting ablation wrapper failed for {cond_tag}: {e}", file=sys.stderr)
-
-                    Pt, pt_meta = _collect_Pt_samples_for_plotting(
+                    Pt_samples, Pt_meta = _collect_Pt_samples_for_plotting(
                         model=m,
                         dataloader_factory=dl,
-                        rollout_timeline_fn=rollout_tl_used,
+                        rollout_timeline_fn=rollout_timeline_fn,
                         seeds=seed_list,
                         episodes=int(episodes),
-
-                        ckpt_path=ckpt_path,
+                        ckpt_path=ckpt_path if ckpt_path is not None else None,
                         artifacts_request=meta.get("artifacts_request", None),
+                    )
+                    # Pt_samples: (K, T+1, N)
+                    K, L, Nn = Pt_samples.shape
 
+                    tv_curves = np.stack([_tv_to_uniform(Pt_samples[i]) for i in range(K)], axis=0)   # (K, T+1)
+                    mp_curves = np.stack([_max_prob(Pt_samples[i]) for i in range(K)], axis=0)       # (K, T+1)
 
-                    )  # (K, T+1, N)
+                    tv_mean, tv_lo, tv_hi = _curve_mean_ci(tv_curves, alpha=alpha)
+                    mp_mean, mp_lo, mp_hi = _curve_mean_ci(mp_curves, alpha=alpha)
 
-                    # If K<2, most CI code will warn (ddof/div0). Skip CI plots in that case.
-                    if int(Pt.shape[0]) < 2:
-                        print(
-                            f"[warn] plots: {cond_tag} produced only K={Pt.shape[0]} sample(s); "
-                            "skipping CI-based plots to avoid misleading uncertainty.",
-                            file=sys.stderr,
-                        )
-                        continue
+                    safe = _sanitize_filename(cond_tag)
+                    out_npz = figdir / f"plotdata__{safe}.npz"
+                    np.savez_compressed(
+                        out_npz,
+                        Pt_samples=Pt_samples.astype(np.float32),
+                        tv_curves=tv_curves.astype(np.float32),
+                        maxprob_curves=mp_curves.astype(np.float32),
+                        meta=json.dumps(Pt_meta, default=str),
+                    )
 
-                    ci_note = f"CI across {pt_meta.get('ci_mode','?')} (K={pt_meta.get('n_samples','?')})"
+                    _save_curve_png(
+                        figdir / f"tv_to_uniform__{safe}.png",
+                        tv_mean, tv_lo, tv_hi,
+                        title=f"TV to uniform — {cond_tag} ({Pt_meta.get('ci_mode','?')}, K={K})",
+                        ylabel="TV(P_t, Uniform)"
+                    )
+                    _save_curve_png(
+                        figdir / f"max_prob__{safe}.png",
+                        mp_mean, mp_lo, mp_hi,
+                        title=f"Max node prob — {cond_tag} ({Pt_meta.get('ci_mode','?')}, K={K})",
+                        ylabel="max_i p_t(i)"
+                    )
+                    _save_final_topk_png(
+                        figdir / f"final_topk__{safe}.png",
+                        np.mean(Pt_samples, axis=0),
+                        k=32,
+                        title=f"Final distribution top-k — {cond_tag}"
+                    )
 
+                    plots_index["conditions"][cond_tag] = {
+                        "ci_mode": Pt_meta.get("ci_mode", None),
+                        "K": int(K),
+                        "T": int(L - 1),
+                        "N": int(Nn),
+                        "files": [
+                            f"plotdata__{safe}.npz",
+                            f"tv_to_uniform__{safe}.png",
+                            f"max_prob__{safe}.png",
+                            f"final_topk__{safe}.png",
+                        ],
+                    }
 
+                (figdir / "plots_index.json").write_text(_json_dump(plots_index), encoding="utf-8")
 
-                    # --- NEW: pick ONE consistent node set for all conditions (defendable comparisons) ---
-                    if "nodes_shared" not in locals():
-                        nodes_shared = None
-                        forced_nodes = []
-                        try:
-                            start_node = int(payload.get("start_node", 0))
-                            forced_nodes.append(start_node)
-                        except Exception:
-                            pass
-                        try:
-                            t = payload.get("targets", None)
-                            if isinstance(t, torch.Tensor) and t.numel() > 0:
-                                forced_nodes.extend([int(v) for v in t.detach().cpu().tolist()])
-                        except Exception:
-                            pass
-                        # dedup preserving order
-                        seen = set()
-                        forced_nodes = [v for v in forced_nodes if (v not in seen and not seen.add(v))]
+                # OPTIONAL: if acpl.eval.plots exists, try it too (but never fail the run)
+                if plot_mod is not None:
+                    for fn_name in ("plot_eval", "plot_suite", "plot_results", "run", "main"):
+                        fn = getattr(plot_mod, fn_name, None)
+                        if callable(fn):
+                            try:
+                                _call_plot_best_effort(fn, structured_out, figdir)
+                            except Exception as e:
+                                print(f"[warn] acpl.eval.plots.{fn_name} failed (ignored): {type(e).__name__}: {e}", file=sys.stderr)
+                            break
 
-                    if nodes_shared is None:
-                        Pmean = Pt.mean(axis=0)          # (T+1, N)
-                        score = Pmean.max(axis=0)        # (N,)
-                        order = np.argsort(-score).tolist()
-                        Nn = int(Pmean.shape[1])
-                        nodes_shared = []
-                        for v in forced_nodes + order:
-                            v = int(v)
-                            if 0 <= v < Nn and v not in nodes_shared:
-                                nodes_shared.append(v)
-                            if len(nodes_shared) >= 12:
-                                break
-
-
-
-
-
-
-
-
-
-
-
-
-                    # TV curves are only meaningful/claimed for mixing suites
-                    if is_mixing and hasattr(plot_mod, "plot_tv_curves"):
-                        plot_mod.plot_tv_curves(
-                            Pt,
-                            savepath=(figdir / f"tv__{safe}.png"),
-                            title=f"{suite} — {cond_tag} — TV-to-uniform — {ci_note}",
-                        )
-
-                    # NodePermute: node identities are meaningless, so timelines are typically not interpretable
-                    is_nodeperm = ("nodepermute" in cond_tag.lower())
-                    if (not is_nodeperm) and hasattr(plot_mod, "plot_position_timelines"):
-                        plot_mod.plot_position_timelines(
-                            Pt,
-                            nodes=nodes_shared,
-                            topk=None,
-                            savepath=(figdir / f"Pt__{safe}.png"),
-                            title=f"{suite} — {cond_tag} — mean Pt — {ci_note}",
-                        )
-
-
-
-                        
             except Exception as e:
-                print(f"[warn] plot generation failed: {e}", file=sys.stderr)
-
-
+                # CRITICAL: do not swallow plot failures
+                print(f"[warn] plot generation failed: {type(e).__name__}: {e}", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
 
 
     if report:
@@ -4724,6 +5091,44 @@ def run_eval(
 
 
 
+        # ---- Mask sensitivity -> expand conditions (base + ablations) ----
+        if mask_sensitivity:
+            parsed_specs: list[MaskSensitivitySpec] = []
+            for s in mask_sensitivity:
+                parsed_specs.append(_parse_mask_sensitivity_spec(s))
+
+            # Expand on TOP of whatever exists now (base + ablations)
+            cur_items = list(cond_runners.items())
+
+            for spec in parsed_specs:
+                for frac in spec.fracs:
+                    for cond_tag, rr in cur_items:
+                        new_tag = f"{cond_tag}__ms_{_sanitize_filename(spec.kind)}_{_frac_tag(frac)}"
+
+                        wrapped_dl = _wrap_dataloader_for_mask_sensitivity(
+                            rr["dataloader_factory"],
+                            spec=spec,
+                            frac=float(frac),
+                            manifest_hex=str(manifest_hex),
+                            cond_tag=str(cond_tag),
+                        )
+
+                        cond_runners[new_tag] = {
+                            "model": rr["model"],
+                            "dataloader_factory": wrapped_dl,
+                            "rollout_fn": rr["rollout_fn"],
+                            "meta": {
+                                **(rr.get("meta", {}) or {}),
+                                "mask_sensitivity": {
+                                    "kind": spec.kind,
+                                    "frac": float(frac),
+                                    "mask_value": float(spec.mask_value),
+                                    "keep_degree": bool(spec.keep_degree),
+                                    "keep_last_indicator": bool(spec.keep_last_indicator),
+                                    "per_episode": bool(spec.per_episode),
+                                },
+                            },
+                        }
 
 
 
@@ -4774,6 +5179,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Overrides key=val (supports dotted keys). Example: model.gnn.hidden=128 seed=123",
     )
 
+
+    ap.add_argument(
+        "--mask-sensitivity",
+        dest="mask_sensitivity",
+        action="append",
+        default=None,
+        help='Mask sensitivity sweep spec. Repeatable. Example: --mask-sensitivity "random:frac=0,0.05,0.10,0.20,0.30"',
+    )
+
+
+
     # --- robustness sweeps (Phase 6) ---
     p.add_argument("--robust_sweep", action="store_true", help="Run robustness sigma sweeps (trainer-native only).")
     p.add_argument("--robust_sweep_kinds", type=str, nargs="*", default=[], help="Kinds to sweep.")
@@ -4782,6 +5198,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--robust_sweep_bootstrap", type=int, default=200, help="Bootstrap samples per trial.")
     p.add_argument("--robust_sweep_include_ablations", action="store_true", help="Also sweep ablation conditions.")
     p.add_argument("--robust_sweep_max_plot_metrics", type=int, default=6, help="Max metrics per sweep plot.")
+
+
+
+
+
+
 
     # --- first-class artifacts (B7) ---
     p.add_argument("--no_artifacts", action="store_true", help="Disable artifacts/*. outputs.")
@@ -4980,18 +5402,44 @@ def _parse_seeds(s: str) -> list[int]:
 
 
 def _as_torch_dtype(x: Any) -> Any:
-    # Accept torch.float32, "float32", "torch.float32"
+    # Accept torch.float32, "float32", "torch.float32", plus common aliases.
     if isinstance(x, torch.dtype):
         return x
-    if isinstance(x, str):
-        s = x.strip()
-        if s.startswith("torch."):
-            s = s[len("torch.") :]
-        if hasattr(torch, s):
-            dt = getattr(torch, s)
-            if isinstance(dt, torch.dtype):
-                return dt
-    return x
+    if not isinstance(x, str):
+        return x
+
+    s = x.strip()
+    if not s:
+        return x
+
+    # normalize
+    s0 = s
+    s = s.lower()
+    if s.startswith("torch."):
+        s = s[len("torch.") :]
+
+    aliases = {
+        "fp32": "float32",
+        "f32": "float32",
+        "float": "float32",
+        "fp16": "float16",
+        "f16": "float16",
+        "half": "float16",
+        "bf16": "bfloat16",
+        "bfloat": "bfloat16",
+        "c64": "complex64",
+        "c128": "complex128",
+    }
+    s = aliases.get(s, s)
+
+    if hasattr(torch, s):
+        dt = getattr(torch, s)
+        if isinstance(dt, torch.dtype):
+            return dt
+
+    # fallback: return original input (permissive)
+    return s0
+
 
 
 def _split_prefixed(flat: dict[str, Any], prefix: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -5007,7 +5455,35 @@ def _split_prefixed(flat: dict[str, Any], prefix: str) -> tuple[dict[str, Any], 
     return a, b
 
 
-def _parse_baseline_policy_kwargs(tokens: list[str]) -> dict[str, Any]:
+
+
+
+def _parse_tokens_or_json_dict(tokens: list[str] | None) -> dict[str, Any]:
+    """
+    Accept:
+      - None / [] -> {}
+      - single token JSON dict -> parsed dict
+      - single token 'k=v,k2=v2' -> parsed dict
+      - token list 'k=v ...' -> parsed dict (via _kv_overrides)
+    """
+    if not tokens:
+        return {}
+
+    if len(tokens) == 1:
+        s = tokens[0].strip()
+        if not s:
+            return {}
+        # Delegate: JSON dict or k=v,k2=v2 (or single k=v)
+        return _parse_json_dict(s)
+
+
+
+    # default: tokenized k=v
+    return _kv_overrides(list(tokens))
+
+
+
+def _parse_baseline_policy_kwargs(tokens: list[str] | None) -> dict[str, Any]:
     """
     Supports:
       theta_scale=..., theta_noise_std=..., theta_clip=..., strict_theta_shape=...
@@ -5017,14 +5493,23 @@ def _parse_baseline_policy_kwargs(tokens: list[str]) -> dict[str, Any]:
       embedding.seed=...
       embedding.normalize=true
       embedding.dtype=float32
+
+    Also supports a single JSON dict token, including:
+      {"theta_scale": 1.0, "embedding": {"mode": "...", "out_dim": 64, ...}}
     """
-    flat = _kv_overrides(tokens)
+    raw = _parse_tokens_or_json_dict(tokens)
 
     # dtype normalization if provided
-    if "theta_dtype" in flat:
-        flat["theta_dtype"] = _as_torch_dtype(flat["theta_dtype"])
+    if "theta_dtype" in raw:
+        raw["theta_dtype"] = _as_torch_dtype(raw["theta_dtype"])
 
-    emb_flat, rest = _split_prefixed(flat, "embedding")
+    # Handle embedding from either dotted keys or nested dict
+    emb_flat, rest = _split_prefixed(raw, "embedding")
+    if not emb_flat and isinstance(raw.get("embedding", None), dict):
+        emb_flat = dict(raw["embedding"])  # type: ignore[arg-type]
+        rest = dict(raw)
+        rest.pop("embedding", None)
+
     if emb_flat:
         try:
             from acpl.baselines.policies import NodeEmbeddingConfig
@@ -5036,21 +5521,36 @@ def _parse_baseline_policy_kwargs(tokens: list[str]) -> dict[str, Any]:
         if "dtype" in emb_flat:
             emb_flat["dtype"] = _as_torch_dtype(emb_flat["dtype"])
 
+        # normalize bool safely (avoid bool("false")==True surprises)
+        normalize_val = emb_flat.get("normalize", False)
+        if isinstance(normalize_val, str):
+            normalize_val = normalize_val.strip().lower() in ("1", "true", "yes", "y", "on")
+
+        # Coerce common fields (dotted-key parsing may leave strings)
+        out_dim = emb_flat.get("out_dim", None)
+        if out_dim is not None:
+            out_dim_s = str(out_dim).strip()
+            out_dim = None if out_dim_s == "" else int(out_dim_s)
+
+        seed_val = emb_flat.get("seed", 0)
+        seed = 0 if seed_val is None else int(str(seed_val).strip() or "0")
+
         emb_cfg = NodeEmbeddingConfig(
             mode=str(emb_flat.get("mode", "identity")),
-            out_dim=emb_flat.get("out_dim", None),
-            seed=int(emb_flat.get("seed", 0)),
-            normalize=bool(emb_flat.get("normalize", False)),
+            out_dim=out_dim,
+            seed=seed,
+            normalize=bool(normalize_val),
             dtype=emb_flat.get("dtype", torch.float32),
         )
+
         rest["embedding"] = emb_cfg
 
     return rest
 
 
-def _parse_baseline_coins_kwargs(tokens: list[str]) -> dict[str, Any]:
-    # Coins kwargs are schedule-specific; just parse key=val with numbers/bools/json support.
-    return _kv_overrides(tokens)
+def _parse_baseline_coins_kwargs(tokens: list[str] | None) -> dict[str, Any]:
+    # Coins kwargs are schedule-specific; parse key=val tokens or JSON dict.
+    return _parse_tokens_or_json_dict(tokens)
 
 
 
@@ -5073,37 +5573,48 @@ def _parse_baseline_coins_kwargs(tokens: list[str]) -> dict[str, Any]:
 
 
 
-
-
+_num_re = re.compile(r"^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$")
 
 def _kv_overrides(pairs: list[str]) -> dict[str, Any]:
-    out = {}
+    out: dict[str, Any] = {}
     for token in pairs:
-        if "=" not in token:
+        if not token or "=" not in token:
             continue
         k, v = token.split("=", 1)
         k = k.strip()
         v = v.strip()
-        # Try to parse numbers/bools/json
-        if v.lower() in ("true", "false"):
-            out[k] = v.lower() == "true"
+
+        if not k:
             continue
-        try:
-            if "." in v:
-                out[k] = float(v)
-            else:
-                out[k] = int(v)
+
+        # bool
+        vl = v.lower()
+        if vl in ("true", "false"):
+            out[k] = (vl == "true")
             continue
-        except Exception:
-            pass
-        # JSON?
+
+        # number (int/float incl scientific notation)
+        if _num_re.match(v):
+            try:
+                # prefer int if it looks like int
+                if re.match(r"^[+-]?\d+$", v):
+                    out[k] = int(v)
+                else:
+                    out[k] = float(v)
+                continue
+            except Exception:
+                pass
+
+        # JSON value (dict/list/number/string/null/true/false)
         try:
             out[k] = json.loads(v)
             continue
         except Exception:
             pass
+
         out[k] = v
     return out
+
 
 
 def _parse_json_dict(s: str | None) -> dict[str, Any]:
@@ -5113,11 +5624,12 @@ def _parse_json_dict(s: str | None) -> dict[str, Any]:
     if not ss:
         return {}
     # JSON preferred
-    if (ss.startswith("{") and ss.endswith("}")) or (ss.startswith("[") and ss.endswith("]")):
+    if ss.startswith("{") and ss.endswith("}"):
         obj = json.loads(ss)
         if isinstance(obj, dict):
             return obj
         raise ValueError("Expected a JSON object/dict.")
+
     # fallback: k=v,k2=v2
     out: dict[str, Any] = {}
     parts = [p.strip() for p in ss.split(",") if p.strip()]
@@ -5158,7 +5670,12 @@ def _parse_overrides_list(items: list[str] | None) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="ACPL eval driver (CI-style aggregation + ablations + plots + artifacts).")
+    if argv is None:
+        argv = sys.argv[1:]
+
+    ap = argparse.ArgumentParser(
+        description="ACPL eval driver (CI-style aggregation + ablations + plots + artifacts)."
+    )
 
     ap.add_argument("--ckpt", type=str, default=None, help="Checkpoint path (file or run directory).")
     ap.add_argument("--config", type=str, default=None, help="Config path (YAML/JSON). Required if --policy baseline without --ckpt.")
@@ -5175,8 +5692,27 @@ def main(argv: list[str] | None = None) -> int:
 
     ap.add_argument("--policy", type=str, default="ckpt", choices=["ckpt", "baseline"], help="Use checkpoint policy or baseline.")
     ap.add_argument("--baseline-kind", type=str, default="hadamard", help="Baseline kind (if --policy baseline).")
-    ap.add_argument("--baseline-coins-kwargs", type=str, default=None, help="JSON or k=v,k2=v2 for baseline coin generator.")
-    ap.add_argument("--baseline-policy-kwargs", type=str, default=None, help="JSON or k=v,k2=v2 for baseline policy wrapper.")
+
+    # IMPORTANT: accept strings like "random:frac=..."
+    ap.add_argument(
+        "--mask-sensitivity",
+        nargs="*",
+        default=None,
+        help="Optional list of masking modes/names to run sensitivity sweeps (empty => disabled).",
+    )
+
+    ap.add_argument(
+        "--baseline-coins-kwargs",
+        nargs="*",
+        default=None,
+        help="Baseline coin generator kwargs. Provide key=val tokens and/or a single JSON dict string.",
+    )
+    ap.add_argument(
+        "--baseline-policy-kwargs",
+        nargs="*",
+        default=None,
+        help="Baseline policy kwargs. Provide key=val tokens and/or a single JSON dict string.",
+    )
 
     # Robust sweeps
     ap.add_argument("--robust-sweep", action="store_true", help="Run robustness sigma sweeps (if disorder plumbing exists).")
@@ -5199,25 +5735,53 @@ def main(argv: list[str] | None = None) -> int:
 
     args = ap.parse_args(argv)
 
+
+
+
+
+
+
+    def _maybe_json(s: str | None) -> dict[str, Any] | None:
+        if s is None:
+            return None
+        s = s.strip()
+        if not s:
+            return None
+        obj = json.loads(s)
+        if not isinstance(obj, dict):
+            raise TypeError("Expected JSON object (dict).")
+        return obj
+
+    # Normalize mask_sensitivity into list[str] | None
+    ms = getattr(args, "mask_sensitivity", None)
+    if isinstance(ms, str):
+        ms = [ms]
+    if isinstance(ms, list) and len(ms) == 0:
+        ms = None
+    args.mask_sensitivity = ms
+
+
+
+
+
     ckpt_path = _as_path(args.ckpt) if args.ckpt else None
     config_path = _as_path(args.config) if args.config else None
     outdir = _as_path(args.outdir)
 
     extra_overrides = _parse_overrides_list(args.override)
 
-    baseline_coins_kwargs = _parse_json_dict(args.baseline_coins_kwargs)
-    baseline_policy_kwargs = _parse_json_dict(args.baseline_policy_kwargs)
+    baseline_coins_kwargs = _parse_baseline_coins_kwargs(args.baseline_coins_kwargs)
+    baseline_policy_kwargs = _parse_baseline_policy_kwargs(args.baseline_policy_kwargs)
 
-    run_eval(
+    run_kwargs = dict(
         ckpt_path=ckpt_path,
-        config_path=config_path,
         outdir=outdir,
         suite=args.suite,
-        device=args.device or ("cuda" if torch.cuda.is_available() else "cpu"),
-        seeds=int(args.seeds),
-        episodes=int(args.episodes),
-        ablations=list(args.ablations or []),
-        plots=bool(args.plots),
+        device=args.device,
+        seeds=args.seeds,
+        episodes=args.episodes,
+        ablations=getattr(args, "ablations", None),
+        plots=getattr(args, "plots", False),
         extra_overrides=extra_overrides or None,
         policy=str(args.policy),
         baseline_kind=str(args.baseline_kind),
@@ -5239,7 +5803,16 @@ def main(argv: list[str] | None = None) -> int:
         artifacts_embed_seed=args.artifacts_embed_seed,
         artifacts_embeddings_max_nodes=int(args.artifacts_embeddings_max_nodes),
     )
+
+    # Only pass mask_sensitivity if run_eval supports it AND user provided it
+    sig = inspect.signature(run_eval)
+    if "mask_sensitivity" in sig.parameters and args.mask_sensitivity is not None:
+        run_kwargs["mask_sensitivity"] = args.mask_sensitivity
+
+
+    run_eval(**run_kwargs)
     return 0
+
 
 
 if __name__ == "__main__":
@@ -5247,10 +5820,3 @@ if __name__ == "__main__":
 
 
 
-
-
-
-
-
-if __name__ == "__main__":
-    main()
