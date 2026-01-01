@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-
+from contextlib import contextmanager
 import matplotlib
 import numpy as np
 import torch
@@ -27,6 +27,8 @@ __all__ = [
     "plot_tv_curves",
     "plot_robustness_sweep",
     "plot_mean_pt_ci_across_episodes",
+    "confusion_matrix",
+    "plot_confusion_matrix",
 ]
 
 
@@ -40,6 +42,84 @@ def _import_matplotlib_pyplot():
         pass
     import matplotlib.pyplot as plt  # noqa: WPS433 (local import by design)
     return plt
+
+
+
+# --------------------------------------------------------------------------------------
+#                              Plot: Confusion matrix
+# --------------------------------------------------------------------------------------
+
+
+def confusion_matrix_counts(
+    y_true: Sequence[int] | np.ndarray | torch.Tensor,
+    y_pred: Sequence[int] | np.ndarray | torch.Tensor,
+    *,
+    labels: Sequence[int] | None = None,
+) -> tuple[np.ndarray, list[int]]:
+    """
+    Compute a confusion matrix (counts) without sklearn.
+
+    Parameters
+    ----------
+    y_true, y_pred:
+        Sequences of class ids (same length).
+    labels:
+        Optional explicit label set and order. If None, uses sorted unique from union.
+
+    Returns
+    -------
+    cm : (C, C) counts where rows=true, cols=pred
+    labels_out : list of labels in the matrix order
+    """
+    yt = ensure_numpy(np.asarray(y_true))
+    yp = ensure_numpy(np.asarray(y_pred))
+    yt = np.asarray(yt).reshape(-1)
+    yp = np.asarray(yp).reshape(-1)
+    if yt.shape[0] != yp.shape[0]:
+        raise ValueError(f"y_true and y_pred length mismatch: {yt.shape[0]} vs {yp.shape[0]}")
+
+    # Coerce to integers defensibly (common for node ids / class ids).
+    # If floats are provided, they must be integer-valued.
+    def _to_int(a: np.ndarray, name: str) -> np.ndarray:
+        if np.issubdtype(a.dtype, np.integer):
+            return a.astype(np.int64, copy=False)
+        if np.issubdtype(a.dtype, np.floating):
+            if not np.all(np.isfinite(a)):
+                raise ValueError(f"{name} contains non-finite values.")
+            if not np.allclose(a, np.round(a)):
+                raise TypeError(f"{name} must be integer-valued (got non-integer floats).")
+            return np.round(a).astype(np.int64, copy=False)
+        # object/strings/etc are not supported here (keeps eval strict/defendable)
+        raise TypeError(f"{name} must be integer class ids; got dtype={a.dtype}")
+
+    yt = _to_int(yt, "y_true")
+    yp = _to_int(yp, "y_pred")
+
+    if labels is None:
+        labs = np.unique(np.concatenate([yt, yp], axis=0))
+        labels_out = [int(x) for x in labs.tolist()]
+    else:
+        labels_out = [int(x) for x in list(labels)]
+        if len(labels_out) == 0:
+            raise ValueError("labels must be non-empty if provided.")
+
+    idx = {lab: i for i, lab in enumerate(labels_out)}
+    C = len(labels_out)
+    cm = np.zeros((C, C), dtype=np.int64)
+
+    # Count with explicit indexing for clarity/traceability
+    for t, p in zip(yt.tolist(), yp.tolist()):
+        if t not in idx or p not in idx:
+            # If user provides explicit labels, we treat out-of-set values as error.
+            if labels is not None:
+                raise ValueError(f"Found class outside provided labels: true={t}, pred={p}")
+            # Otherwise union construction should have included them already.
+            continue
+        cm[idx[t], idx[p]] += 1
+
+    return cm, labels_out
+
+
 
 
 # --------------------------------------------------------------------------------------
@@ -59,8 +139,67 @@ class PlotStyle:
     label_size: int = 11
     tick_size: int = 10
     grid: bool = True
+    grid_alpha: float = 0.30
+    grid_linewidth: float = 0.6
     alpha_ci: float = 0.25
+    line_width: float = 2.0
+    despine: bool = True
+    legend_frame: bool = False
     tight_layout: bool = True
+
+
+
+
+
+
+
+
+
+
+
+def _rc_for_style(st: PlotStyle) -> dict[str, object]:
+    """
+    Paper-like Matplotlib rcParams, applied via rc_context to avoid global side-effects.
+    This is the main reason GNN repos look “consistent” across figures.
+    """
+    rc: dict[str, object] = {
+        "figure.dpi": st.dpi,
+        "savefig.dpi": st.dpi,
+        "axes.titlesize": st.title_size,
+        "axes.labelsize": st.label_size,
+        "xtick.labelsize": st.tick_size,
+        "ytick.labelsize": st.tick_size,
+        "legend.fontsize": st.tick_size,
+        "lines.linewidth": st.line_width,
+        "axes.grid": st.grid,
+        "grid.alpha": st.grid_alpha,
+        "grid.linewidth": st.grid_linewidth,
+        "axes.axisbelow": True,
+        "legend.frameon": st.legend_frame,
+        # Nice defaults for “paper-ish” look
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.02,
+    }
+    if st.despine:
+        rc.update(
+            {
+                "axes.spines.top": False,
+                "axes.spines.right": False,
+            }
+        )
+    return rc
+
+
+@contextmanager
+def _mpl_style(st: PlotStyle):
+    with matplotlib.rc_context(rc=_rc_for_style(st)):
+        yield
+
+
+
+
+
+
 
 
 def ensure_numpy(x: np.ndarray | torch.Tensor | Sequence[np.ndarray | torch.Tensor]) -> np.ndarray:
@@ -449,14 +588,15 @@ def plot_position_timelines(
     # layout
     cols = min(4, K)
     rows = int(np.ceil(K / cols))
-    fig, axs = plt.subplots(
-        rows,
-        cols,
-        figsize=(st.figsize[0], max(st.figsize[1], 1.8 * rows)),
-        dpi=st.dpi,
-        squeeze=False,
-        sharey=sharey,
-    )
+    with _mpl_style(st):
+        fig, axs = plt.subplots(
+            rows,
+            cols,
+            figsize=(st.figsize[0], max(st.figsize[1], 1.8 * rows)),
+            dpi=st.dpi,
+            squeeze=False,
+            sharey=sharey,
+        )
 
     tgrid = np.arange(T)
 
@@ -466,19 +606,19 @@ def plot_position_timelines(
         ax = axs[r, c]
 
         if Pm.shape[0] <= 1:
-            ax.plot(tgrid, Pm[0, :, v], lw=1.8)
+            ax.plot(tgrid, Pm[0, :, v], lw=st.line_width)
         else:
             # mean ± CI across samples (episodes and/or seeds)
             m, lo, hi = mean_ci(Pm[:, :, v], axis=0, conf=0.95)
-            ax.plot(tgrid, m, lw=1.8)
+            ax.plot(tgrid, m, lw=st.line_width)
             ax.fill_between(tgrid, lo, hi, alpha=st.alpha_ci, linewidth=0)
 
-
+        ax.set_ylim(bottom=0.0)
         ax.set_xlabel("t", fontsize=st.label_size)
         ax.set_ylabel(f"P[v={v}]", fontsize=st.label_size)
         ax.tick_params(axis="both", labelsize=st.tick_size)
         if st.grid:
-            ax.grid(True, linewidth=0.5, alpha=0.5)
+            ax.grid(True, linewidth=st.grid_linewidth, alpha=st.grid_alpha)
 
     # hide empty panels
     for j in range(K, rows * cols):
@@ -613,8 +753,11 @@ def plot_tv_curves(
     T = m.shape[0]
     tgrid = np.arange(T)
 
-    fig, ax = plt.subplots(1, 1, figsize=st.figsize, dpi=st.dpi)
-    ax.plot(tgrid, m, lw=2.0)
+    with _mpl_style(st):
+        fig, ax = plt.subplots(1, 1, figsize=st.figsize, dpi=st.dpi)
+    ax.plot(tgrid, m, lw=st.line_width)
+    
+    
     if lo is not None and hi is not None:
         ax.fill_between(tgrid, lo, hi, alpha=st.alpha_ci, linewidth=0)
 
@@ -622,9 +765,13 @@ def plot_tv_curves(
     ax.set_ylabel("TV(P_t, U)", fontsize=st.label_size)
     ax.tick_params(axis="both", labelsize=st.tick_size)
     if st.grid:
-        ax.grid(True, linewidth=0.5, alpha=0.5)
+        ax.grid(True, linewidth=st.grid_linewidth, alpha=st.grid_alpha)
     if logy:
         ax.set_yscale("log")
+
+    else:
+        ax.set_ylim(0.0, 1.0)
+
     if title:
         ax.set_title(title, fontsize=st.title_size)
 
@@ -683,10 +830,14 @@ def plot_robustness_sweep(
     x = np.asarray(list(xgrid), dtype=np.float64)
     M = x.shape[0]
 
-    fig, ax = plt.subplots(1, 1, figsize=st.figsize, dpi=st.dpi)
+    with _mpl_style(st):
+        fig, ax = plt.subplots(1, 1, figsize=st.figsize, dpi=st.dpi)
+ 
 
     for name, arr in metrics.items():
-        Y = np.where(np.isfinite(ensure_numpy(arr)), ensure_numpy(arr), np.nan).astype(np.float64)
+
+        arr_np = ensure_numpy(arr)
+        Y = np.where(np.isfinite(arr_np), arr_np, np.nan).astype(np.float64)
 
         if Y.ndim == 1:
             if Y.shape[0] != M:
@@ -701,7 +852,7 @@ def plot_robustness_sweep(
         else:
             raise ValueError(f"Metric '{name}' must be (M,) or (S,M); got {Y.shape}.")
 
-        ax.plot(x, m, lw=2.0, label=name)
+        ax.plot(x, m, lw=st.line_width, label=name)
         if lo is not None and hi is not None:
             ax.fill_between(x, lo, hi, alpha=st.alpha_ci, linewidth=0)
 
@@ -709,10 +860,10 @@ def plot_robustness_sweep(
     ax.set_ylabel(ylabel, fontsize=st.label_size)
     ax.tick_params(axis="both", labelsize=st.tick_size)
     if st.grid:
-        ax.grid(True, linewidth=0.5, alpha=0.5)
+        ax.grid(True, linewidth=st.grid_linewidth, alpha=st.grid_alpha)
     if title:
         ax.set_title(title, fontsize=st.title_size)
-    ax.legend(loc=legend_loc)
+    ax.legend(loc=legend_loc, frameon=st.legend_frame)
 
     if st.tight_layout:
         fig.tight_layout()
@@ -721,4 +872,158 @@ def plot_robustness_sweep(
 
 
 
+# --------------------------------------------------------------------------------------
+#                              Plot: Confusion matrix
+# --------------------------------------------------------------------------------------
 
+
+def confusion_matrix(
+    y_true: Sequence[int] | np.ndarray,
+    y_pred: Sequence[int] | np.ndarray,
+    *,
+    labels: Sequence[int] | None = None,
+    normalize: str | None = None,
+) -> tuple[np.ndarray, list[int]]:
+    """
+    Compute a confusion matrix (no sklearn dependency).
+
+    Parameters
+    ----------
+    y_true, y_pred:
+        Integer class labels (same length).
+    labels:
+        Explicit label set and order. If None, uses sorted unique labels from y_true ∪ y_pred.
+    normalize:
+        None     -> raw counts (float64 returned for plotting convenience)
+        "true"   -> row-normalized (each true-label row sums to 1)
+        "pred"   -> column-normalized
+        "all"    -> normalized by total count
+
+    Returns
+    -------
+    cm, labels_list
+        cm has shape (C, C) where C=len(labels_list).
+    """
+    yt = np.asarray(list(y_true), dtype=np.int64).reshape(-1)
+    yp = np.asarray(list(y_pred), dtype=np.int64).reshape(-1)
+    if yt.shape != yp.shape:
+        raise ValueError(f"y_true and y_pred must have same shape; got {yt.shape} vs {yp.shape}")
+
+    if labels is None:
+        labs = np.unique(np.concatenate([yt, yp], axis=0))
+        labels_list = [int(x) for x in labs.tolist()]
+    else:
+        labels_list = [int(x) for x in list(labels)]
+
+    C = len(labels_list)
+    if C == 0:
+        return np.zeros((0, 0), dtype=np.float64), []
+
+    lut = {lab: i for i, lab in enumerate(labels_list)}
+    cm = np.zeros((C, C), dtype=np.float64)
+
+    for t, p in zip(yt.tolist(), yp.tolist()):
+        ti = lut.get(int(t), None)
+        pi = lut.get(int(p), None)
+        if ti is None or pi is None:
+            continue
+        cm[ti, pi] += 1.0
+
+    if normalize is None:
+        return cm, labels_list
+
+    norm = str(normalize).lower().strip()
+    eps = 1e-12
+    if norm in ("true", "row", "rows"):
+        denom = cm.sum(axis=1, keepdims=True)
+        cm = np.divide(cm, np.maximum(denom, eps), out=np.zeros_like(cm), where=denom > 0)
+    elif norm in ("pred", "col", "cols", "column", "columns"):
+        denom = cm.sum(axis=0, keepdims=True)
+        cm = np.divide(cm, np.maximum(denom, eps), out=np.zeros_like(cm), where=denom > 0)
+    elif norm in ("all", "total"):
+        denom = float(cm.sum())
+        cm = cm / max(denom, eps)
+    else:
+        raise ValueError(f"normalize must be None|'true'|'pred'|'all' (got {normalize!r})")
+
+    return cm, labels_list
+
+
+
+
+
+def plot_confusion_matrix(
+    y_true: Sequence[int] | np.ndarray,
+    y_pred: Sequence[int] | np.ndarray,
+    *,
+    labels: Sequence[int] | None = None,
+    normalize: str | None = "true",
+    max_labels: int | None = 64,
+    style: PlotStyle | None = None,
+    title: str | None = "Confusion matrix",
+    xlabel: str = "predicted",
+    ylabel: str = "true",
+    savepath: str | Path | None = None,
+    close: bool = False,
+) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
+    """
+    Plot a confusion matrix.
+
+    Notes
+    -----
+    - By default, normalizes by true-label rows (useful when class counts are imbalanced).
+    - If labels is None and there are too many unique labels, we keep the most frequent
+      true-labels up to `max_labels` and drop the rest (so the plot stays readable).
+    """
+    plt = _import_matplotlib_pyplot()
+    st = style or PlotStyle()
+
+    yt = np.asarray(list(y_true), dtype=np.int64).reshape(-1)
+    yp = np.asarray(list(y_pred), dtype=np.int64).reshape(-1)
+
+    # If label set is huge, reduce when we are free to choose labels.
+    if labels is None and (max_labels is not None):
+        uniq = np.unique(yt)
+        if uniq.size > int(max_labels):
+            # keep most frequent true labels
+            vals, counts = np.unique(yt, return_counts=True)
+            order = np.argsort(-counts)
+            keep = set(int(v) for v in vals[order[: int(max_labels)]].tolist())
+            mask = np.array([int(t) in keep and int(p) in keep for t, p in zip(yt, yp)], dtype=bool)
+            yt = yt[mask]
+            yp = yp[mask]
+            labels = sorted(keep)
+
+    cm, labs = confusion_matrix(yt, yp, labels=labels, normalize=normalize)
+
+    fig, ax = plt.subplots(1, 1, figsize=st.figsize, dpi=st.dpi)
+    im = ax.imshow(cm, aspect="auto")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+    ax.set_xlabel(xlabel, fontsize=st.label_size)
+    ax.set_ylabel(ylabel, fontsize=st.label_size)
+    ax.tick_params(axis="both", labelsize=st.tick_size)
+
+    # tick labels
+    ax.set_xticks(np.arange(len(labs)))
+    ax.set_yticks(np.arange(len(labs)))
+    ax.set_xticklabels([str(x) for x in labs], rotation=90)
+    ax.set_yticklabels([str(x) for x in labs])
+
+    # annotate only if not too large
+    if cm.size and (len(labs) <= 30):
+        for i in range(len(labs)):
+            for j in range(len(labs)):
+                v = cm[i, j]
+                if np.isfinite(v) and v > 0:
+                    ax.text(j, i, f"{v:.2f}" if normalize else f"{int(round(v))}",
+                            ha="center", va="center", fontsize=max(7, st.tick_size - 2))
+
+    if title:
+        ax.set_title(title, fontsize=st.title_size)
+
+    if st.tight_layout:
+        fig.tight_layout()
+
+    _savefig(fig, savepath, close=close)
+    return fig, ax

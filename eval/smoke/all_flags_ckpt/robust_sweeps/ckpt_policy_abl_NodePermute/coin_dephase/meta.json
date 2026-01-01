@@ -1,1 +1,0 @@
-{"cond": "ckpt_policy__abl_NodePermute", "kind": "coin_dephase", "sigmas": [0.0, 0.05], "trials": 1, "episodes": 2, "seeds": [0], "bootstrap_samples_per_trial": 10, "manifest_hex": "0a9437c1659aa051690f80f3d2b78e92", "seed_base": 0, "base_disorder": {"enabled": false}, "note": "Each trial uses a distinct disorder_seed; episodes/seeds still control dataset randomness."}

@@ -4937,153 +4937,199 @@ def run_eval(
                 theta_noise_std=theta_noise_std,
             )
 
-            # ---- Minimal, signature-independent plotting fallback ----
-            def _tcrit(df: int, alpha: float) -> float:
-                # Prefer SciPy if available; else use normal approx / small table for 95%
+            # ---- Research-ready plotting via acpl.eval.plots (no hardcoded CI tables) ----
+            if plot_mod is None:
+                raise RuntimeError("plots requested but acpl.eval.plots could not be imported.")
+
+            st = plot_mod.PlotStyle()
+
+            def _coerce_int_scalar(v):
+                if v is None:
+                    return None
+                # torch / numpy scalar
                 try:
-                    from scipy.stats import t as _t
-                    return float(_t.ppf(1.0 - alpha / 2.0, df))
+                    if hasattr(v, "detach"):
+                        v = v.detach()
+                    if hasattr(v, "cpu"):
+                        v = v.cpu()
+                    if hasattr(v, "item"):
+                        v = v.item()
                 except Exception:
-                    # 95% two-sided table for df=1..30
-                    if abs(alpha - 0.05) < 1e-12 and 1 <= df <= 30:
-                        t95 = {
-                            1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365,
-                            8: 2.306, 9: 2.262, 10: 2.228, 11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145,
-                            15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086, 21: 2.080,
-                            22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056, 27: 2.052, 28: 2.048,
-                            29: 2.045, 30: 2.042,
-                        }
-                        return t95[df]
-                    # normal approx
-                    z = statistics.NormalDist().inv_cdf(1.0 - alpha / 2.0)
-                    return float(z)
+                    pass
+                try:
+                    return int(v)
+                except Exception:
+                    return None
 
-            def _curve_mean_ci(curves: np.ndarray, alpha: float) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
-                curves = np.asarray(curves, dtype=float)
-                mu = np.nanmean(curves, axis=0)
-                K = int(curves.shape[0])
-                if K < 2:
-                    return mu, None, None
-                sd = np.nanstd(curves, axis=0, ddof=1)
-                se = sd / max(np.sqrt(K), 1.0)
-                tc = _tcrit(K - 1, alpha)
-                lo = mu - tc * se
-                hi = mu + tc * se
-                return mu, lo, hi
+            def _extract_target_idx(batch: dict) -> int | None:
+                """Best-effort target extraction for node-index targets."""
+                if not isinstance(batch, dict):
+                    return None
 
-            def _tv_to_uniform(Pt: np.ndarray) -> np.ndarray:
-                # Pt: (T+1, N)
-                Nn = Pt.shape[1]
-                u = 1.0 / max(Nn, 1)
-                return 0.5 * np.sum(np.abs(Pt - u), axis=1)
+                # Common conventions
+                for k in (
+                    "target_node",
+                    "target",
+                    "target_idx",
+                    "target_index",
+                    "goal",
+                    "goal_node",
+                    "label",
+                    "y",
+                    "dst",
+                    "dest",
+                    "destination",
+                ):
+                    if k in batch:
+                        t = _coerce_int_scalar(batch.get(k))
+                        if t is not None:
+                            return t
 
-            def _max_prob(Pt: np.ndarray) -> np.ndarray:
-                return np.max(Pt, axis=1)
+                # Heuristic: first scalar-ish key containing "target"/"goal"
+                for k, v in batch.items():
+                    lk = str(k).lower()
+                    if ("target" in lk) or ("goal" in lk):
+                        t = _coerce_int_scalar(v)
+                        if t is not None:
+                            return t
 
-            def _save_curve_png(savepath: Path, mean: np.ndarray, lo: np.ndarray | None, hi: np.ndarray | None,
-                                *, title: str, ylabel: str) -> None:
-                import matplotlib
-                matplotlib.use("Agg", force=True)
-                import matplotlib.pyplot as plt
-                x = np.arange(mean.shape[0], dtype=float)
-                plt.figure()
-                plt.plot(x, mean)
-                if lo is not None and hi is not None:
-                    plt.fill_between(x, lo, hi, alpha=0.2)
-                plt.title(title)
-                plt.xlabel("t")
-                plt.ylabel(ylabel)
-                plt.tight_layout()
-                plt.savefig(savepath, dpi=200)
-                plt.close()
+                return None
 
-            def _save_final_topk_png(savepath: Path, Pt_mean: np.ndarray, *, k: int = 32, title: str = "") -> None:
-                import matplotlib
-                matplotlib.use("Agg", force=True)
-                import matplotlib.pyplot as plt
-                p = Pt_mean[-1]  # final time (N,)
-                Nn = p.shape[0]
-                kk = int(min(k, Nn))
-                idx = np.argsort(-p)[:kk]
-                vals = p[idx]
-                plt.figure()
-                plt.plot(np.arange(kk), vals)
-                plt.title(title or f"Top-{kk} probs at final time")
-                plt.xlabel("rank")
-                plt.ylabel("p")
-                plt.tight_layout()
-                plt.savefig(savepath, dpi=200)
-                plt.close()
+            # Collect samples for plotting:
+            #   - single seed => per-episode samples (K,T,N)
+            #   - multi-seed  => per-seed mean samples (S,T,N) (CI across seeds)
+            Pt_samples_list: list[np.ndarray] = []
+            y_true: list[int] = []
+            y_pred: list[int] = []
+            Ns: list[int] = []
 
-            # Collect plots per condition
-            plots_index: dict[str, Any] = {"conditions": {}}
-            alpha = float(eval_cfg.ci_alpha) if "eval_cfg" in locals() else 0.05
+            if not seeds:
+                seeds = [0]
 
-            for cond_tag, rr in plot_runners.items():
-                m = rr["model"]
-                dl = rr["dataloader_factory"]
+            if len(seeds) <= 1:
+                seed0 = int(seeds[0])
+                it = eval_iter_fn(seed=seed0, episodes=episodes)
+                for batch in it:
+                    Pt_tn = rollout_timeline_fn(model, batch)  # (T+1, N) torch on device
+                    Pt_np = Pt_tn.detach().cpu().numpy()
+                    Pt_samples_list.append(Pt_np)
 
-                Pt_samples, Pt_meta = _collect_Pt_samples_for_plotting(
-                    model=m,
-                    dataloader_factory=dl,
-                    rollout_timeline_fn=rollout_timeline_fn,
-                    seeds=seed_list,
-                    episodes=int(episodes),
-                    ckpt_path=ckpt_path if ckpt_path is not None else None,
-                    artifacts_request=meta.get("artifacts_request", None),
-                )
-                # Pt_samples: (K, T+1, N)
-                K, L, Nn = Pt_samples.shape
+                    t = _extract_target_idx(batch)
+                    if t is not None:
+                        pred = int(np.nanargmax(Pt_np[-1]))
+                        y_true.append(int(t))
+                        y_pred.append(pred)
+                        Ns.append(int(Pt_np.shape[-1]))
 
-                tv_curves = np.stack([_tv_to_uniform(Pt_samples[i]) for i in range(K)], axis=0)   # (K, T+1)
-                mp_curves = np.stack([_max_prob(Pt_samples[i]) for i in range(K)], axis=0)       # (K, T+1)
+                if len(Pt_samples_list) == 0:
+                    raise RuntimeError("No episodes produced Pt samples for plotting.")
+                Pt_samples = np.stack(Pt_samples_list, axis=0)
+            else:
+                for s in seeds:
+                    it = eval_iter_fn(seed=int(s), episodes=episodes)
+                    sum_Pt = None
+                    k = 0
+                    for batch in it:
+                        Pt_tn = rollout_timeline_fn(model, batch)  # (T+1,N)
+                        Pt_cpu = Pt_tn.detach().cpu()
+                        sum_Pt = Pt_cpu if (sum_Pt is None) else (sum_Pt + Pt_cpu)
+                        k += 1
 
-                tv_mean, tv_lo, tv_hi = _curve_mean_ci(tv_curves, alpha=alpha)
-                mp_mean, mp_lo, mp_hi = _curve_mean_ci(mp_curves, alpha=alpha)
+                        t = _extract_target_idx(batch)
+                        if t is not None:
+                            Pt_np_last = Pt_cpu.numpy()[-1]
+                            pred = int(np.nanargmax(Pt_np_last))
+                            y_true.append(int(t))
+                            y_pred.append(pred)
+                            Ns.append(int(Pt_cpu.shape[-1]))
 
-                safe = _sanitize_filename(cond_tag)
-                out_npz = figdir / f"plotdata__{safe}.npz"
-                np.savez_compressed(
-                    out_npz,
-                    Pt_samples=Pt_samples.astype(np.float32),
-                    tv_curves=tv_curves.astype(np.float32),
-                    maxprob_curves=mp_curves.astype(np.float32),
-                    meta=json.dumps(Pt_meta, default=str),
-                )
+                    if sum_Pt is None or k <= 0:
+                        raise RuntimeError(f"No episodes for seed={s} when collecting plot samples.")
+                    Pt_samples_list.append((sum_Pt / float(k)).numpy())
 
-                _save_curve_png(
-                    figdir / f"tv_to_uniform__{safe}.png",
-                    tv_mean, tv_lo, tv_hi,
-                    title=f"TV to uniform — {cond_tag} ({Pt_meta.get('ci_mode','?')}, K={K})",
-                    ylabel="TV(P_t, Uniform)"
-                )
-                _save_curve_png(
-                    figdir / f"max_prob__{safe}.png",
-                    mp_mean, mp_lo, mp_hi,
-                    title=f"Max node prob — {cond_tag} ({Pt_meta.get('ci_mode','?')}, K={K})",
-                    ylabel="max_i p_t(i)"
-                )
-                _save_final_topk_png(
-                    figdir / f"final_topk__{safe}.png",
-                    np.mean(Pt_samples, axis=0),
-                    k=32,
-                    title=f"Final distribution top-k — {cond_tag}"
-                )
+                Pt_samples = np.stack(Pt_samples_list, axis=0)
 
-                plots_index["conditions"][cond_tag] = {
-                    "ci_mode": Pt_meta.get("ci_mode", None),
-                    "K": int(K),
-                    "T": int(L - 1),
-                    "N": int(Nn),
-                    "files": [
-                        f"plotdata__{safe}.npz",
-                        f"tv_to_uniform__{safe}.png",
-                        f"max_prob__{safe}.png",
-                        f"final_topk__{safe}.png",
-                    ],
-                }
+            # --- Standard PT timeline plot (mean ± CI across samples) ---
+            plot_mod.plot_mean_pt_ci_across_episodes(
+                Pt_samples,
+                suite=suite,
+                policy=cond,
+                topk=12,
+                style=st,
+                savepath=plot_mod.figs_savepath(paths.root, "position_timelines", cond),
+                close=True,
+            )
 
-            (figdir / "plots_index.json").write_text(_json_dump(plots_index), encoding="utf-8")
+            # --- TV-to-uniform curves (mean ± CI across samples) ---
+            plot_mod.plot_tv_curves(
+                Pt_samples,
+                style=st,
+                title=f"{suite} — {cond} — TV(P_t, U)",
+                savepath=plot_mod.figs_savepath(paths.root, "tv_to_uniform", cond),
+                close=True,
+            )
+
+            # --- Confusion matrix: target node vs predicted node (argmax at final time) ---
+            if y_true and y_pred and hasattr(plot_mod, "plot_confusion_matrix"):
+                try:
+                    from collections import Counter
+                    Ns_arr = np.asarray(Ns, dtype=np.int64)
+                    # If graph sizes vary, pick the most common N to keep the matrix meaningful.
+                    modeN = int(Counter(Ns_arr.tolist()).most_common(1)[0][0]) if Ns_arr.size else None
+                    if modeN is not None:
+                        keep = (Ns_arr == modeN)
+                        yt = np.asarray(y_true, dtype=np.int64)[keep]
+                        yp = np.asarray(y_pred, dtype=np.int64)[keep]
+
+                        # compress labels if too large
+                        max_labels = 32
+                        counts = Counter()
+                        counts.update(yt.tolist())
+                        counts.update(yp.tolist())
+                        labs_sorted = [lab for lab, _ in counts.most_common()]
+
+                        other_tok = -1
+                        if len(labs_sorted) > max_labels:
+                            top = labs_sorted[: max_labels - 1]
+                            mapping = {lab: i for i, lab in enumerate(top)}
+                            yt_m = np.asarray([mapping.get(int(a), other_tok) for a in yt], dtype=np.int64)
+                            yp_m = np.asarray([mapping.get(int(a), other_tok) for a in yp], dtype=np.int64)
+                            label_names = [str(lab) for lab in top] + ["other"]
+                            ncls = len(label_names)
+                            # remap 'other' to last index
+                            yt_m = np.where(yt_m == other_tok, ncls - 1, yt_m)
+                            yp_m = np.where(yp_m == other_tok, ncls - 1, yp_m)
+                        else:
+                            # exact label set
+                            top = sorted(labs_sorted)
+                            mapping = {lab: i for i, lab in enumerate(top)}
+                            yt_m = np.asarray([mapping[int(a)] for a in yt], dtype=np.int64)
+                            yp_m = np.asarray([mapping[int(a)] for a in yp], dtype=np.int64)
+                            label_names = [str(lab) for lab in top]
+                            ncls = len(label_names)
+
+                        if ncls >= 2 and hasattr(plot_mod, "confusion_matrix"):
+                            cm = plot_mod.confusion_matrix(yt_m, yp_m, labels=list(range(ncls)), normalize="true")
+                        else:
+                            # fallback: simple counts
+                            cm = np.zeros((ncls, ncls), dtype=np.float64)
+                            for a, b in zip(yt_m, yp_m):
+                                if 0 <= a < ncls and 0 <= b < ncls:
+                                    cm[a, b] += 1.0
+                            # normalize rows
+                            row = cm.sum(axis=1, keepdims=True)
+                            cm = np.divide(cm, np.maximum(row, 1e-12))
+
+                        plot_mod.plot_confusion_matrix(
+                            cm,
+                            labels=label_names,
+                            style=st,
+                            title=f"{suite} — {cond} — confusion (rows=true, cols=pred)",
+                            savepath=plot_mod.figs_savepath(paths.root, "confusion_matrix", cond),
+                            close=True,
+                        )
+                except Exception as _cm_e:
+                    print(f"[warn] confusion matrix skipped: {_cm_e}", file=sys.stderr)
 
             # OPTIONAL: if acpl.eval.plots exists, try it too (but never fail the run)
             if plot_mod is not None:
