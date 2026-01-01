@@ -4208,27 +4208,41 @@ def run_eval(
         # --------------------------- Build condition runners ---------------------------
         base_tag = ("ckpt_policy" if policy != "baseline" else f"baseline_{_sanitize_filename(baseline_kind)}")
 
-        cond_runners[bundle.tag] = {
-            "model": bundle.model,
-            "dataloader_factory": bundle.dataloader_factory,
-            "rollout_fn": bundle.rollout_fn,
-            "meta": dict(bundle.meta or {}),
+        # Base condition (NEVER reference `bundle` here)
+        base_meta = {
+            "tag": base_tag,
+            "policy": policy,
+            "baseline_kind": (baseline_kind if policy == "baseline" else None),
+            "ckpt": str(ckpt_path) if ckpt_path is not None else None,
+            "suite": suite,
         }
 
-        # Keep plot runners aligned with conditions
-        if plots:
-            plot_runners[bundle.tag] = {
-                "model": bundle.model,
-                "dataloader_factory": bundle.dataloader_factory,
-                "rollout_fn": bundle.rollout_fn,
-                "meta": dict(bundle.meta or {}),
+        cond_runners: dict[str, dict[str, Any]] = {
+            base_tag: {
+                "model": model,
+                "dataloader_factory": _make_eval_iter,
+                "rollout_fn": rollout_fn,
+                "cfg": cfg,
+                "meta": dict(base_meta),
             }
+        }
 
+        # plot_runners is also used by artifacts; keep it populated even if plots=False
+        plot_runners: dict[str, dict[str, Any]] = {
+            base_tag: {
+                "model": model,
+                "dataloader_factory": _make_eval_iter,
+                "rollout_fn": rollout_fn,
+                "cfg": cfg,
+                "meta": dict(base_meta),
+            }
+        }
 
         # ---- Ablations -> expand conditions ----
         if ablations and abl_mod is not None:
             for a in ablations:
                 canon = _normalize_ablation_name(a)
+
                 try:
                     bundle = _build_ablation_bundle(
                         abl_mod,
@@ -4244,6 +4258,7 @@ def run_eval(
                     bundle = None
                     if strict_ablations:
                         raise
+                    print(f"[warn] ablation '{canon}' could not be applied: {e}", file=sys.stderr)
 
                 # Special-case: NoPE fallback (still meaningful + defendable)
                 if bundle is None and canon == "NoPE":
@@ -4256,21 +4271,23 @@ def run_eval(
                     )
 
                 if bundle is None:
-                    msg = f"[warn] ablation '{canon}' could not be built; skipping"
-                    print(msg)
                     continue
 
                 cond_runners[bundle.tag] = {
-                    "tag": bundle.tag,
                     "model": bundle.model,
                     "dataloader_factory": bundle.dataloader_factory,
                     "rollout_fn": bundle.rollout_fn,
-                    # Merge base provenance (ckpt/config/manifest) with ablation metadata
-                    "meta": {
-                        **(cond_runners.get(base_tag, {}).get("meta", {}) or {}),
-                        **(bundle.meta or {}),
-                    },
+                    "cfg": cfg,
+                    "meta": dict(bundle.meta) if isinstance(bundle.meta, dict) else {"tag": bundle.tag},
                 }
+                plot_runners[bundle.tag] = {
+                    "model": bundle.model,
+                    "dataloader_factory": bundle.dataloader_factory,
+                    "rollout_fn": bundle.rollout_fn,
+                    "cfg": cfg,
+                    "meta": dict(bundle.meta) if isinstance(bundle.meta, dict) else {"tag": bundle.tag},
+                }
+
 
 
 
