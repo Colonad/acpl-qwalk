@@ -4082,7 +4082,7 @@ def run_eval(
                 )
 
 
-
+        episodes_default = int(episodes)
 
         if is_search:
             marks_per_episode = int(data_cfg.get("marks_per_episode", task_cfg.get("marks_per_episode", 1)))
@@ -5103,7 +5103,7 @@ def run_eval(
 
                     if len(seeds_plot) <= 1:
                         seed0 = int(seeds_plot[0])
-                        it = eval_iter_fn(seed=seed0, episodes=episodes)
+                        it = eval_iter_fn(int(seed0), None if episodes is None else int(episodes))
                         for batch in it:
                             Pt_tn = rollout_timeline_fn(model_plot, batch)  # (T+1, N) torch on device
                             Pt_np = Pt_tn.detach().cpu().numpy()
@@ -5122,7 +5122,7 @@ def run_eval(
 
                     else:
                         for s in seeds_plot:
-                            it = eval_iter_fn(seed=int(s), episodes=episodes)
+                            it = eval_iter_fn(int(s), None if episodes is None else int(episodes))
 
                             sum_Pt = None
                             k = 0
