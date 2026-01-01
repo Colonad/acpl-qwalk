@@ -57,6 +57,7 @@ Notes
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
+from acpl.data.features import FeatureSpec, build_node_features
 
 import logging
 import math

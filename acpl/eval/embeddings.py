@@ -11,6 +11,7 @@ from .stats import StatsEvalConfig, embedding_basic_stats
 import numpy as np
 import torch
 import torch.nn as nn
+from acpl.data.features import FeatureSpec, build_node_features
 
 __all__ = [
     "EmbeddingEvalConfig",

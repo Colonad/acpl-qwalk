@@ -71,6 +71,14 @@ __all__ = [
     # Small helpers
     "randn_device",
     "rand_device",
+
+    "sample_shift_disorder",
+    "format_disorder_meta",
+    "EpisodeDisorder",
+    "build_episode_disorder",
+    "maybe_apply_coin_dephase",
+
+
 ]
 
 
@@ -302,6 +310,17 @@ class ShiftDisorder:
     phase: Tensor | None  # (A,) complex64
     mask: Tensor | None   # (A,) float32 (0/1)
 
+@dataclass(frozen=True)
+class EpisodeDisorder:
+    """
+    Bundle of deterministic disorder objects for a single episode.
+
+    - `shift` is intended to be sampled ONCE per episode and reused for all t.
+    - `rng` is used to derive per-step streams (e.g., coin dephase with extra=t).
+    """
+    spec: DisorderSpec
+    rng: DisorderRNG
+    shift: ShiftDisorder
 
 def _as_bool(x: Any, default: bool = False) -> bool:
     if isinstance(x, bool):

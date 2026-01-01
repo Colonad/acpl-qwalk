@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 from typing import Any, Generic, Literal, TypeVar
+from acpl.data.features import FeatureSpec, build_node_features
 
 import numpy as np
 import yaml

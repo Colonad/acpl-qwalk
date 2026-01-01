@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import inspect
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Mapping, MutableMapping, Optional, Protocol, Sequence
+from acpl.data.features import FeatureSpec, build_node_features
 
 import torch
 import torch.nn as nn
@@ -18,6 +19,10 @@ __all__ = [
     "BaselinePolicy",
     "CoinScheduleLike",
     "build_baseline_policy",
+
+
+    "build_baseline_policy_by_kind",
+    "build_baseline_policy_from_cfg",
     # Embeddings adapter (for eval/plots)
     "NodeEmbeddingConfig",
     "NodeEmbeddingAdapter",
@@ -140,6 +145,12 @@ class NodeEmbeddingAdapter(nn.Module):
             if self.out_dim != self.in_dim:
                 # allow identity-with-pad via fixed projection (still deterministic)
                 self._proj = self._make_fixed_linear(self.in_dim, self.out_dim, seed=cfg.seed)
+           
+           
+           
+                # keep params in requested dtype (so forward() dtype casting stays consistent)
+                self._proj.to(dtype=cfg.dtype)           
+           
             else:
                 self._proj = None
             return
@@ -151,12 +162,21 @@ class NodeEmbeddingAdapter(nn.Module):
 
         if mode == "linear_fixed":
             self.lin = self._make_fixed_linear(self.in_dim, self.out_dim, seed=cfg.seed)
+            
+            self.lin.to(dtype=cfg.dtype)
+            
             return
 
         if mode == "mlp_fixed":
             hidden = max(8, min(4 * self.out_dim, 512))
             self.lin1 = self._make_fixed_linear(self.in_dim, hidden, seed=cfg.seed + 1)
             self.lin2 = self._make_fixed_linear(hidden, self.out_dim, seed=cfg.seed + 2)
+            
+
+            self.lin1.to(dtype=cfg.dtype)
+            self.lin2.to(dtype=cfg.dtype)            
+            
+            
             return
 
         raise ValueError(f"Unknown embedding mode: {mode}")
@@ -232,7 +252,7 @@ class BaselinePolicyConfig:
     theta_dtype: torch.dtype = torch.float32
 
     # Embeddings
-    embedding: NodeEmbeddingConfig = NodeEmbeddingConfig()
+    embedding: NodeEmbeddingConfig = field(default_factory=NodeEmbeddingConfig)
 
 
 def _call_schedule_robust(
@@ -327,6 +347,10 @@ class BaselinePolicy(nn.Module):
         F = int(X.shape[1])
         if self._emb_adapter is None or self._emb_in_dim != F:
             self._emb_adapter = NodeEmbeddingAdapter(F, self.cfg.embedding)
+            # CRITICAL: keep embedding adapter on same device as X (prevents CUDA mismatch)
+            self._emb_adapter.to(device=X.device)
+            
+            
             self._emb_in_dim = F
         return self._emb_adapter
 
@@ -444,7 +468,7 @@ class BaselinePolicy(nn.Module):
 # =============================================================================
 
 
-def build_baseline_policy(
+def build_baseline_policy_by_kind(
     *,
     schedule: CoinScheduleLike,
     cfg: BaselinePolicyConfig | None = None,
@@ -454,6 +478,23 @@ def build_baseline_policy(
     """
     cfg = cfg or BaselinePolicyConfig()
     return BaselinePolicy(schedule=schedule, cfg=cfg)
+
+
+def _node_embedding_cfg_from_any(obj: Any) -> NodeEmbeddingConfig:
+    if isinstance(obj, NodeEmbeddingConfig):
+        return obj
+    if isinstance(obj, Mapping):
+        return NodeEmbeddingConfig(
+            mode=str(obj.get("mode", "identity")),  # type: ignore[arg-type]
+            out_dim=obj.get("out_dim", None),
+            seed=int(obj.get("seed", 0)),
+            normalize=bool(obj.get("normalize", False)),
+            dtype=getattr(torch, str(obj.get("dtype", "float32")), torch.float32),
+        )
+    return NodeEmbeddingConfig()
+
+
+
 
 
 def _try_import_baseline_schedule_from_coins(
@@ -571,7 +612,7 @@ def build_baseline_policy_from_cfg(cfg: Mapping[str, Any]) -> BaselinePolicy:
         embedding=emb_cfg,
     )
 
-    return build_baseline_policy(schedule=schedule, cfg=pol_cfg)
+    return build_baseline_policy_by_kind(schedule=schedule, cfg=pol_cfg)
 
 
 def build_baseline_policy(
@@ -585,7 +626,7 @@ def build_baseline_policy(
     Single-entry convenience factory (good for scripts).
 
     Example:
-      model = build_baseline_policy(
+      model = build_baseline_policy_by_kind
           "grover",
           coins_kwargs={"phase": 0.0},
           policy_kwargs={"theta_clip": 3.14159},
@@ -596,7 +637,7 @@ def build_baseline_policy(
     schedule = _try_import_baseline_schedule_from_coins(kind, coins_kwargs=coins_kwargs)
 
     pk: MutableMapping[str, Any] = dict(policy_kwargs or {})
-    emb_cfg = pk.pop("embedding", None)
+    emb_cfg = _node_embedding_cfg_from_any(pk.pop("embedding", None))
 
     # Build BaselinePolicyConfig from kwargs with safe defaults
     cfg = BaselinePolicyConfig(
@@ -606,7 +647,7 @@ def build_baseline_policy(
         theta_noise_std=float(pk.pop("theta_noise_std", 0.0)),
         theta_clip=pk.pop("theta_clip", None),
         theta_dtype=pk.pop("theta_dtype", torch.float32),
-        embedding=emb_cfg if isinstance(emb_cfg, NodeEmbeddingConfig) else BaselinePolicyConfig().embedding,
+        embedding=emb_cfg,
     )
 
     if pk:

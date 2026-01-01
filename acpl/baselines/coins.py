@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import inspect
 import math
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, Literal, Mapping, Optional, Sequence, Tuple, Union
+from acpl.data.features import FeatureSpec, build_node_features
 
 import numpy as np
 import torch
@@ -16,6 +18,21 @@ __all__ = [
     "SU2Convention",
     "FixedCoinConfig",
     "RandomCoinConfig",
+
+
+
+
+    # schedule builders (used by baselines/policies.py)
+    "FixedSU2ThetaSchedule",
+    "RandomSU2ThetaSchedule",
+    "GlobalScheduleSU2ThetaSchedule",
+    "make_coin_schedule",
+    "build",
+
+
+
+
+
     "GlobalScheduleBasis",
     "GlobalScheduleConfig",
     "BaselineCoinConfig",
@@ -27,6 +44,9 @@ __all__ = [
     "zyz_from_su2",
     "wrap_angle_2pi",
     "wrap_angle_pi",
+
+    "wrap_angle_4pi",
+
     "project_to_su",
     # canonical fixed coins
     "hadamard_su2",
@@ -201,8 +221,30 @@ def wrap_angle_pi(x: torch.Tensor) -> torch.Tensor:
     """Wrap angles into (-π, π]."""
     y = torch.remainder(x + math.pi, TAU) - math.pi
     # map -pi to +pi for consistency
-    y = torch.where(torch.isclose(y, torch.tensor(-math.pi, device=y.device, dtype=y.dtype)), y + TAU, y)
+    y = torch.where(torch.isclose(y, x.new_tensor(-math.pi)), y + TAU, y)
     return y
+
+
+
+
+
+FOUR_PI = 2.0 * TAU
+
+def wrap_angle_4pi(x: torch.Tensor) -> torch.Tensor:
+    """
+    Wrap angles into (-2π, 2π]. (4π-periodic)
+
+    Important for SU(2) Euler lifts where α,γ appear as half-angles: shifting by 2π
+    multiplies U by -I, so only 4π-periodic wrapping preserves the SU(2) element.
+    """
+    y = torch.remainder(x + TAU, FOUR_PI) - TAU  # [-2π, 2π)
+    y = torch.where(torch.isclose(y, x.new_tensor(-TAU)), y + FOUR_PI, y)  # (-2π, 2π]
+    return y
+
+
+
+
+
 
 
 # =============================================================================
@@ -254,7 +296,12 @@ def su2_from_zyz(theta: torch.Tensor) -> torch.Tensor:
     gamma = theta[..., 2]
 
     # promote to complex
-    dtype = torch.complex64 if theta.dtype in (torch.float16, torch.float32) else torch.complex128
+    dtype = (
+        torch.complex64 if theta.dtype in (torch.float16, torch.float32, torch.bfloat16) else torch.complex128
+    )
+    
+    
+    
     device = theta.device
 
     half = 0.5
@@ -391,15 +438,20 @@ def fixed_coin_su2_theta(kind: FixedCoinKind, *, device: Optional[torch.device] 
         return torch.zeros((3,), device=device, dtype=torch.float32)
 
     if kind == "hadamard":
-        U = hadamard_su2(device=device, dtype=torch.complex64)
-        return zyz_from_su2(U)
+        # Canonical (defendable) representative for U_H = iH in our ZYZ convention.
+        # Using wrapped angle recovery can land on the -U representative, which is not
+        # always a *global* phase when degrees differ across nodes (e.g., line endpoints).
+        #
+        # This theta satisfies su2_from_zyz(theta) == hadamard_su2() (up to fp error),
+        # without relying on inversion heuristics:
+        #   alpha = 2π, beta = π/2, gamma = π
+        return torch.tensor([TAU, 0.5 * math.pi, math.pi], device=device, dtype=torch.float32)
+
 
     if kind == "grover":
-        # Grover for d=2 is Pauli-X (up to phase). Make it SU(2) via iX.
-        X = torch.tensor([[0.0, 1.0], [1.0, 0.0]], device=device, dtype=torch.float32)
-        U = (1j * X.to(torch.complex64))
-        U = project_to_su(U)
-        return zyz_from_su2(U)
+        # Canonical representative for iX in our ZYZ convention:
+        #   alpha = 2π, beta = π, gamma = π
+        return torch.tensor([TAU, math.pi, math.pi], device=device, dtype=torch.float32)
 
     raise ValueError(f"Unknown fixed coin kind: {kind}")
 
@@ -504,8 +556,8 @@ def random_su2_theta(
         theta_t = theta_t.expand(theta_t.shape[0], N, 3)
 
     # final wrap
-    theta_t[..., 0] = wrap_angle_pi(theta_t[..., 0])
-    theta_t[..., 2] = wrap_angle_pi(theta_t[..., 2])
+    theta_t[..., 0] = wrap_angle_4pi(theta_t[..., 0])
+    theta_t[..., 2] = wrap_angle_4pi(theta_t[..., 2])
     theta_t[..., 1] = theta_t[..., 1].clamp(0.0, math.pi)
     return theta_t.contiguous()
 
@@ -638,9 +690,13 @@ def make_unitary_coin_baseline_by_degree(
             if fixed_kind == "identity":
                 U = identity_unitary(2, device=device, dtype=dtype)
             elif fixed_kind == "grover":
-                U = grover_unitary(2, device=device, dtype=dtype)
-                # make SU(2)-ish if needed by removing global phase (optional)
-                U = project_to_su(U)
+                # Use canonical iX (SU(2)) rather than projecting X, which can choose -iX.
+                X = torch.tensor([[0.0, 1.0], [1.0, 0.0]], device=device, dtype=torch.float32)
+                U = (1j * X.to(torch.complex64)).to(dtype=dtype)
+                U = project_to_su(U)  # safe
+            
+            
+            
             else:
                 U = hadamard_su2(device=device, dtype=dtype)
             out[d] = U
@@ -696,6 +752,117 @@ def make_baseline_from_config(
         return make_unitary_coin_baseline_by_degree(degrees, cfg=cfg, device=device)
 
     raise ValueError(f"Unknown cfg.family: {cfg.family}")
+
+
+
+
+
+
+
+# =============================================================================
+# Schedule objects + builders (for BaselinePolicy auto-construction)
+# =============================================================================
+
+@dataclass(frozen=True)
+class FixedSU2ThetaSchedule:
+    cfg: FixedCoinConfig = FixedCoinConfig(kind="hadamard")
+
+    def __call__(
+        self,
+        X: torch.Tensor,
+        edge_index: torch.Tensor,
+        *,
+        T: int,
+        edge_weight: torch.Tensor | None = None,
+        outdeg: torch.Tensor | None = None,
+        indeg: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        N = int(X.shape[0])
+        return make_su2_theta_baseline(kind="fixed", T=int(T), N=N, device=X.device, fixed=self.cfg)
+
+
+@dataclass(frozen=True)
+class RandomSU2ThetaSchedule:
+    cfg: RandomCoinConfig = RandomCoinConfig(seed=0, haar=True, per_node=True, per_time=True)
+
+    def __call__(
+        self,
+        X: torch.Tensor,
+        edge_index: torch.Tensor,
+        *,
+        T: int,
+        edge_weight: torch.Tensor | None = None,
+        outdeg: torch.Tensor | None = None,
+        indeg: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        N = int(X.shape[0])
+        return make_su2_theta_baseline(kind="random", T=int(T), N=N, device=X.device, random=self.cfg)
+
+
+@dataclass(frozen=True)
+class GlobalScheduleSU2ThetaSchedule:
+    cfg: GlobalScheduleConfig = GlobalScheduleConfig(basis="fourier", K=3, seed=0)
+
+    def __call__(
+        self,
+        X: torch.Tensor,
+        edge_index: torch.Tensor,
+        *,
+        T: int,
+        edge_weight: torch.Tensor | None = None,
+        outdeg: torch.Tensor | None = None,
+        indeg: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        N = int(X.shape[0])
+        return make_su2_theta_baseline(kind="global_schedule", T=int(T), N=N, device=X.device, global_schedule=self.cfg)
+
+
+def make_coin_schedule(kind: str, **kwargs: Any):
+    """
+    Baseline schedule factory used by acpl/baselines/policies.py.
+
+    Supported kinds (aliases included):
+      - "hadamard" / "grover" / "identity"  -> fixed SU(2) theta schedule
+      - "fixed"                              -> FixedSU2ThetaSchedule (requires fixed=... or kind=...)
+      - "random"                             -> RandomSU2ThetaSchedule
+      - "global_schedule" / "schedule"       -> GlobalScheduleSU2ThetaSchedule
+    """
+    k = str(kind).lower().strip()
+
+    if k in {"hadamard", "grover", "identity"}:
+        return FixedSU2ThetaSchedule(FixedCoinConfig(kind=k))  # type: ignore[arg-type]
+
+    if k == "fixed":
+        fixed_cfg = kwargs.get("fixed", None)
+        if isinstance(fixed_cfg, FixedCoinConfig):
+            return FixedSU2ThetaSchedule(fixed_cfg)
+        # allow passing fixed.kind directly
+        fk = kwargs.get("kind", kwargs.get("fixed_kind", "hadamard"))
+        return FixedSU2ThetaSchedule(FixedCoinConfig(kind=str(fk)))  # type: ignore[arg-type]
+
+    if k == "random":
+        rcfg = kwargs.get("random", None)
+        if isinstance(rcfg, RandomCoinConfig):
+            return RandomSU2ThetaSchedule(rcfg)
+        return RandomSU2ThetaSchedule(RandomCoinConfig(**kwargs))
+
+    if k in {"global_schedule", "schedule"}:
+        gcfg = kwargs.get("global_schedule", None)
+        if isinstance(gcfg, GlobalScheduleConfig):
+            return GlobalScheduleSU2ThetaSchedule(gcfg)
+        return GlobalScheduleSU2ThetaSchedule(GlobalScheduleConfig(**kwargs))
+
+    raise ValueError(
+        f"Unknown baseline schedule kind='{kind}'. "
+        "Use hadamard/grover/identity/fixed/random/global_schedule."
+    )
+
+
+def build(*, kind: str, **kwargs: Any):
+    """Alias for make_coin_schedule(kind, **kwargs) (supported by policies.py)."""
+    return make_coin_schedule(kind, **kwargs)
+
+
 
 
 # =============================================================================

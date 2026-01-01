@@ -131,7 +131,24 @@ def _segment_sum_det(values: torch.Tensor, index: torch.Tensor, num_segments: in
     else:
         acc_dtype = vals.dtype
 
-    cs = vals.to(acc_dtype).cumsum(dim=0)  # (E, F)
+    # NOTE:
+    # With torch.use_deterministic_algorithms(True), CUDA cumsum is disallowed:
+    # "cumsum_cuda_kernel does not have a deterministic implementation".
+    # So, when determinism is enabled, do cumsum on CPU (deterministic),
+    # then move the result back to the original device.
+    det_on = bool(getattr(torch, "are_deterministic_algorithms_enabled", lambda: False)())
+    if det_on and vals.is_cuda:
+        cs = (
+            vals.to(device="cpu", dtype=acc_dtype)
+            .cumsum(dim=0)
+            .to(device=vals.device, dtype=acc_dtype)
+        )
+    else:
+        cs = vals.to(acc_dtype).cumsum(dim=0)  # (E, F)
+    
+    
+    
+    
     cs = torch.cat([torch.zeros_like(cs[:1]), cs], dim=0)  # (E+1, F)
 
     # segment starts where idx changes

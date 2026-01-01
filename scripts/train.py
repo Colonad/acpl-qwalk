@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import math
 from pathlib import Path
 import re
@@ -22,6 +22,19 @@ from torch.utils.data import DataLoader, Dataset
 import yaml
 
 from acpl.eval.protocol import EvalConfig, run_ci_eval, summarize_results
+
+
+
+
+
+try:
+    # Required by the FeatureSpec-driven path later in this script
+    from acpl.data.features import FeatureSpec, build_node_features, normalize_degree  # type: ignore
+except Exception as e:
+    FeatureSpec = None  # type: ignore
+    build_node_features = None  # type: ignore
+    normalize_degree = None  # type: ignore
+    _FEATURES_IMPORT_ERR = e
 
 
 def _pad_epoch(i: int) -> str:
@@ -391,6 +404,44 @@ def apply_overrides(cfg: dict, overrides: list[str]) -> dict:
         d[parts[-1]] = val
     return cfg
 
+def _feature_spec_from_cfg(cfg: dict, *, seed: int | None) -> FeatureSpec | None:
+    """
+    If cfg contains a 'features:' dict, interpret it as FeatureSpec kwargs.
+    If missing/None, return None meaning "legacy features".
+    Unknown keys are ignored (so configs don’t hard-break).
+    """
+    feat_cfg = cfg.get("features", None)
+    if feat_cfg is None:
+        return None
+    
+
+
+    if FeatureSpec is None:
+        raise RuntimeError(
+            f"Config contains 'features:' but acpl.data.features could not be imported: {_FEATURES_IMPORT_ERR}"
+        )
+
+
+    if not isinstance(feat_cfg, dict):
+        raise TypeError("cfg['features'] must be a dict if provided.")
+
+    # Only keep keys that exist on FeatureSpec
+    allowed = set(FeatureSpec.__dataclass_fields__.keys())
+    clean = {k: v for k, v in feat_cfg.items() if k in allowed}
+
+    # If user didn’t set a seed, inherit master seed for randomized options (e.g. random_sign)
+    if clean.get("seed", None) is None and seed is not None:
+        clean["seed"] = int(seed)
+
+    return FeatureSpec(**clean)
+
+
+def _default_coords_1d(N: int, *, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+    """
+    Deterministic 1D normalized coordinate in [0,1], shape (N,1).
+    This is the legacy behavior you had before (coord1).
+    """
+    return (torch.arange(N, device=device, dtype=dtype).unsqueeze(1) / max(N - 1, 1)).to(dtype)
 
 
 def _coerce_prereg_to_trainer_schema(cfg: dict, *, cfg_path: Path) -> dict:
@@ -635,6 +686,7 @@ class MarkedGraphEpisodeDataset(Dataset):
         marks_per_episode: int,
         manifest_hex: str,
         split: str,
+        append_mark_indicator: bool = True,
     ):
         super().__init__()
         self.payload = payload
@@ -643,14 +695,14 @@ class MarkedGraphEpisodeDataset(Dataset):
         self.k = int(max(1, marks_per_episode))
         self.manifest_hex = str(manifest_hex)
         self.split = str(split)
+        self.append_mark_indicator = bool(append_mark_indicator)
         self.epoch = 0
 
-
-        # Cache device from X (we assume payload["X"] is on the right device already)
         X = payload["X"]
         if not isinstance(X, torch.Tensor):
             raise TypeError("payload['X'] must be a torch.Tensor")
         self.device = X.device
+
 
     def set_epoch(self, epoch: int) -> None:
         self.epoch = int(epoch)
@@ -672,15 +724,17 @@ class MarkedGraphEpisodeDataset(Dataset):
         perm = torch.randperm(self.N, generator=gen)
         marks = perm[: self.k].to(device=self.device, dtype=torch.long)
 
-        # Build mark indicator feature
-        X_base: torch.Tensor = self.payload["X"]  # (N, 2) expected in your current script
-        mark_feat = torch.zeros((self.N, 1), device=self.device, dtype=X_base.dtype)
-        mark_feat.index_fill_(0, marks, 1.0)
-        X_ep = torch.cat([X_base, mark_feat], dim=1)  # (N, 3)
-
+        X_base: torch.Tensor = self.payload["X"]  # (N, F_base)
         out = dict(self.payload)
-        out["X"] = X_ep
-        out["targets"] = marks  # define Ω as the "targets" for loss/metrics
+
+        if self.append_mark_indicator:
+            mark_feat = torch.zeros((self.N, 1), device=self.device, dtype=X_base.dtype)
+            mark_feat.index_fill_(0, marks, 1.0)
+            out["X"] = torch.cat([X_base, mark_feat], dim=1)  # (N, F_base+1)
+        else:
+            out["X"] = X_base
+
+        out["targets"] = marks  # define Ω as "targets" for loss/metrics
         out["marks"] = marks
         return out
 
@@ -1848,32 +1902,123 @@ def main():
         print(f"[setup] normalized target_index {old} -> {target_index} (N={g.N})")
 
 
-    # outdeg = (pm.node_ptr[1:] - pm.node_ptr[:-1]).tolist()
-    # print(f"[debug] outdeg[0]={outdeg[0]} outdeg[target]={outdeg[target_index]} (target={target_index})")
-    # (optional) outdegree sanity check removed (was noisy in logs)
+    # ---------------- Node features (NEW: FeatureSpec-driven) ----------------
+    # Legacy behavior if cfg has no 'features:' block:
+    #   X_base = [deg_norm(inv_sqrt), coord1]  -> (N,2)
+    # New behavior if cfg.features exists:
+    #   X_base = build_node_features(..., spec=FeatureSpec(...)) -> (N,F_base)
 
+    spec = _feature_spec_from_cfg(cfg, seed=seed)
+
+    # Degrees are derived from PortMap (outgoing ports per node), stable & task-agnostic
+    deg_int = (pm.node_ptr[1:] - pm.node_ptr[:-1]).to(device=device, dtype=torch.long)  # (N,)
+
+    if spec is None:
+        # --- Legacy: exactly what you had (degree + 1D coord) ---
+        deg_feat = normalize_degree(deg_int.to(torch.float32), mode="inv_sqrt").view(-1, 1)
+        coord1 = _default_coords_1d(g.N, device=device, dtype=torch.float32)
+        X_base = torch.cat([deg_feat, coord1], dim=1).to(device=device, dtype=dtype)  # (N,2)
+        feat_index = {"deg_norm": (0, 1), "coord1": (1, 2)}
+    else:
+        # --- FeatureSpec path: consume coords if present, else fall back to coord1 ---
+        if g.coords is not None and isinstance(g.coords, torch.Tensor) and g.coords.numel() > 0:
+            coords = g.coords.to(device=device, dtype=torch.float32)
+        else:
+            coords = _default_coords_1d(g.N, device=device, dtype=torch.float32)
+
+        Xb, idx = build_node_features(
+            edge_index=g.edge_index.to(device),
+            degrees=deg_int.to(device),
+            coords=coords,
+            spec=spec,
+            device=device,
+        )
+        X_base = Xb.to(device=device, dtype=dtype)
+        feat_index = idx
+
+    # Decide whether we need an indicator channel:
+    # - search/robust: indicator is appended per-episode by dataset (dynamic Ω)
+    # - transfer (fixed Ω): we can append a static indicator ONCE here if enabled
+    use_indicator = bool(task_cfg.get("use_indicator", (is_search or is_robust)))
+    if is_mixing:
+        use_indicator = False  # indicator is meaningless for pure mixing
+
+    # For transfer-like (but not search/robust), allow static target indicator if enabled
+    X_static = X_base
+    transfer_targets_static = None
+    if use_indicator and (not is_search) and (not is_robust) and (not is_mixing):
+        target_radius = int(task_cfg.get("target_radius", 0))
+        lo = max(0, target_index - target_radius)
+        hi = min(g.N, target_index + target_radius + 1)
+        transfer_targets_static = torch.arange(lo, hi, device=device, dtype=torch.long)
+
+        tfeat = torch.zeros((g.N, 1), device=device, dtype=X_base.dtype)
+        tfeat.index_fill_(0, transfer_targets_static, 1.0)
+        X_static = torch.cat([X_base, tfeat], dim=1).to(device=device, dtype=dtype)
+
+    # Compute the model input dimension correctly
+    base_dim = int(X_base.shape[1])
+    if use_indicator and (is_search or is_robust):
+        in_dim = base_dim + 1  # dataset appends per-episode indicator
+    elif use_indicator and (not is_mixing) and (transfer_targets_static is not None):
+        in_dim = int(X_static.shape[1])  # we appended it once
+    else:
+        in_dim = base_dim
+
+    # Persist feature metadata for reproducibility
+    try:
+        import json as _json
+        meta = {
+            "manifest_hex": manifest_hex,
+            "use_indicator": bool(use_indicator),
+            "base_dim": base_dim,
+            "in_dim": int(in_dim),
+            "feature_index": feat_index,
+            "feature_spec": (asdict(spec) if spec is not None else None),
+        }
+        (run_dir / "features.json").write_text(_json.dumps(meta, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"[warn] could not write features.json: {e}")
+    # ------------------------------------------------------------------------
+
+
+    # ---------------- Loss config (supports task.loss being dict OR string) ----------------
+    task_loss_raw = task_cfg.get("loss", None)
+    task_loss_cfg: dict[str, Any] = {}
+    if isinstance(task_loss_raw, dict):
+        task_loss_cfg = dict(task_loss_raw)
+    elif isinstance(task_loss_raw, str):
+        task_loss_cfg = {"kind": task_loss_raw}
+    elif task_loss_raw is not None:
+        raise TypeError(f"task.loss must be a dict or string (got {type(task_loss_raw)}).")
 
     loss_cfg = cfg.get("loss", {}) or {}
-    if not isinstance(loss_cfg, dict):
+    if isinstance(loss_cfg, dict):
+        loss_cfg = dict(loss_cfg)
+    elif isinstance(loss_cfg, str):
+        loss_cfg = {"kind": loss_cfg}
+    else:
         loss_cfg = {}
 
-    reduction = str(
-        loss_cfg.get("reduction", task_cfg.get("reduce", task_cfg.get("reduction", "mean")))
-    ).lower().strip()
+    # Precedence: top-level loss overrides task.loss (so experiment-wide overrides win)
+    loss_cfg = {**task_loss_cfg, **loss_cfg}
 
-    renorm = bool(
-        loss_cfg.get("normalize_prob", task_cfg.get("normalize_prob", task_cfg.get("renorm", True)))
-    )
+    # Now read everything ONLY from loss_cfg (no accidental dict->str)
+    reduction = str(loss_cfg.get("reduction", "mean")).lower().strip()
+    renorm = bool(loss_cfg.get("normalize_prob", True))
+    loss_kind = str(loss_cfg.get("kind", "nll")).lower().strip()
+    eps = float(loss_cfg.get("eps", 1e-8))
+    margin = float(loss_cfg.get("margin", 0.0))
 
-    loss_kind = str(
-        loss_cfg.get("kind", task_cfg.get("loss", "nll"))
-    ).lower().strip()
+    # Used by metric pack + LoopConfig; safe default even if you don't use CVaR loss yet
+    cvar_alpha = float(loss_cfg.get("cvar_alpha", 0.1))
 
-    eps = float(loss_cfg.get("eps", task_cfg.get("eps", 1e-8)))
-    margin = float(loss_cfg.get("margin", task_cfg.get("margin", 0.0)))
+    # Optional: store resolved loss back into cfg for logging/checkpoint reproducibility
+    cfg["loss"] = dict(loss_cfg)
+    # -------------------------------------------------------------------------------
 
-    # cvar_alpha used by the metric pack + loop config
-    cvar_alpha = float(loss_cfg.get("cvar_alpha", task_cfg.get("cvar_alpha", 0.1)))
+
+
 
     # Model config (each subkey may also be a string; coerce to dicts)
     model_cfg = cfg.get("model", {}) or {}
@@ -1898,8 +2043,6 @@ def main():
 
         head_layernorm = False
 
-    use_indicator = bool(task_cfg.get("use_indicator", is_search or is_robust))
-    in_dim = 3 if use_indicator else 2
 
 
     acpl_cfg = ACPLPolicyConfig(
@@ -1990,13 +2133,6 @@ def main():
 
 
 
-    # Simple node features (degree + coord)
-    N = g.N
-    deg_out = (pm.node_ptr[1:] - pm.node_ptr[:-1]).to(device=device, dtype=dtype)  # (N,)
-    deg_feat = deg_out.unsqueeze(1)  # (N,1)
-
-    coord1 = torch.arange(N, device=device, dtype=dtype).unsqueeze(1) / max(N - 1, 1)
-    X = torch.cat([deg_feat, coord1], dim=1)  # (N,2)
 
 
     # Optim (advanced)
@@ -2028,11 +2164,21 @@ def main():
     batch_size = int(train_cfg.get("batch_size", 1))
     episodes_per_epoch = max(1, int(train_cfg.get("episodes_per_epoch", 200)))
 
+
+
+
+
+    if batch_size != 1:
+        raise ValueError(
+            f"scripts/train.py currently assumes batch_size==1 (collate_fn returns xs[0]). Got batch_size={batch_size}."
+        )
+
+
     if is_search:
         marks_per_episode = int(data_cfg.get("marks_per_episode", task_cfg.get("marks_per_episode", 1)))
 
         payload = {
-            "X": X,  # base (N,2); dataset appends mark channel -> (N,3)
+            "X": X_base,  # base (N,F_base); dataset may append -> (N,F_base+1)
             "edge_index": g.edge_index,
             "T": int(T),
             "targets": None,
@@ -2045,6 +2191,7 @@ def main():
             marks_per_episode=marks_per_episode,
             manifest_hex=manifest_hex,
             split="train",
+            append_mark_indicator=use_indicator,
         )
         eval_ds = MarkedGraphEpisodeDataset(
             payload,
@@ -2053,6 +2200,7 @@ def main():
             marks_per_episode=marks_per_episode,
             manifest_hex=manifest_hex,
             split="val",
+            append_mark_indicator=use_indicator,
         )
 
 
@@ -2063,7 +2211,7 @@ def main():
         append_indicator = bool(task_cfg.get("use_indicator", True))
 
         payload = {
-            "X": X,  # base (N,2); dataset may append target indicator -> (N,3)
+            "X": X_base,  
             "edge_index": g.edge_index,
             "T": int(T),
             "targets": None,      # dataset sets this
@@ -2095,7 +2243,7 @@ def main():
     elif is_mixing:
         # mixing: no targets needed
         payload = {
-            "X": X,  # (N,2) typically
+            "X": X_base,  # (N,2) typically
             "edge_index": g.edge_index,
             "T": int(T),
         }
@@ -2110,11 +2258,12 @@ def main():
         targets = torch.arange(lo, hi, device=device, dtype=torch.long)
 
         payload = {
-            "X": X,  # (N,2)
+            "X": X_static if (use_indicator and transfer_targets_static is not None) else X_base,
             "edge_index": g.edge_index,
             "T": int(T),
             "targets": targets,
         }
+
 
         train_ds = SingleGraphEpisodeDataset(payload, num_episodes=episodes_per_epoch)
         eval_ds = SingleGraphEpisodeDataset(payload, num_episodes=max(1, episodes_per_epoch // 4))
@@ -2602,9 +2751,37 @@ def main():
         ci_alpha = float((cfg.get("log", {}) or {}).get("ci_alpha", 0.05))
 
         # Build an iterable of batches for a given seed
-        def _make_eval_iter(seed: int):
+        def _make_eval_iter(seed_i: int):
+            if is_search:
+                ds = MarkedGraphEpisodeDataset(
+                    payload,
+                    num_episodes=ci_episodes,
+                    N=g.N,
+                    marks_per_episode=int(data_cfg.get("marks_per_episode", task_cfg.get("marks_per_episode", 1))),
+                    manifest_hex=manifest_hex,
+                    split="test",
+                    append_mark_indicator=use_indicator,
+                )
+                ds.set_epoch(seed_i)
+                return (ds[i] for i in range(len(ds)))
+
+            if is_robust:
+                ds = RobustTargetEpisodeDataset(
+                    payload,
+                    num_episodes=ci_episodes,
+                    N=g.N,
+                    targets_per_episode=int(task_cfg.get("targets_per_episode", 1)),
+                    manifest_hex=manifest_hex,
+                    split="test",
+                    append_target_indicator=bool(task_cfg.get("use_indicator", True)),
+                    random_start=bool(task_cfg.get("random_start", True)),
+                )
+                ds.set_epoch(seed_i)
+                return (ds[i] for i in range(len(ds)))
+
             ds = SingleGraphEpisodeDataset(payload, num_episodes=ci_episodes)
             return (ds[i] for i in range(len(ds)))
+
 
         eval_cfg = EvalConfig(
             seeds=[],  # auto-generate [0..n_seeds-1]

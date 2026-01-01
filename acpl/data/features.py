@@ -1,7 +1,9 @@
 # acpl/data/features.py
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+
+
 import math
 from typing import Literal
 

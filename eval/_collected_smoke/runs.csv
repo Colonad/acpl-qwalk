@@ -1,2 +1,0 @@
-run_id,evaldir,meta_hash,suite,checkpoint,device,episodes,seeds,policy,baseline_kind,ablations,model_config_hash
-basic_valid_ckpt_model_last.pt_10_1_1a810b6b,/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/eval/tmp_smoke,1a810b6b4ed9d00de323c95f5493abbe,basic_valid,runs/testing/model_last.pt,cpu,10,1,ckpt,,"NoPE,GlobalCoin,TimeFrozen,NodePermute",be715f8c53e826475546868921dca704

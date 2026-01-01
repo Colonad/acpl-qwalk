@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import hashlib
 from typing import Any, Literal
 
+
 import numpy as np
 
 __all__ = [

@@ -6,6 +6,7 @@ from typing import Any, Callable
 import inspect
 import torch
 
+
 from acpl.data.graphs import (
     GraphData,
     cycle_graph,

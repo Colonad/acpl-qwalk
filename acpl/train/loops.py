@@ -285,6 +285,18 @@ def train_epoch(
         step += 1
         batch = _to_device_batch(batch, device)
 
+
+        # Optional: fill missing disorder metadata for deterministic sampling.
+        # Does NOT override existing keys.
+        d = batch.get("disorder", None)
+        if isinstance(d, dict):
+            d.setdefault("episode_index", int(step))
+            d.setdefault("trial_id", 0)
+            d.setdefault("seed", int(d.get("seed", 0)))
+
+
+
+
         if hooks and "before_batch" in hooks:
             try:
                 hooks["before_batch"](batch=batch, step=step)

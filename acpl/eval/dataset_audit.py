@@ -65,6 +65,7 @@ import logging
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Literal, Mapping, Sequence
 
+
 import numpy as np
 
 # Matplotlib is optional unless plots=True
