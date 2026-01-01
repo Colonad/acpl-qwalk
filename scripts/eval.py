@@ -2027,8 +2027,13 @@ def _wrap_dataloader_for_mask_sensitivity(
     """
     frac = float(frac)
 
-    def wrapped_factory(seed_i: int):
-        it = base_factory(int(seed_i))
+    def wrapped_factory(seed: int, episodes: int | None = None, **_kwargs):
+        # Back-compat: some callers pass only seed; plotter passes (seed=..., episodes=...)
+        try:
+            it = base_factory(seed=int(seed), episodes=(None if episodes is None else int(episodes)))
+        except TypeError:
+            it = base_factory(int(seed)) if episodes is None else base_factory(int(seed), int(episodes))
+
         ep = 0
 
         # precompute fixed nodes if requested
@@ -2708,8 +2713,12 @@ def _fallback_nope_bundle(
     tname = str((task or {}).get("name", "")).lower()
     keep_indicator = bool((task or {}).get("use_indicator", ("search" in tname) or ("robust" in tname)))
 
-    def wrapped_factory(seed_i: int):
-        it = dataloader_factory(seed_i)
+    def wrapped_factory(seed: int, episodes: int | None = None, **_kwargs):
+        try:
+            it = dataloader_factory(seed=int(seed), episodes=(None if episodes is None else int(episodes)))
+        except TypeError:
+            it = dataloader_factory(int(seed)) if episodes is None else dataloader_factory(int(seed), int(episodes))
+
         for batch in it:
             if not isinstance(batch, Mapping):
                 yield batch
@@ -4084,16 +4093,17 @@ def run_eval(
                 "targets": None,
             }
 
-            def _make_eval_iter(seed_i: int):
+            def _make_eval_iter(seed: int, episodes: int | None = None, **_kwargs):
                 ds = th.MarkedGraphEpisodeDataset(
                     payload,
-                    num_episodes=int(episodes),
+                    num_episodes=int(episodes_default if episodes is None else episodes),
                     N=g.N,
                     marks_per_episode=marks_per_episode,
                     manifest_hex=manifest_hex,
                     split="test",
                 )
-                ds.set_epoch(int(seed_i))  # disjoint deterministic episodes per CI seed
+                ds.set_epoch(int(seed))
+
                 return (ds[i] for i in range(len(ds)))
 
         elif is_robust:
@@ -4108,10 +4118,11 @@ def run_eval(
                 "start_node": 0,
             }
 
-            def _make_eval_iter(seed_i: int):
+            def _make_eval_iter(seed: int, episodes: int | None = None, **_kwargs):
+
                 ds = th.RobustTargetEpisodeDataset(
                     payload,
-                    num_episodes=int(episodes),
+                    num_episodes=int(episodes_default if episodes is None else episodes),
                     N=g.N,
                     targets_per_episode=targets_per_episode,
                     manifest_hex=manifest_hex,
@@ -4119,7 +4130,8 @@ def run_eval(
                     append_target_indicator=append_indicator,
                     random_start=random_start,
                 )
-                ds.set_epoch(int(seed_i))
+                ds.set_epoch(int(seed))
+
                 return (ds[i] for i in range(len(ds)))
 
         elif is_mixing:
@@ -4129,10 +4141,10 @@ def run_eval(
                 "T": int(T),
             }
 
-            def _make_eval_iter(seed_i: int):
-                ds = th.SingleGraphEpisodeDataset(payload, num_episodes=int(episodes))
+            def _make_eval_iter(seed: int, episodes: int | None = None, **_kwargs):
+                ds = th.SingleGraphEpisodeDataset(payload, num_episodes=int(episodes_default if episodes is None else episodes))
                 if hasattr(ds, "set_epoch"):
-                    ds.set_epoch(int(seed_i))
+                    ds.set_epoch(int(seed))
                 return (ds[i] for i in range(len(ds)))
 
         else:
@@ -4149,12 +4161,16 @@ def run_eval(
                 hi = min(int(g.N), target_index + target_radius + 1)
                 payload["targets"] = torch.arange(lo, hi, device=torch_device, dtype=torch.long)
 
-            def _make_eval_iter(seed_i: int):
-                ds = th.SingleGraphEpisodeDataset(payload, num_episodes=int(episodes))
+            def _make_eval_iter(seed: int, episodes: int | None = None, **_kwargs):
+
+                ds = th.SingleGraphEpisodeDataset(
+                    payload,
+                    num_episodes=int(episodes_default if episodes is None else episodes),
+                )
                 if hasattr(ds, "set_epoch"):
-                    ds.set_epoch(int(seed_i))
+                    ds.set_epoch(int(seed))
                 return (ds[i] for i in range(len(ds)))
-            
+
         
         
         
