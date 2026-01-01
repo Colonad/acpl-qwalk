@@ -4208,18 +4208,22 @@ def run_eval(
         # --------------------------- Build condition runners ---------------------------
         base_tag = ("ckpt_policy" if policy != "baseline" else f"baseline_{_sanitize_filename(baseline_kind)}")
 
-        cond_runners: dict[str, dict[str, Any]] = {
-            base_tag: {
-                "model": model,
-                "dataloader_factory": _make_eval_iter,
-                "rollout_fn": rollout_fn,
-                "meta": {
-                    "policy": policy,
-                    "baseline_kind": baseline_kind if policy == "baseline" else None,
-                    "title_suffix": title_suffix,
-                },
-            }
+        cond_runners[bundle.tag] = {
+            "model": bundle.model,
+            "dataloader_factory": bundle.dataloader_factory,
+            "rollout_fn": bundle.rollout_fn,
+            "meta": dict(bundle.meta or {}),
         }
+
+        # Keep plot runners aligned with conditions
+        if plots:
+            plot_runners[bundle.tag] = {
+                "model": bundle.model,
+                "dataloader_factory": bundle.dataloader_factory,
+                "rollout_fn": bundle.rollout_fn,
+                "meta": dict(bundle.meta or {}),
+            }
+
 
         # ---- Ablations -> expand conditions ----
         if ablations and abl_mod is not None:
@@ -4258,9 +4262,16 @@ def run_eval(
 
                 cond_runners[bundle.tag] = {
                     "tag": bundle.tag,
-                    "runner": bundle.runner,
-                    "meta": bundle.meta,
+                    "model": bundle.model,
+                    "dataloader_factory": bundle.dataloader_factory,
+                    "rollout_fn": bundle.rollout_fn,
+                    # Merge base provenance (ckpt/config/manifest) with ablation metadata
+                    "meta": {
+                        **(cond_runners.get(base_tag, {}).get("meta", {}) or {}),
+                        **(bundle.meta or {}),
+                    },
                 }
+
 
 
 
@@ -4540,6 +4551,22 @@ def run_eval(
         if callable(proto_entry):
             try:
                 results = proto_entry(model=m_for_eval, **kwargs)
+            
+            
+                # --------------------------- Raw logs ---------------------------
+                # Export a complete, machine-readable per-condition record under:
+                #   <outdir>/raw/<tag>/results.json
+                try:
+                    raw_tag_dir = paths.raw_dir / tag
+                    raw_tag_dir.mkdir(parents=True, exist_ok=True)
+                    (raw_tag_dir / "results.json").write_text(
+                        json.dumps(results, indent=2, sort_keys=True),
+                        encoding="utf-8",
+                    )
+                except Exception as e:
+                    print(f"[warn] raw export failed for condition '{tag}': {e}", file=sys.stderr)
+
+            
             except TypeError:
                 try:
                     results = proto_entry(m_for_eval, **kwargs)
@@ -4610,21 +4637,7 @@ def run_eval(
         )
         art_eps = int(max(1, min(int(artifacts_embed_episodes), int(episodes))))
 
-        _write_first_class_artifacts(
-            outdir=outdir,
-            cfg=cfg,
-            conditions=cond_runners,
-            structured_out=structured_out,
-            seeds=art_seeds,
-            episodes=art_eps,
-            device=torch_device,
-            T_default=T,
-            max_nodes=int(artifacts_embeddings_max_nodes),
-            want_embeddings=bool(artifacts_embeddings),
-            want_stats=bool(artifacts_stats),
-            emb_mod=emb_mod,
-            stats_mod=stats_mod,
-        )
+
 
 
 
@@ -4856,13 +4869,21 @@ def run_eval(
             if artifacts_embed_seed is not None:
                 seeds_for_emb = [int(artifacts_embed_seed)]
 
+
+
+            # Limit episodes for artifacts (keeps CI/smoke runs fast)
+            episodes_for_artifacts = int(min(int(episodes), int(artifacts_embed_episodes)))
+            if episodes_for_artifacts < 1:
+                episodes_for_artifacts = 1
+
+
             _write_first_class_artifacts(
                 outdir=outdir,
                 structured_out=structured_out,
                 conditions=plot_runners,
                 cfg=cfg,
                 seeds=seeds_for_emb,
-                episodes=episodes,
+                episodes=episodes_for_artifacts,
                 device=torch_device,
                 # Required inputs for defensible, reproducible artifacts
                 T_default=int(T),
