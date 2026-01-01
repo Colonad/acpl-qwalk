@@ -5011,145 +5011,182 @@ def run_eval(
 
 
 
-            # --- Normalize seeds into a list[int] (handles int/None/iterable) ---
-            if seeds is None:
-                seeds = [0]
-            elif isinstance(seeds, (int, np.integer)):
-                seeds = [int(seeds)]
-            else:
-                seeds = [int(s) for s in list(seeds)]
-            if len(seeds) == 0:
-                seeds = [0]
-
-            # --- Always define eval_iter_fn once (fixes NameError) ---
-            eval_iter_fn = rr.get("dataloader_factory", None)
-            if not callable(eval_iter_fn):
-                raise RuntimeError("runner is missing a callable 'dataloader_factory(seed:int, episodes:int)->iter'.")
-
-
-
-            # Collect samples for plotting:
-            #   - single seed => per-episode samples (K,T,N)
-            #   - multi-seed  => per-seed mean samples (S,T,N) (CI across seeds)
-            Pt_samples_list: list[np.ndarray] = []
-            y_true: list[int] = []
-            y_pred: list[int] = []
-            Ns: list[int] = []
-
-            # For plotting, normalize seeds into an explicit list[int].
-            # (run_eval accepts either an int count, or an explicit list/tuple of seeds.)
-            seeds_plot = seeds
-            if seeds_plot is None:
-                seeds_plot = []
-            elif isinstance(seeds_plot, int):
-                seeds_plot = list(range(int(seeds_plot)))
-            else:
+            # Which conditions should we plot?
+            runners_for_plots = None
+            try:
+                if isinstance(plot_runners, dict) and len(plot_runners) > 0:
+                    runners_for_plots = plot_runners
+            except Exception:
+                runners_for_plots = None
+            if runners_for_plots is None:
                 try:
-                    seeds_plot = list(seeds_plot)
+                    if isinstance(cond_runners, dict) and len(cond_runners) > 0:
+                        runners_for_plots = cond_runners
                 except Exception:
-                    seeds_plot = [int(seeds_plot)]
+                    runners_for_plots = None
+
+            if runners_for_plots is None:
+                raise RuntimeError("No condition runners available for plotting.")
+
+            # Prefer the explicit seed list computed earlier in run_eval (stable and deterministic).
+            seeds_plot: list[int] = []
+            try:
+                seeds_plot = [int(s) for s in list(seeds_list)]  # type: ignore[name-defined]
+            except Exception:
+                seeds_plot = []
+            
+            
+            
+            
+            
+            
+            
+            
+            if len(seeds_plot) == 0:
+                # Fallback to CLI `seeds` (may be count or list-like)
+                if seeds is None:
+                    seeds_plot = [0]
+                elif isinstance(seeds, (int, np.integer)):
+                    seeds_plot = [int(seeds)]
+                else:
+                    try:
+                        seeds_plot = [int(s) for s in list(seeds)]
+                    except Exception:
+                        seeds_plot = [0]
 
             if len(seeds_plot) == 0:
                 seeds_plot = [0]
 
-            if len(seeds_plot) <= 1:
-                seed0 = int(seeds[0])
-                it = eval_iter_fn(seed=seed0, episodes=episodes)
-                for batch in it:
-                    Pt_tn = rollout_timeline_fn(model, batch)  # (T+1, N) torch on device
-                    Pt_np = Pt_tn.detach().cpu().numpy()
-                    Pt_samples_list.append(Pt_np)
-
-                    t = _extract_target_idx(batch)
-                    if t is not None:
-                        pred = int(np.nanargmax(Pt_np[-1]))
-                        y_true.append(int(t))
-                        y_pred.append(pred)
-                        Ns.append(int(Pt_np.shape[-1]))
-
-                if len(Pt_samples_list) == 0:
-                    raise RuntimeError("No episodes produced Pt samples for plotting.")
-                Pt_samples = np.stack(Pt_samples_list, axis=0)
-            else:
-                for s in seeds_plot:
-                    it = eval_iter_fn(seed=int(s), episodes=episodes)
-
-                    sum_Pt = None
-                    k = 0
-                    for batch in it:
-                        Pt_tn = rollout_timeline_fn(model, batch)  # (T+1,N)
-                        Pt_cpu = Pt_tn.detach().cpu()
-                        sum_Pt = Pt_cpu if (sum_Pt is None) else (sum_Pt + Pt_cpu)
-                        k += 1
-
-                        t = _extract_target_idx(batch)
-                        if t is not None:
-                            Pt_np_last = Pt_cpu.numpy()[-1]
-                            pred = int(np.nanargmax(Pt_np_last))
-                            y_true.append(int(t))
-                            y_pred.append(pred)
-                            Ns.append(int(Pt_cpu.shape[-1]))
-
-                    if sum_Pt is None or k <= 0:
-                        raise RuntimeError(f"No episodes for seed={s} when collecting plot samples.")
-                    Pt_samples_list.append((sum_Pt / float(k)).numpy())
-
-                Pt_samples = np.stack(Pt_samples_list, axis=0)
-
-            # --- Standard PT timeline plot (mean ± CI across samples) ---
-            plot_mod.plot_mean_pt_ci_across_episodes(
-                Pt_samples,
-                suite=suite,
-                policy=cond,
-                topk=12,
-                style=st,
-                savepath=plot_mod.figs_savepath(paths.root, "position_timelines", cond),
-                close=True,
-            )
-
-            # --- TV-to-uniform curves (mean ± CI across samples) ---
-            plot_mod.plot_tv_curves(
-                Pt_samples,
-                style=st,
-                title=f"{suite} — {cond} — TV(P_t, U)",
-                savepath=plot_mod.figs_savepath(paths.root, "tv_to_uniform", cond),
-                close=True,
-            )
-
-            # --- Confusion matrix: target node vs predicted node (argmax at final time) ---
-            # We pass raw (y_true, y_pred) into acpl.eval.plots so the plot module owns:
-            #  - label selection (max_labels)
-            #  - normalization (rows=true)
-            #  - rendering
-            if y_true and y_pred and hasattr(plot_mod, "plot_confusion_matrix"):
+            # --- Per-condition plots ---
+            for cond, rr in runners_for_plots.items():
                 try:
-                    from collections import Counter
+                    if not isinstance(rr, dict):
+                        print(f"[warn] skipping plots for '{cond}': runner entry is not a dict.", file=sys.stderr)
+                        continue
 
-                    Ns_arr = np.asarray(Ns, dtype=np.int64)
+                    model_plot = rr.get("model", None)
+                    eval_iter_fn = rr.get("dataloader_factory", None)
 
-                    # If graph sizes vary, pick the most common N to keep the matrix meaningful.
-                    modeN = int(Counter(Ns_arr.tolist()).most_common(1)[0][0]) if Ns_arr.size else None
-                    if modeN is not None:
-                        keep = (Ns_arr == modeN)
-                        yt = np.asarray(y_true, dtype=np.int64)[keep]
-                        yp = np.asarray(y_pred, dtype=np.int64)[keep]
+                    if model_plot is None:
+                        print(f"[warn] skipping plots for '{cond}': missing model.", file=sys.stderr)
+                        continue
+                    if not callable(eval_iter_fn):
+                        print(
+                            f"[warn] skipping plots for '{cond}': missing callable dataloader_factory(seed:int, episodes:int)->iter.",
+                            file=sys.stderr,
+                        )
+                        continue
 
-                        if yt.size > 0 and yp.size > 0:
-                            plot_mod.plot_confusion_matrix(
-                                yt,
-                                yp,
-                                labels=None,          # auto (and will be reduced if too large)
-                                normalize="true",     # row-normalize: P(pred | true)
-                                max_labels=32,
-                                style=st,
-                                title=f"{suite} — {cond} — confusion (rows=true, cols=pred) (N={modeN})",
-                                savepath=plot_mod.figs_savepath(paths.root, "confusion_matrix", cond),
-                                close=True,
-                            )
-                except Exception as _cm_e:
-                    print(f"[warn] confusion matrix skipped: {_cm_e}", file=sys.stderr)
+                    # Collect samples for plotting:
+                    #   - single seed => per-episode samples (K,T,N)
+                    #   - multi-seed  => per-seed mean samples (S,T,N) (CI across seeds)
+                    Pt_samples_list: list[np.ndarray] = []
+                    y_true: list[int] = []
+                    y_pred: list[int] = []
+                    Ns: list[int] = []
 
-            # OPTIONAL: if acpl.eval.plots exists, try it too (but never fail the run)
+                    if len(seeds_plot) <= 1:
+                        seed0 = int(seeds_plot[0])
+                        it = eval_iter_fn(seed=seed0, episodes=episodes)
+                        for batch in it:
+                            Pt_tn = rollout_timeline_fn(model_plot, batch)  # (T+1, N) torch on device
+                            Pt_np = Pt_tn.detach().cpu().numpy()
+                            Pt_samples_list.append(Pt_np)
+
+                            t = _extract_target_idx(batch)
+                            if t is not None:
+                                pred = int(np.nanargmax(Pt_np[-1]))
+                                y_true.append(int(t))
+                                y_pred.append(pred)
+                                Ns.append(int(Pt_np.shape[-1]))
+
+                        if len(Pt_samples_list) == 0:
+                            raise RuntimeError("No episodes produced Pt samples for plotting.")
+                        Pt_samples = np.stack(Pt_samples_list, axis=0)
+
+                    else:
+                        for s in seeds_plot:
+                            it = eval_iter_fn(seed=int(s), episodes=episodes)
+
+                            sum_Pt = None
+                            k = 0
+                            for batch in it:
+                                Pt_tn = rollout_timeline_fn(model_plot, batch)  # (T+1,N)
+                                Pt_cpu = Pt_tn.detach().cpu()
+                                sum_Pt = Pt_cpu if (sum_Pt is None) else (sum_Pt + Pt_cpu)
+                                k += 1
+
+                                t = _extract_target_idx(batch)
+                                if t is not None:
+                                    Pt_np_last = Pt_cpu.numpy()[-1]
+                                    pred = int(np.nanargmax(Pt_np_last))
+                                    y_true.append(int(t))
+                                    y_pred.append(pred)
+                                    Ns.append(int(Pt_cpu.shape[-1]))
+
+                            if sum_Pt is None or k <= 0:
+                                raise RuntimeError(f"No episodes for seed={s} when collecting plot samples.")
+                            Pt_samples_list.append((sum_Pt / float(k)).numpy())
+
+                        Pt_samples = np.stack(Pt_samples_list, axis=0)
+
+                    # --- Standard PT timeline plot (mean ± CI across samples) ---
+                    plot_mod.plot_mean_pt_ci_across_episodes(
+                        Pt_samples,
+                        suite=suite,
+                        policy=cond,
+                        topk=12,
+                        style=st,
+                        savepath=plot_mod.figs_savepath(paths.root, "position_timelines", cond),
+                        close=True,
+                    )
+
+                    # --- TV-to-uniform curves (mean ± CI across samples) ---
+                    plot_mod.plot_tv_curves(
+                        Pt_samples,
+                        style=st,
+                        title=f"{suite} — {cond} — TV(P_t, U)",
+                        savepath=plot_mod.figs_savepath(paths.root, "tv_to_uniform", cond),
+                        close=True,
+                    )
+
+                    # --- Confusion matrix: target node vs predicted node (argmax at final time) ---
+                    if y_true and y_pred and hasattr(plot_mod, "plot_confusion_matrix"):
+                        try:
+                            from collections import Counter
+
+                            Ns_arr = np.asarray(Ns, dtype=np.int64)
+
+                            # If graph sizes vary, pick the most common N to keep the matrix meaningful.
+                            modeN = int(Counter(Ns_arr.tolist()).most_common(1)[0][0]) if Ns_arr.size else None
+                            if modeN is not None:
+                                keep = (Ns_arr == modeN)
+                                yt = np.asarray(y_true, dtype=np.int64)[keep]
+                                yp = np.asarray(y_pred, dtype=np.int64)[keep]
+
+                                if yt.size > 0 and yp.size > 0:
+                                    plot_mod.plot_confusion_matrix(
+                                        yt,
+                                        yp,
+                                        labels=None,          # auto (and will be reduced if too large)
+                                        normalize="true",     # row-normalize: P(pred | true)
+                                        max_labels=32,
+                                        style=st,
+                                        title=f"{suite} — {cond} — confusion (rows=true, cols=pred) (N={modeN})",
+                                        savepath=plot_mod.figs_savepath(paths.root, "confusion_matrix", cond),
+                                        close=True,
+                                    )
+                        except Exception as _cm_e:
+                            print(f"[warn] confusion matrix skipped for '{cond}': {_cm_e}", file=sys.stderr)
+
+                except Exception as _cond_e:
+                    print(
+                        f"[warn] plots for condition '{cond}' failed: {type(_cond_e).__name__}: {_cond_e}",
+                        file=sys.stderr,
+                    )
+                    print(traceback.format_exc(), file=sys.stderr)
+
+            # OPTIONAL: if acpl.eval.plots defines a higher-level plot driver, try it too (but never fail the run)
             if plot_mod is not None:
                 for fn_name in ("plot_eval", "plot_suite", "plot_results", "run", "main"):
                     fn = getattr(plot_mod, fn_name, None)
@@ -5157,7 +5194,10 @@ def run_eval(
                         try:
                             _call_plot_best_effort(fn, structured_out, figdir)
                         except Exception as e:
-                            print(f"[warn] acpl.eval.plots.{fn_name} failed (ignored): {type(e).__name__}: {e}", file=sys.stderr)
+                            print(
+                                f"[warn] acpl.eval.plots.{fn_name} failed (ignored): {type(e).__name__}: {e}",
+                                file=sys.stderr,
+                            )
                         break
 
         except Exception as e:
