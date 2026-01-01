@@ -2018,10 +2018,10 @@ def _wrap_dataloader_for_mask_sensitivity(
     cond_tag: str,
 ):
     """
-    Returns a dataloader_factory(seed_i) iterator that masks X for a deterministic subset of nodes.
+    Returns a dataloader_factory(seed) iterator that masks X for a deterministic subset of nodes.
 
     Determinism:
-      - uses _stable_seed_u64(... manifest_hex, cond_tag, seed_i, episode_idx, frac ...)
+      - uses _stable_seed_u64(... manifest_hex, cond_tag, seed, episode_idx, frac ...)
       - per_episode=True => re-sample each episode (more statistically meaningful)
       - per_episode=False => fixed mask per seed (useful as a control)
     """
@@ -2052,7 +2052,7 @@ def _wrap_dataloader_for_mask_sensitivity(
             N = int(X0.shape[-2])
             k = int(math.floor(frac * N + 1e-12))
             k = max(0, min(N, k))
-            seed_u32 = int(_stable_seed_u64("mask_sens", manifest_hex, cond_tag, "fixed", int(seed_i), frac) & 0xFFFFFFFF)
+            seed_u32 = int(_stable_seed_u64("mask_sens", manifest_hex, cond_tag, "fixed", int(seed), frac) & 0xFFFFFFFF)
             rng = np.random.RandomState(seed_u32)
             fixed_nodes = rng.choice(N, size=k, replace=False) if k > 0 else np.zeros((0,), dtype=np.int64)
 
@@ -2100,7 +2100,7 @@ def _wrap_dataloader_for_mask_sensitivity(
             k = int(math.floor(frac * N + 1e-12))
             k = max(0, min(N, k))
 
-            seed_u32 = int(_stable_seed_u64("mask_sens", manifest_hex, cond_tag, int(seed_i), int(ep), frac) & 0xFFFFFFFF)
+            seed_u32 = int(_stable_seed_u64("mask_sens", manifest_hex, cond_tag, int(seed), int(ep), frac) & 0xFFFFFFFF)
             rng = np.random.RandomState(seed_u32)
             nodes = rng.choice(N, size=k, replace=False) if k > 0 else np.zeros((0,), dtype=np.int64)
 
