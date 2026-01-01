@@ -4330,11 +4330,24 @@ def run_eval(
         proto_entry = _get_protocol_callable()
 
 
-    # Normalize seeds
-    if isinstance(seeds, int):
-        seed_list = list(range(seeds))
+    # Normalize seeds.
+    # CLI `--seeds` is an *int count* (e.g. 5 => evaluate seeds [0..4]), but much of the
+    # downstream plumbing (plots/artifacts/robustness) expects an explicit sequence of ints.
+    if seeds is None:
+        seed_list: list[int] = []
+    elif isinstance(seeds, int):
+        if seeds < 0:
+            raise ValueError(f"seeds must be >= 0; got {seeds}")
+        seed_list = list(range(int(seeds)))
+    elif isinstance(seeds, str):
+        # Support comma/space-delimited explicit lists (defensive; CLI currently uses int).
+        seed_list = _parse_seeds_arg(seeds)
     else:
-        seed_list = list(seeds)
+        seed_list = [int(s) for s in seeds]
+
+    # From here on, treat `seeds` as the explicit list to avoid len()/iteration TypeErrors.
+    seeds = seed_list
+
 
     # Common kwargs passed to protocol
     common_kwargs = {
