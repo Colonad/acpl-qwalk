@@ -2551,6 +2551,7 @@ def _write_first_class_artifacts(
             try:
                 m = rr["model"]
                 dl = rr["dataloader_factory"]
+                it = dl(seed=seed0, episodes=episodes)
                 # Safety: skip huge graphs
                 try:
                     # probe one batch to see N
@@ -4928,7 +4929,7 @@ def run_eval(
             print(f"[warn] artifact generation failed: {type(e).__name__}: {e}", file=sys.stderr)
 
 
-        # ---------------- Plots (defendable; robust fallbacks) ----------------
+    # ---------------- Plots (defendable; robust fallbacks) ----------------
     if plots:
         try:
             figdir = _ensure_dir(paths.figs_dir)
@@ -5021,7 +5022,7 @@ def run_eval(
 
             if len(seeds) <= 1:
                 seed0 = int(seeds[0])
-                it = eval_iter_fn(seed=seed0, episodes=episodes)
+                it = dl(seed=seed0, episodes=episodes)
                 for batch in it:
                     Pt_tn = rollout_timeline_fn(model, batch)  # (T+1, N) torch on device
                     Pt_np = Pt_tn.detach().cpu().numpy()
@@ -5039,6 +5040,7 @@ def run_eval(
                 Pt_samples = np.stack(Pt_samples_list, axis=0)
             else:
                 for s in seeds:
+                    eval_iter_fn = rr["dataloader_factory"]
                     it = eval_iter_fn(seed=int(s), episodes=episodes)
                     sum_Pt = None
                     k = 0
