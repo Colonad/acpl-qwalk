@@ -613,8 +613,10 @@ def sample_shift_disorder(
     spec: DisorderSpec,
     *,
     rng: DisorderRNG,
+    extra: int = 0,
     validate: bool = False,
 ) -> ShiftDisorder:
+
     """
     Convenience wrapper to sample phase/mask for an episode, using separate RNG streams.
     """
@@ -622,7 +624,8 @@ def sample_shift_disorder(
     mask: Tensor | None = None
 
     if spec.edge_phase.enabled and spec.edge_phase.sigma > 0.0:
-        g = rng.stream("edge_phase")
+        g = rng.stream("edge_phase", extra=int(extra))
+
         if spec.edge_phase.flipflop_safe:
             phase = sample_flipflop_edge_phases(
                 rev,
@@ -643,7 +646,7 @@ def sample_shift_disorder(
             phase = torch.exp(torch.complex(torch.zeros_like(phi), phi)).to(torch.complex64)
 
     if spec.edge_dropout.enabled and spec.edge_dropout.p > 0.0:
-        g = rng.stream("edge_dropout")
+        g = rng.stream("edge_dropout", extra=int(extra))
         if spec.edge_dropout.flipflop_safe:
             mask = sample_flipflop_edge_keep_mask(rev, spec.edge_dropout.p, generator=g, validate=validate)
         else:
@@ -678,3 +681,82 @@ def format_disorder_meta(spec: DisorderSpec) -> dict[str, Any]:
             "sigma": float(spec.coin_dephase.sigma),
         },
     }
+
+
+
+
+
+
+def _any_enabled(spec: DisorderSpec) -> bool:
+    return bool(
+        (spec.edge_phase.enabled and spec.edge_phase.sigma > 0.0)
+        or (spec.edge_dropout.enabled and spec.edge_dropout.p > 0.0)
+        or (spec.coin_dephase.enabled and spec.coin_dephase.sigma > 0.0)
+    )
+
+
+def build_episode_disorder(
+    rev: Tensor,
+    disorder: Mapping[str, Any] | DisorderSpec | None,
+    *,
+    device: torch.device,
+    validate: bool = False,
+) -> EpisodeDisorder | None:
+    """
+    Build a deterministic episode-level disorder bundle.
+
+    Parameters
+    ----------
+    rev:
+        Arc involution permutation (A,) mapping each arc to its flip-flop partner.
+        In your simulator this is `shift.perm`.
+    disorder:
+        Either `None`, a dict (typically batch["disorder"]), or a DisorderSpec.
+    device:
+        Target device for RNG + sampled modifiers.
+    validate:
+        If True, checks that rev is an involution (debug aid).
+
+    Returns
+    -------
+    EpisodeDisorder | None
+        None if disorder is None or all channels are disabled/zero.
+    """
+    if disorder is None:
+        return None
+
+    spec = disorder if isinstance(disorder, DisorderSpec) else parse_disorder_spec(disorder)
+    if not _any_enabled(spec):
+        return None
+
+    rev_t = rev
+    if rev_t.device != device:
+        rev_t = rev_t.to(device=device)
+
+    rng = DisorderRNG(spec, device=device)
+
+    # Sample ONCE per episode (stable across time steps).
+    shift_mod = sample_shift_disorder(rev_t, spec, rng=rng, extra=0, validate=validate)
+
+    return EpisodeDisorder(spec=spec, rng=rng, shift=shift_mod)
+
+
+def maybe_apply_coin_dephase(
+    psi: Tensor,
+    ctx: EpisodeDisorder | None,
+    *,
+    t: int,
+) -> Tensor:
+    """
+    Apply per-step coin/state dephasing if enabled.
+
+    Uses a per-step deterministic substream keyed by `t`, so results are stable
+    even if episode lengths change or early exits happen.
+    """
+    if ctx is None:
+        return psi
+    spec = ctx.spec
+    if not (spec.coin_dephase.enabled and spec.coin_dephase.sigma > 0.0):
+        return psi
+    g = ctx.rng.stream("coin_dephase", extra=int(t))
+    return apply_state_dephase(psi, spec.coin_dephase.sigma, generator=g)

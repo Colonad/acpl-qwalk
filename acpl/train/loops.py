@@ -441,6 +441,19 @@ def eval_epoch(
     for batch in iterator:
         n_batches += 1
         batch = _to_device_batch(batch, device)
+
+
+
+        # Optional: fill missing disorder metadata for deterministic sampling.
+        d = batch.get("disorder", None)
+        if isinstance(d, dict):
+            # `step` is constant during eval_epoch, so use batch index as episode_index fallback.
+            d.setdefault("episode_index", int(n_batches))  # n_batches already incremented
+            d.setdefault("trial_id", 0)
+            d.setdefault("seed", int(d.get("seed", 0)))
+
+
+
         P, aux = rollout_fn(model, batch)
         if isinstance(P, torch.Tensor) and P.ndim == 1:
             P = P.unsqueeze(0)
@@ -529,9 +542,12 @@ def save_checkpoint(
     optimizer: torch.optim.Optimizer | None = None,
     scheduler: torch.optim.lr_scheduler._LRScheduler | None = None,
     loop_state: LoopState | None = None,
+    loop_cfg: LoopConfig | None = None,
     ckpt_cfg: CheckpointConfig | None = None,
     extra: dict[str, Any] | None = None,
 ) -> str:
+
+
     """Serialize training state to `path`."""
     path = str(path)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -540,7 +556,7 @@ def save_checkpoint(
         "optimizer": optimizer.state_dict() if optimizer is not None else None,
         "scheduler": scheduler.state_dict() if scheduler is not None else None,
         "loop_state": loop_state.to_dict() if loop_state is not None else {},
-        "loop_cfg": asdict(loop_state) if loop_state is not None else {},
+        "loop_cfg": asdict(loop_cfg) if loop_cfg is not None else {},
         "checkpoint_cfg": asdict(ckpt_cfg) if ckpt_cfg is not None else {},
         "extra": extra or {},
         "torch_version": torch.__version__,
@@ -677,8 +693,10 @@ def fit(
                 optimizer=optimizer,
                 scheduler=scheduler,
                 loop_state=state,
+                loop_cfg=loop_cfg,
                 ckpt_cfg=ckpt_cfg,
             )
+
             logger.log_text("fit/ckpt", f"Saved checkpoint: {out}", step=state.step)
 
             # Keep only last K
@@ -729,8 +747,10 @@ def fit(
                         optimizer=optimizer,
                         scheduler=scheduler,
                         loop_state=state,
+                        loop_cfg=loop_cfg,
                         ckpt_cfg=ckpt_cfg,
                     )
+
                     logger.log_text(
                         "fit/ckpt",
                         f"New best ({loop_cfg.best_key}={primary_value:.6f}); saved → {state.best_path}",

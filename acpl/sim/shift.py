@@ -50,6 +50,15 @@ class ShiftOp:
     def device(self) -> torch.device:
         return self.perm.device
 
+
+
+    @property
+    def rev(self) -> torch.Tensor:
+        """Alias for the flip-flop involution permutation (arc reverse mapping)."""
+        return self.perm
+
+
+
     # ------------------------------- Constructors --------------------------- #
 
     @staticmethod

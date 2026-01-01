@@ -1783,14 +1783,21 @@ def _run_robustness_sweeps(
                         los.append(float("nan"))
                         his.append(float("nan"))
                         continue
-                    if compute_ci is not None and col.shape[0] >= 2:
-                        ci = compute_ci(np.asarray(col, dtype=float), method="student_t", alpha=float(ci_alpha))
-                        means.append(float(ci.mean))
-                        los.append(float(ci.lo))
-                        his.append(float(ci.hi))
+                    m0 = float(np.mean(col))
+                    if col.shape[0] >= 2 and np.isfinite(m0):
+                        s = float(np.std(col, ddof=1))
+                        df = int(col.shape[0] - 1)
+                        alpha = float(ci_alpha)
+                        try:
+                            from scipy import stats as _sp_stats  # type: ignore
+                            tcrit = float(_sp_stats.t.ppf(1.0 - alpha / 2.0, df))
+                        except Exception:
+                            tcrit = float(statistics.NormalDist().inv_cdf(1.0 - alpha / 2.0))
+                        half = tcrit * s / math.sqrt(col.shape[0])
+                        means.append(m0)
+                        los.append(m0 - half)
+                        his.append(m0 + half)
                     else:
-                        # fallback: no CI
-                        m0 = float(np.mean(col))
                         means.append(m0)
                         los.append(m0)
                         his.append(m0)
@@ -3790,6 +3797,12 @@ def run_eval(
         and isinstance(ckpt.get("config", None), dict)
     )
 
+    if not trainer_native_ok:
+        raise RuntimeError(
+            "scripts/eval.py requires a config dict (from checkpoint or --config) and "
+            "acpl.eval.protocol available; cannot run eval without config."
+        )
+
 
     abl_mod = _maybe_get_ablations()
     plot_mod = _maybe_get_plots()
@@ -4208,49 +4221,47 @@ def run_eval(
             }
         }
 
-# ---- Ablations -> expand conditions ----
-if ablations and abl_mod is not None:
-    for a in ablations:
-        canon = _normalize_ablation_name(a)
-        try:
-            bundle = _build_ablation_bundle(
-                abl_mod,
-                ablation=canon,
-                base_tag=base_tag,
-                model=model,
-                dataloader_factory=_make_eval_iter,
-                rollout_fn=rollout_fn,
-                cfg=cfg,
-                device=torch_device,
-            )
-        except Exception as e:
-            bundle = None
-            if strict_ablations:
-                raise
+        # ---- Ablations -> expand conditions ----
+        if ablations and abl_mod is not None:
+            for a in ablations:
+                canon = _normalize_ablation_name(a)
+                try:
+                    bundle = _build_ablation_bundle(
+                        abl_mod,
+                        ablation=canon,
+                        base_tag=base_tag,
+                        model=model,
+                        dataloader_factory=_make_eval_iter,
+                        rollout_fn=rollout_fn,
+                        cfg=cfg,
+                        device=torch_device,
+                    )
+                except Exception as e:
+                    bundle = None
+                    if strict_ablations:
+                        raise
 
-        # Special-case: NoPE fallback (still meaningful + defendable)
-        if bundle is None and canon == "NoPE":
-            bundle = _fallback_nope_bundle(
-                base_tag=base_tag,
-                model=model,
-                dataloader_factory=_make_eval_iter,
-                rollout_fn=rollout_fn,
-                cfg=cfg,
-            )
+                # Special-case: NoPE fallback (still meaningful + defendable)
+                if bundle is None and canon == "NoPE":
+                    bundle = _fallback_nope_bundle(
+                        base_tag=base_tag,
+                        model=model,
+                        dataloader_factory=_make_eval_iter,
+                        rollout_fn=rollout_fn,
+                        cfg=cfg,
+                    )
 
-        if bundle is None:
-            msg = f"[warn] ablation '{canon}' could not be applied; skipping."
-            if strict_ablations:
-                raise RuntimeError(msg)
-            print(msg, file=sys.stderr)
-            continue
+                if bundle is None:
+                    msg = f"[warn] ablation '{canon}' could not be built; skipping"
+                    print(msg)
+                    continue
 
-        cond_runners[bundle.tag] = {
-            "model": bundle.model,
-            "dataloader_factory": bundle.dataloader_factory,
-            "rollout_fn": bundle.rollout_fn,
-            "meta": dict(bundle.meta or {}),
-        }
+                cond_runners[bundle.tag] = {
+                    "tag": bundle.tag,
+                    "runner": bundle.runner,
+                    "meta": bundle.meta,
+                }
+
 
 
 
@@ -4571,12 +4582,12 @@ if ablations and abl_mod is not None:
     base_res = run_one_condition(base_tag)
 
 
-    if trainer_native_ok:
-        plot_runners[base_tag] = {
-            "model": model,
-            "dataloader_factory": _make_eval_iter,
-            "meta": {},  # base condition has no ablation cfg
-        }
+    plot_runners[base_tag] = {
+        "model": model,
+        "dataloader_factory": _make_eval_iter,
+        "rollout_fn": rollout_fn,
+        "meta": {},  # base condition has no ablation cfg
+    }
 
 
     base_summary = (base_res or {}).get("summary", {})
@@ -4711,12 +4722,12 @@ if ablations and abl_mod is not None:
                 )
                 cond_tag = bundle.tag
 
-                if trainer_native_ok:
-                    plot_runners[cond_tag] = {
-                        "model": bundle.model,
-                        "dataloader_factory": bundle.dataloader_factory,
-                        "meta": dict(bundle.meta or {}),  # <-- keep ablation_cfg for plotting
-                    }
+                plot_runners[cond_tag] = {
+                    "model": bundle.model,
+                    "dataloader_factory": bundle.dataloader_factory,
+                    "rollout_fn": bundle.rollout_fn,
+                    "meta": dict(bundle.meta or {}),  # keep ablation_cfg for plotting
+                }
 
             structured_out["conditions"][cond_tag] = res or {}
 
@@ -4728,64 +4739,62 @@ if ablations and abl_mod is not None:
 
     # -------------------- Mask sensitivity (feature masking) --------------------
     if mask_sensitivity:
-        if not trainer_native_ok:
-            print("[warn] --mask-sensitivity is only supported in trainer-native eval path; skipping.", file=sys.stderr)
-        else:
-            for spec_str in mask_sensitivity:
-                try:
-                    spec = _parse_mask_sensitivity_spec(spec_str)
-                except Exception as e:
-                    print(f"[warn] invalid --mask-sensitivity spec {spec_str!r}: {e}", file=sys.stderr)
+        for spec_str in mask_sensitivity:
+            try:
+                spec = _parse_mask_sensitivity_spec(spec_str)
+            except Exception as e:
+                print(f"[warn] invalid --mask-sensitivity spec {spec_str!r}: {e}", file=sys.stderr)
+                continue
+
+            # We already evaluate the unmasked base condition; skip frac==0 duplicates.
+            for frac in spec.fracs:
+                if float(frac) <= 0.0:
                     continue
 
-                # We already evaluate the unmasked base condition; skip frac==0 duplicates.
-                for frac in spec.fracs:
-                    if float(frac) <= 0.0:
-                        continue
+                cond_tag = f"{base_tag}__mask_{spec.kind}_frac{_frac_tag(frac)}"
+                masked_factory = _wrap_dataloader_for_mask_sensitivity(
+                    _make_eval_iter,
+                    spec=spec,
+                    frac=float(frac),
+                    manifest_hex=str(manifest_hex),
+                    cond_tag=cond_tag,
+                )
 
-                    cond_tag = f"{base_tag}__mask_{spec.kind}_frac{_frac_tag(frac)}"
-                    masked_factory = _wrap_dataloader_for_mask_sensitivity(
-                        _make_eval_iter,
-                        spec=spec,
-                        frac=float(frac),
-                        manifest_hex=str(manifest_hex),
-                        cond_tag=cond_tag,
-                    )
+                res = run_one_condition(
+                    cond_tag,
+                    dataloader_factory_override=masked_factory,
+                    rollout_fn_override=rollout_fn,
+                    extra_meta={
+                        "mask_sensitivity": {
+                            "spec": spec_str,
+                            "kind": spec.kind,
+                            "frac": float(frac),
+                            "mask_value": float(spec.mask_value),
+                            "keep_degree": bool(spec.keep_degree),
+                            "keep_last_indicator": bool(spec.keep_last_indicator),
+                            "per_episode": bool(spec.per_episode),
+                        }
+                    },
+                )
 
-                    res = run_one_condition(
-                        cond_tag,
-                        dataloader_factory_override=masked_factory,
-                        rollout_fn_override=rollout_fn,
-                        extra_meta={
-                            "mask_sensitivity": {
-                                "spec": spec_str,
-                                "kind": spec.kind,
-                                "frac": float(frac),
-                                "mask_value": float(spec.mask_value),
-                                "keep_degree": bool(spec.keep_degree),
-                                "keep_last_indicator": bool(spec.keep_last_indicator),
-                                "per_episode": bool(spec.per_episode),
-                            }
-                        },
-                    )
+                structured_out["conditions"][cond_tag] = res or {}
 
-                    structured_out["conditions"][cond_tag] = res or {}
+                # CSV row
+                summ = (res or {}).get("summary", {})
+                row = {"cond": cond_tag}
+                row.update({f"metric.{k}": v for k, v in (summ or {}).items()})
+                summaries_for_csv.append(row)
 
-                    # CSV row
-                    summ = (res or {}).get("summary", {})
-                    row = {"cond": cond_tag}
-                    row.update({f"metric.{k}": v for k, v in (summ or {}).items()})
-                    summaries_for_csv.append(row)
-
-                    # Plots + artifacts use this mapping
-                    plot_runners[cond_tag] = {
-                        "model": model,
-                        "dataloader_factory": masked_factory,
-                        "meta": {"mask_sensitivity": {"spec": spec_str, "frac": float(frac)}},
-                    }
+                # Plots + artifacts use this mapping
+                plot_runners[cond_tag] = {
+                    "model": model,
+                    "dataloader_factory": masked_factory,
+                    "rollout_fn": rollout_fn,
+                    "meta": {"mask_sensitivity": {"spec": spec_str, "frac": float(frac)}},
+                }
 
     # ---------------- Robustness sweeps (Phase 6) ----------------
-    if trainer_native_ok and bool(robust_sweep):
+    if bool(robust_sweep):
         try:
             # choose which conditions to sweep
             if robust_sweep_include_ablations:
@@ -4842,239 +4851,217 @@ if ablations and abl_mod is not None:
     # ---------------- First-class artifacts (B7): stats + embeddings ----------------
     if bool(artifacts):
         try:
-            if trainer_native_ok:
-                # Optionally force a single seed for embedding artifacts (useful for quick CI runs)
-                seeds_for_emb = seed_list
-                if artifacts_embed_seed is not None:
-                    seeds_for_emb = [int(artifacts_embed_seed)]
+            # Optionally force a single seed for embedding artifacts (useful for quick CI runs)
+            seeds_for_emb = seed_list
+            if artifacts_embed_seed is not None:
+                seeds_for_emb = [int(artifacts_embed_seed)]
 
-                # T_default is known in trainer-native path
-                T_default = int(T) if "T" in locals() else None
+            _write_first_class_artifacts(
+                outdir=outdir,
+                structured_out=structured_out,
+                conditions=plot_runners,
+                cfg=cfg,
+                seeds=seeds_for_emb,
+                episodes=episodes,
+                device=torch_device,
+                # Required inputs for defensible, reproducible artifacts
+                T_default=int(T),
+                max_nodes=int(artifacts_embeddings_max_nodes),
+                emb_mod=emb_mod,
+                stats_mod=stats_mod,
+                want_embeddings=bool(artifacts_embeddings),
+                want_stats=bool(artifacts_stats),
+            )
 
-                _write_first_class_artifacts(
-                    outdir=outdir,
-                    cfg=cfg if isinstance(cfg, dict) else None,
-                    conditions=plot_runners,                 # models + dataloaders per condition
-                    structured_out=structured_out,
-                    seeds=seeds_for_emb,
-                    episodes=int(min(int(episodes), int(artifacts_embed_episodes))),
-                    device=torch_device,
-                    T_default=T_default,
-                    max_nodes=int(artifacts_embeddings_max_nodes),
-                    want_embeddings=bool(artifacts_embeddings),
-                    want_stats=bool(artifacts_stats),
-                    emb_mod=emb_mod,
-                    stats_mod=stats_mod,
-                )
-            else:
-                # Non-trainer-native: still emit stats.json/table from summaries (no embeddings)
-                _write_first_class_artifacts(
-                    outdir=outdir,
-                    cfg=None,
-                    conditions={},                           # no dataloaders available
-                    structured_out=structured_out,
-                    seeds=seed_list,
-                    episodes=int(min(int(episodes), int(artifacts_embed_episodes))),
-                    device=torch.device("cpu"),
-                    T_default=None,
-                    max_nodes=int(artifacts_embeddings_max_nodes),
-                    want_embeddings=False,
-                    want_stats=bool(artifacts_stats),
-                    emb_mod=emb_mod,
-                    stats_mod=stats_mod,
-                )
         except Exception as e:
             print(f"[warn] artifact generation failed: {type(e).__name__}: {e}", file=sys.stderr)
 
 
         # ---------------- Plots (defendable; robust fallbacks) ----------------
     if plots:
-        if not trainer_native_ok:
-            print("[warn] plots requested, but trainer-native eval path is unavailable; skipping plots.", file=sys.stderr)
-        else:
-            try:
-                figdir = _ensure_dir(paths.figs_dir)
+        try:
+            figdir = _ensure_dir(paths.figs_dir)
 
-                # Build a timeline rollout strictly for plotting.
-                theta_scale = float((cfg.get("coin", {}) or {}).get("theta_scale", 1.0)) if isinstance(cfg, dict) else 1.0
-                theta_noise_std = float((cfg.get("coin", {}) or {}).get("theta_noise_std", 0.0)) if isinstance(cfg, dict) else 0.0
+            # Build a timeline rollout strictly for plotting.
+            theta_scale = float((cfg.get("coin", {}) or {}).get("theta_scale", 1.0)) if isinstance(cfg, dict) else 1.0
+            theta_noise_std = float((cfg.get("coin", {}) or {}).get("theta_noise_std", 0.0)) if isinstance(cfg, dict) else 0.0
 
-                rollout_timeline_fn = _make_rollout_timeline_fn(
-                    th,
-                    pm=pm,
-                    shift=shift,
-                    family=coin_family,
-                    adaptor=adaptor,
-                    cdtype=cdtype,
-                    device=torch_device,
-                    init_mode=init_mode,
-                    theta_scale=theta_scale,
-                    theta_noise_std=theta_noise_std,
+            rollout_timeline_fn = _make_rollout_timeline_fn(
+                th,
+                pm=pm,
+                shift=shift,
+                family=coin_family,
+                adaptor=adaptor,
+                cdtype=cdtype,
+                device=torch_device,
+                init_mode=init_mode,
+                theta_scale=theta_scale,
+                theta_noise_std=theta_noise_std,
+            )
+
+            # ---- Minimal, signature-independent plotting fallback ----
+            def _tcrit(df: int, alpha: float) -> float:
+                # Prefer SciPy if available; else use normal approx / small table for 95%
+                try:
+                    from scipy.stats import t as _t
+                    return float(_t.ppf(1.0 - alpha / 2.0, df))
+                except Exception:
+                    # 95% two-sided table for df=1..30
+                    if abs(alpha - 0.05) < 1e-12 and 1 <= df <= 30:
+                        t95 = {
+                            1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365,
+                            8: 2.306, 9: 2.262, 10: 2.228, 11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145,
+                            15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086, 21: 2.080,
+                            22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056, 27: 2.052, 28: 2.048,
+                            29: 2.045, 30: 2.042,
+                        }
+                        return t95[df]
+                    # normal approx
+                    z = statistics.NormalDist().inv_cdf(1.0 - alpha / 2.0)
+                    return float(z)
+
+            def _curve_mean_ci(curves: np.ndarray, alpha: float) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
+                curves = np.asarray(curves, dtype=float)
+                mu = np.nanmean(curves, axis=0)
+                K = int(curves.shape[0])
+                if K < 2:
+                    return mu, None, None
+                sd = np.nanstd(curves, axis=0, ddof=1)
+                se = sd / max(np.sqrt(K), 1.0)
+                tc = _tcrit(K - 1, alpha)
+                lo = mu - tc * se
+                hi = mu + tc * se
+                return mu, lo, hi
+
+            def _tv_to_uniform(Pt: np.ndarray) -> np.ndarray:
+                # Pt: (T+1, N)
+                Nn = Pt.shape[1]
+                u = 1.0 / max(Nn, 1)
+                return 0.5 * np.sum(np.abs(Pt - u), axis=1)
+
+            def _max_prob(Pt: np.ndarray) -> np.ndarray:
+                return np.max(Pt, axis=1)
+
+            def _save_curve_png(savepath: Path, mean: np.ndarray, lo: np.ndarray | None, hi: np.ndarray | None,
+                                *, title: str, ylabel: str) -> None:
+                import matplotlib
+                matplotlib.use("Agg", force=True)
+                import matplotlib.pyplot as plt
+                x = np.arange(mean.shape[0], dtype=float)
+                plt.figure()
+                plt.plot(x, mean)
+                if lo is not None and hi is not None:
+                    plt.fill_between(x, lo, hi, alpha=0.2)
+                plt.title(title)
+                plt.xlabel("t")
+                plt.ylabel(ylabel)
+                plt.tight_layout()
+                plt.savefig(savepath, dpi=200)
+                plt.close()
+
+            def _save_final_topk_png(savepath: Path, Pt_mean: np.ndarray, *, k: int = 32, title: str = "") -> None:
+                import matplotlib
+                matplotlib.use("Agg", force=True)
+                import matplotlib.pyplot as plt
+                p = Pt_mean[-1]  # final time (N,)
+                Nn = p.shape[0]
+                kk = int(min(k, Nn))
+                idx = np.argsort(-p)[:kk]
+                vals = p[idx]
+                plt.figure()
+                plt.plot(np.arange(kk), vals)
+                plt.title(title or f"Top-{kk} probs at final time")
+                plt.xlabel("rank")
+                plt.ylabel("p")
+                plt.tight_layout()
+                plt.savefig(savepath, dpi=200)
+                plt.close()
+
+            # Collect plots per condition
+            plots_index: dict[str, Any] = {"conditions": {}}
+            alpha = float(eval_cfg.ci_alpha) if "eval_cfg" in locals() else 0.05
+
+            for cond_tag, rr in plot_runners.items():
+                m = rr["model"]
+                dl = rr["dataloader_factory"]
+
+                Pt_samples, Pt_meta = _collect_Pt_samples_for_plotting(
+                    model=m,
+                    dataloader_factory=dl,
+                    rollout_timeline_fn=rollout_timeline_fn,
+                    seeds=seed_list,
+                    episodes=int(episodes),
+                    ckpt_path=ckpt_path if ckpt_path is not None else None,
+                    artifacts_request=meta.get("artifacts_request", None),
+                )
+                # Pt_samples: (K, T+1, N)
+                K, L, Nn = Pt_samples.shape
+
+                tv_curves = np.stack([_tv_to_uniform(Pt_samples[i]) for i in range(K)], axis=0)   # (K, T+1)
+                mp_curves = np.stack([_max_prob(Pt_samples[i]) for i in range(K)], axis=0)       # (K, T+1)
+
+                tv_mean, tv_lo, tv_hi = _curve_mean_ci(tv_curves, alpha=alpha)
+                mp_mean, mp_lo, mp_hi = _curve_mean_ci(mp_curves, alpha=alpha)
+
+                safe = _sanitize_filename(cond_tag)
+                out_npz = figdir / f"plotdata__{safe}.npz"
+                np.savez_compressed(
+                    out_npz,
+                    Pt_samples=Pt_samples.astype(np.float32),
+                    tv_curves=tv_curves.astype(np.float32),
+                    maxprob_curves=mp_curves.astype(np.float32),
+                    meta=json.dumps(Pt_meta, default=str),
                 )
 
-                # ---- Minimal, signature-independent plotting fallback ----
-                def _tcrit(df: int, alpha: float) -> float:
-                    # Prefer SciPy if available; else use normal approx / small table for 95%
-                    try:
-                        from scipy.stats import t as _t
-                        return float(_t.ppf(1.0 - alpha / 2.0, df))
-                    except Exception:
-                        # 95% two-sided table for df=1..30
-                        if abs(alpha - 0.05) < 1e-12 and 1 <= df <= 30:
-                            t95 = {
-                                1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365,
-                                8: 2.306, 9: 2.262, 10: 2.228, 11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145,
-                                15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086, 21: 2.080,
-                                22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056, 27: 2.052, 28: 2.048,
-                                29: 2.045, 30: 2.042,
-                            }
-                            return t95[df]
-                        # normal approx
-                        z = statistics.NormalDist().inv_cdf(1.0 - alpha / 2.0)
-                        return float(z)
+                _save_curve_png(
+                    figdir / f"tv_to_uniform__{safe}.png",
+                    tv_mean, tv_lo, tv_hi,
+                    title=f"TV to uniform — {cond_tag} ({Pt_meta.get('ci_mode','?')}, K={K})",
+                    ylabel="TV(P_t, Uniform)"
+                )
+                _save_curve_png(
+                    figdir / f"max_prob__{safe}.png",
+                    mp_mean, mp_lo, mp_hi,
+                    title=f"Max node prob — {cond_tag} ({Pt_meta.get('ci_mode','?')}, K={K})",
+                    ylabel="max_i p_t(i)"
+                )
+                _save_final_topk_png(
+                    figdir / f"final_topk__{safe}.png",
+                    np.mean(Pt_samples, axis=0),
+                    k=32,
+                    title=f"Final distribution top-k — {cond_tag}"
+                )
 
-                def _curve_mean_ci(curves: np.ndarray, alpha: float) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
-                    curves = np.asarray(curves, dtype=float)
-                    mu = np.nanmean(curves, axis=0)
-                    K = int(curves.shape[0])
-                    if K < 2:
-                        return mu, None, None
-                    sd = np.nanstd(curves, axis=0, ddof=1)
-                    se = sd / max(np.sqrt(K), 1.0)
-                    tc = _tcrit(K - 1, alpha)
-                    lo = mu - tc * se
-                    hi = mu + tc * se
-                    return mu, lo, hi
+                plots_index["conditions"][cond_tag] = {
+                    "ci_mode": Pt_meta.get("ci_mode", None),
+                    "K": int(K),
+                    "T": int(L - 1),
+                    "N": int(Nn),
+                    "files": [
+                        f"plotdata__{safe}.npz",
+                        f"tv_to_uniform__{safe}.png",
+                        f"max_prob__{safe}.png",
+                        f"final_topk__{safe}.png",
+                    ],
+                }
 
-                def _tv_to_uniform(Pt: np.ndarray) -> np.ndarray:
-                    # Pt: (T+1, N)
-                    Nn = Pt.shape[1]
-                    u = 1.0 / max(Nn, 1)
-                    return 0.5 * np.sum(np.abs(Pt - u), axis=1)
+            (figdir / "plots_index.json").write_text(_json_dump(plots_index), encoding="utf-8")
 
-                def _max_prob(Pt: np.ndarray) -> np.ndarray:
-                    return np.max(Pt, axis=1)
+            # OPTIONAL: if acpl.eval.plots exists, try it too (but never fail the run)
+            if plot_mod is not None:
+                for fn_name in ("plot_eval", "plot_suite", "plot_results", "run", "main"):
+                    fn = getattr(plot_mod, fn_name, None)
+                    if callable(fn):
+                        try:
+                            _call_plot_best_effort(fn, structured_out, figdir)
+                        except Exception as e:
+                            print(f"[warn] acpl.eval.plots.{fn_name} failed (ignored): {type(e).__name__}: {e}", file=sys.stderr)
+                        break
 
-                def _save_curve_png(savepath: Path, mean: np.ndarray, lo: np.ndarray | None, hi: np.ndarray | None,
-                                    *, title: str, ylabel: str) -> None:
-                    import matplotlib
-                    matplotlib.use("Agg", force=True)
-                    import matplotlib.pyplot as plt
-                    x = np.arange(mean.shape[0], dtype=float)
-                    plt.figure()
-                    plt.plot(x, mean)
-                    if lo is not None and hi is not None:
-                        plt.fill_between(x, lo, hi, alpha=0.2)
-                    plt.title(title)
-                    plt.xlabel("t")
-                    plt.ylabel(ylabel)
-                    plt.tight_layout()
-                    plt.savefig(savepath, dpi=200)
-                    plt.close()
-
-                def _save_final_topk_png(savepath: Path, Pt_mean: np.ndarray, *, k: int = 32, title: str = "") -> None:
-                    import matplotlib
-                    matplotlib.use("Agg", force=True)
-                    import matplotlib.pyplot as plt
-                    p = Pt_mean[-1]  # final time (N,)
-                    Nn = p.shape[0]
-                    kk = int(min(k, Nn))
-                    idx = np.argsort(-p)[:kk]
-                    vals = p[idx]
-                    plt.figure()
-                    plt.plot(np.arange(kk), vals)
-                    plt.title(title or f"Top-{kk} probs at final time")
-                    plt.xlabel("rank")
-                    plt.ylabel("p")
-                    plt.tight_layout()
-                    plt.savefig(savepath, dpi=200)
-                    plt.close()
-
-                # Collect plots per condition
-                plots_index: dict[str, Any] = {"conditions": {}}
-                alpha = float(eval_cfg.ci_alpha) if "eval_cfg" in locals() else 0.05
-
-                for cond_tag, rr in plot_runners.items():
-                    m = rr["model"]
-                    dl = rr["dataloader_factory"]
-
-                    Pt_samples, Pt_meta = _collect_Pt_samples_for_plotting(
-                        model=m,
-                        dataloader_factory=dl,
-                        rollout_timeline_fn=rollout_timeline_fn,
-                        seeds=seed_list,
-                        episodes=int(episodes),
-                        ckpt_path=ckpt_path if ckpt_path is not None else None,
-                        artifacts_request=meta.get("artifacts_request", None),
-                    )
-                    # Pt_samples: (K, T+1, N)
-                    K, L, Nn = Pt_samples.shape
-
-                    tv_curves = np.stack([_tv_to_uniform(Pt_samples[i]) for i in range(K)], axis=0)   # (K, T+1)
-                    mp_curves = np.stack([_max_prob(Pt_samples[i]) for i in range(K)], axis=0)       # (K, T+1)
-
-                    tv_mean, tv_lo, tv_hi = _curve_mean_ci(tv_curves, alpha=alpha)
-                    mp_mean, mp_lo, mp_hi = _curve_mean_ci(mp_curves, alpha=alpha)
-
-                    safe = _sanitize_filename(cond_tag)
-                    out_npz = figdir / f"plotdata__{safe}.npz"
-                    np.savez_compressed(
-                        out_npz,
-                        Pt_samples=Pt_samples.astype(np.float32),
-                        tv_curves=tv_curves.astype(np.float32),
-                        maxprob_curves=mp_curves.astype(np.float32),
-                        meta=json.dumps(Pt_meta, default=str),
-                    )
-
-                    _save_curve_png(
-                        figdir / f"tv_to_uniform__{safe}.png",
-                        tv_mean, tv_lo, tv_hi,
-                        title=f"TV to uniform — {cond_tag} ({Pt_meta.get('ci_mode','?')}, K={K})",
-                        ylabel="TV(P_t, Uniform)"
-                    )
-                    _save_curve_png(
-                        figdir / f"max_prob__{safe}.png",
-                        mp_mean, mp_lo, mp_hi,
-                        title=f"Max node prob — {cond_tag} ({Pt_meta.get('ci_mode','?')}, K={K})",
-                        ylabel="max_i p_t(i)"
-                    )
-                    _save_final_topk_png(
-                        figdir / f"final_topk__{safe}.png",
-                        np.mean(Pt_samples, axis=0),
-                        k=32,
-                        title=f"Final distribution top-k — {cond_tag}"
-                    )
-
-                    plots_index["conditions"][cond_tag] = {
-                        "ci_mode": Pt_meta.get("ci_mode", None),
-                        "K": int(K),
-                        "T": int(L - 1),
-                        "N": int(Nn),
-                        "files": [
-                            f"plotdata__{safe}.npz",
-                            f"tv_to_uniform__{safe}.png",
-                            f"max_prob__{safe}.png",
-                            f"final_topk__{safe}.png",
-                        ],
-                    }
-
-                (figdir / "plots_index.json").write_text(_json_dump(plots_index), encoding="utf-8")
-
-                # OPTIONAL: if acpl.eval.plots exists, try it too (but never fail the run)
-                if plot_mod is not None:
-                    for fn_name in ("plot_eval", "plot_suite", "plot_results", "run", "main"):
-                        fn = getattr(plot_mod, fn_name, None)
-                        if callable(fn):
-                            try:
-                                _call_plot_best_effort(fn, structured_out, figdir)
-                            except Exception as e:
-                                print(f"[warn] acpl.eval.plots.{fn_name} failed (ignored): {type(e).__name__}: {e}", file=sys.stderr)
-                            break
-
-            except Exception as e:
-                # CRITICAL: do not swallow plot failures
-                print(f"[warn] plot generation failed: {type(e).__name__}: {e}", file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
+        except Exception as e:
+            # CRITICAL: do not swallow plot failures
+            print(f"[warn] plot generation failed: {type(e).__name__}: {e}", file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)
 
 
     if report:
