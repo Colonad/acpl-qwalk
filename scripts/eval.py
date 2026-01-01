@@ -5009,6 +5009,25 @@ def run_eval(
 
                 return None
 
+
+
+            # --- Normalize seeds into a list[int] (handles int/None/iterable) ---
+            if seeds is None:
+                seeds = [0]
+            elif isinstance(seeds, (int, np.integer)):
+                seeds = [int(seeds)]
+            else:
+                seeds = [int(s) for s in list(seeds)]
+            if len(seeds) == 0:
+                seeds = [0]
+
+            # --- Always define eval_iter_fn once (fixes NameError) ---
+            eval_iter_fn = rr.get("dataloader_factory", None)
+            if not callable(eval_iter_fn):
+                raise RuntimeError("runner is missing a callable 'dataloader_factory(seed:int, episodes:int)->iter'.")
+
+
+
             # Collect samples for plotting:
             #   - single seed => per-episode samples (K,T,N)
             #   - multi-seed  => per-seed mean samples (S,T,N) (CI across seeds)
@@ -5017,12 +5036,25 @@ def run_eval(
             y_pred: list[int] = []
             Ns: list[int] = []
 
-            if not seeds:
-                seeds = [0]
+            # For plotting, normalize seeds into an explicit list[int].
+            # (run_eval accepts either an int count, or an explicit list/tuple of seeds.)
+            seeds_plot = seeds
+            if seeds_plot is None:
+                seeds_plot = []
+            elif isinstance(seeds_plot, int):
+                seeds_plot = list(range(int(seeds_plot)))
+            else:
+                try:
+                    seeds_plot = list(seeds_plot)
+                except Exception:
+                    seeds_plot = [int(seeds_plot)]
 
-            if len(seeds) <= 1:
+            if len(seeds_plot) == 0:
+                seeds_plot = [0]
+
+            if len(seeds_plot) <= 1:
                 seed0 = int(seeds[0])
-                it = dl(seed=seed0, episodes=episodes)
+                it = eval_iter_fn(seed=seed0, episodes=episodes)
                 for batch in it:
                     Pt_tn = rollout_timeline_fn(model, batch)  # (T+1, N) torch on device
                     Pt_np = Pt_tn.detach().cpu().numpy()
@@ -5039,9 +5071,9 @@ def run_eval(
                     raise RuntimeError("No episodes produced Pt samples for plotting.")
                 Pt_samples = np.stack(Pt_samples_list, axis=0)
             else:
-                for s in seeds:
-                    eval_iter_fn = rr["dataloader_factory"]
+                for s in seeds_plot:
                     it = eval_iter_fn(seed=int(s), episodes=episodes)
+
                     sum_Pt = None
                     k = 0
                     for batch in it:
@@ -5085,10 +5117,16 @@ def run_eval(
             )
 
             # --- Confusion matrix: target node vs predicted node (argmax at final time) ---
+            # We pass raw (y_true, y_pred) into acpl.eval.plots so the plot module owns:
+            #  - label selection (max_labels)
+            #  - normalization (rows=true)
+            #  - rendering
             if y_true and y_pred and hasattr(plot_mod, "plot_confusion_matrix"):
                 try:
                     from collections import Counter
+
                     Ns_arr = np.asarray(Ns, dtype=np.int64)
+
                     # If graph sizes vary, pick the most common N to keep the matrix meaningful.
                     modeN = int(Counter(Ns_arr.tolist()).most_common(1)[0][0]) if Ns_arr.size else None
                     if modeN is not None:
@@ -5096,53 +5134,18 @@ def run_eval(
                         yt = np.asarray(y_true, dtype=np.int64)[keep]
                         yp = np.asarray(y_pred, dtype=np.int64)[keep]
 
-                        # compress labels if too large
-                        max_labels = 32
-                        counts = Counter()
-                        counts.update(yt.tolist())
-                        counts.update(yp.tolist())
-                        labs_sorted = [lab for lab, _ in counts.most_common()]
-
-                        other_tok = -1
-                        if len(labs_sorted) > max_labels:
-                            top = labs_sorted[: max_labels - 1]
-                            mapping = {lab: i for i, lab in enumerate(top)}
-                            yt_m = np.asarray([mapping.get(int(a), other_tok) for a in yt], dtype=np.int64)
-                            yp_m = np.asarray([mapping.get(int(a), other_tok) for a in yp], dtype=np.int64)
-                            label_names = [str(lab) for lab in top] + ["other"]
-                            ncls = len(label_names)
-                            # remap 'other' to last index
-                            yt_m = np.where(yt_m == other_tok, ncls - 1, yt_m)
-                            yp_m = np.where(yp_m == other_tok, ncls - 1, yp_m)
-                        else:
-                            # exact label set
-                            top = sorted(labs_sorted)
-                            mapping = {lab: i for i, lab in enumerate(top)}
-                            yt_m = np.asarray([mapping[int(a)] for a in yt], dtype=np.int64)
-                            yp_m = np.asarray([mapping[int(a)] for a in yp], dtype=np.int64)
-                            label_names = [str(lab) for lab in top]
-                            ncls = len(label_names)
-
-                        if ncls >= 2 and hasattr(plot_mod, "confusion_matrix"):
-                            cm = plot_mod.confusion_matrix(yt_m, yp_m, labels=list(range(ncls)), normalize="true")
-                        else:
-                            # fallback: simple counts
-                            cm = np.zeros((ncls, ncls), dtype=np.float64)
-                            for a, b in zip(yt_m, yp_m):
-                                if 0 <= a < ncls and 0 <= b < ncls:
-                                    cm[a, b] += 1.0
-                            # normalize rows
-                            row = cm.sum(axis=1, keepdims=True)
-                            cm = np.divide(cm, np.maximum(row, 1e-12))
-
-                        plot_mod.plot_confusion_matrix(
-                            cm,
-                            labels=label_names,
-                            style=st,
-                            title=f"{suite} — {cond} — confusion (rows=true, cols=pred)",
-                            savepath=plot_mod.figs_savepath(paths.root, "confusion_matrix", cond),
-                            close=True,
-                        )
+                        if yt.size > 0 and yp.size > 0:
+                            plot_mod.plot_confusion_matrix(
+                                yt,
+                                yp,
+                                labels=None,          # auto (and will be reduced if too large)
+                                normalize="true",     # row-normalize: P(pred | true)
+                                max_labels=32,
+                                style=st,
+                                title=f"{suite} — {cond} — confusion (rows=true, cols=pred) (N={modeN})",
+                                savepath=plot_mod.figs_savepath(paths.root, "confusion_matrix", cond),
+                                close=True,
+                            )
                 except Exception as _cm_e:
                     print(f"[warn] confusion matrix skipped: {_cm_e}", file=sys.stderr)
 
