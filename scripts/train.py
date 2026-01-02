@@ -1144,8 +1144,13 @@ def apply_blockdiag_coins_anydeg(
 
 
 def make_rollout_su2_dv2(pm: PortMap, shift: ShiftOp, *, cdtype, init_mode: str = "node0") -> RolloutFn:
-    from acpl.sim.step import step
-    from acpl.sim.utils import partial_trace_coin
+    from acpl.sim.step import step as _step
+    from acpl.sim.utils import partial_trace_coin as _ptc
+
+    # If these were decorated with @torch.no_grad(), call the undecorated function.
+    step = getattr(_step, "__wrapped__", _step)
+    partial_trace_coin = getattr(_ptc, "__wrapped__", _ptc)
+
 
     def rollout(model: nn.Module, batch: dict):
         X: torch.Tensor = _maybe_squeeze_leading(batch["X"])
@@ -1282,126 +1287,7 @@ def make_rollout_anydeg_exp_or_cayley(
     return rollout
 
 
-def make_transfer_loss(
-    loss_kind: str = "nll",
-    reduction: str = "mean",
-    renorm: bool = True,
-    eps: float = 1e-8,
-    margin: float = 0.0,
-):
-    """
-    Returns a callable: loss_builder(P, aux) -> loss
 
-    P: (B, N) probability-like tensor (will be renormalized if renorm=True)
-    aux: dict that must contain 'targets' (LongTensor indices of target nodes)
-    """
-    lk = str(loss_kind).lower().strip()
-    red = str(reduction).lower().strip()
-
-    def loss_builder(P: torch.Tensor, aux: dict, batch: dict | None = None) -> torch.Tensor:
-        # ensure real + float
-        if isinstance(P, torch.Tensor) and P.is_complex():
-            P = P.real
-        P = P.to(dtype=torch.float32)
-
-        # renormalize into a simplex if requested
-        if renorm:
-            P = P / (P.sum(dim=-1, keepdim=True).clamp_min(1e-12))
-
-        targets = aux.get("targets", None)
-        if targets is None:
-            raise ValueError("Transfer loss requires 'targets' in aux.")
-
-
-
-
-
-
-        trial_P = aux.get("trial_P", None)
-        if trial_P is not None and isinstance(trial_P, torch.Tensor) and trial_P.ndim == 3:
-            # trial_P: (B,K,N)
-            mass_k = trial_P.index_select(-1, targets).sum(dim=-1)  # (B,K)
-            loss_k = -torch.log(mass_k + eps)  # (B,K)
-
-            alpha = float(aux.get("cvar_alpha", cvar_alpha if cvar_alpha is not None else 1.0))
-            alpha = max(0.0, min(1.0, alpha))
-
-            K = loss_k.shape[1]
-            tail = max(1, int(math.ceil(alpha * K)))
-            worst, _ = torch.topk(loss_k, k=tail, dim=1, largest=True, sorted=False)
-            loss = worst.mean(dim=1)  # (B,)
-            return loss.mean()
-
-
-
-
-        # normalize targets to a 1D LongTensor on same device
-        if isinstance(targets, int):
-            targets = torch.tensor([targets], device=P.device, dtype=torch.long)
-        elif isinstance(targets, (list, tuple)):
-            targets = torch.tensor(list(targets), device=P.device, dtype=torch.long)
-        elif isinstance(targets, torch.Tensor):
-            if targets.ndim == 0:
-                targets = targets.view(1)
-            targets = targets.to(device=P.device, dtype=torch.long)
-        else:
-            raise TypeError(f"Unsupported targets type: {type(targets)}")
-
-        # total prob mass on target set
-        mass = P.index_select(dim=-1, index=targets).sum(dim=-1)  # (B,)
-
-        if lk == "nll":
-            # IMPORTANT: do not clamp_min before log; it kills gradients when mass < eps.
-            loss = -torch.log(mass + eps)
-        
-        
-        elif lk in ("robust_combo", "robust-combo", "robustcombo"):
-            # Differentiable combo objective for robust transport.
-            # Robustness should primarily come from disorder/noise during rollout;
-            # this loss just mixes stable terminal-mass objectives.
-
-            # Mix coefficient in [0,1]. Can be overridden per-run via aux.
-            alpha = float(aux.get("robust_combo_alpha", 0.5))
-            alpha = 0.0 if alpha < 0.0 else (1.0 if alpha > 1.0 else alpha)
-
-            loss_nll = -torch.log(mass + eps)  # (B,)
-            loss_prob = -mass                  # (B,)
-            loss = alpha * loss_nll + (1.0 - alpha) * loss_prob
-
-            # Optional: encourage higher-entropy position distribution (more spread),
-            # which can help under disorder. Default off.
-            beta_ent = float(aux.get("robust_entropy_beta", 0.0))
-            if beta_ent != 0.0:
-                ent = -(P * torch.log(P + eps)).sum(dim=-1)  # (B,)
-                loss = loss - beta_ent * ent  # subtract => reward entropy
-
-            # Optional: penalize peaky distributions (also helps robustness). Default off.
-            beta_l2 = float(aux.get("robust_l2_beta", 0.0))
-            if beta_l2 != 0.0:
-                loss = loss + beta_l2 * (P * P).sum(dim=-1)  # (B,)
-        
-        
-        
-        elif lk in ("neg_prob", "negprob", "prob", "neg_success", "neg_success_t", "neg_success_terminal"):
-            loss = -mass
-        elif lk == "hinge":
-            if targets.numel() != 1:
-                raise ValueError("hinge loss currently supports a single target.")
-            t = int(targets[0].item())
-            best_other = torch.cat([P[..., :t], P[..., t + 1 :]], dim=-1).max(dim=-1).values
-            loss = torch.relu(float(margin) - (mass - best_other))
-        else:
-            raise ValueError(f"Unknown transfer loss '{loss_kind}'")
-
-        if red == "mean":
-            return loss.mean()
-        if red == "sum":
-            return loss.sum()
-        if red == "none":
-            return loss
-        raise ValueError(f"Unknown reduction '{reduction}'")
-
-    return loss_builder
 
 def make_multi_disorder_trial_rollout(*, rollout_factory, pm, disorder_cfg, trials_per_episode: int):
     dcfg = disorder_cfg or {}
@@ -1438,6 +1324,99 @@ def make_multi_disorder_trial_rollout(*, rollout_factory, pm, disorder_cfg, tria
         return trial_P.mean(dim=1), aux0
 
     return _rollout
+
+
+def make_transfer_loss(
+    loss_kind: str = "nll",
+    reduction: str = "mean",
+    renorm: bool = True,
+    eps: float = 1e-8,
+    margin: float = 0.0,
+):
+    """
+    Returns a callable: loss_builder(P, aux) -> loss
+
+    P: (B, N) probability-like tensor (will be renormalized if renorm=True)
+    aux: dict that must contain 'targets' (LongTensor indices of target nodes)
+    """
+    lk = str(loss_kind).lower().strip()
+    red = str(reduction).lower().strip()
+
+    def loss_builder(P: torch.Tensor, aux: dict, batch: dict | None = None) -> torch.Tensor:
+        # ensure real + float
+        if isinstance(P, torch.Tensor) and P.is_complex():
+            P = P.real
+        P = P.to(dtype=torch.float32)
+
+        # renormalize into a simplex if requested
+        if renorm:
+            P = P / (P.sum(dim=-1, keepdim=True).clamp_min(1e-12))
+
+        targets = aux.get("targets", None)
+        if targets is None:
+            raise ValueError("Transfer loss requires 'targets' in aux.")
+
+
+        # normalize targets to a 1D LongTensor on same device
+        if isinstance(targets, int):
+            targets = torch.tensor([targets], device=P.device, dtype=torch.long)
+        elif isinstance(targets, (list, tuple)):
+            targets = torch.tensor(list(targets), device=P.device, dtype=torch.long)
+        elif isinstance(targets, torch.Tensor):
+            if targets.ndim == 0:
+                targets = targets.view(1)
+            targets = targets.to(device=P.device, dtype=torch.long)
+        else:
+            raise TypeError(f"Unsupported targets type: {type(targets)}")
+
+        # total prob mass on target set
+        mass = P.index_select(dim=-1, index=targets).sum(dim=-1)  # (B,)
+
+
+
+
+        trial_P = aux.get("trial_P", None)
+        if trial_P is not None and isinstance(trial_P, torch.Tensor) and trial_P.ndim == 3:
+            # trial_P: (B,K,N)
+            mass_k = trial_P.index_select(-1, targets).sum(dim=-1)  # (B,K)
+            loss_k = -torch.log(mass_k + eps)  # (B,K)
+
+            alpha = float(aux.get("cvar_alpha", cvar_alpha if cvar_alpha is not None else 1.0))
+            alpha = max(0.0, min(1.0, alpha))
+
+            K = loss_k.shape[1]
+            tail = max(1, int(math.ceil(alpha * K)))
+            worst, _ = torch.topk(loss_k, k=tail, dim=1, largest=True, sorted=False)
+            loss = worst.mean(dim=1)  # (B,)
+            return loss.mean()
+
+
+
+
+        if lk == "nll":
+            # IMPORTANT: do not clamp_min before log; it kills gradients when mass < eps.
+            loss = -torch.log(mass + eps)
+        elif lk in ("neg_prob", "negprob", "prob", "neg_success", "neg_success_t", "neg_success_terminal"):
+            loss = -mass
+        elif lk == "hinge":
+            if targets.numel() != 1:
+                raise ValueError("hinge loss currently supports a single target.")
+            t = int(targets[0].item())
+            best_other = torch.cat([P[..., :t], P[..., t + 1 :]], dim=-1).max(dim=-1).values
+            loss = torch.relu(float(margin) - (mass - best_other))
+        else:
+            raise ValueError(f"Unknown transfer loss '{loss_kind}'")
+
+        if red == "mean":
+            return loss.mean()
+        if red == "sum":
+            return loss.sum()
+        if red == "none":
+            return loss
+        raise ValueError(f"Unknown reduction '{reduction}'")
+
+    return loss_builder
+
 
 
 def _mix_uniform(N: int, device, dtype=torch.float32) -> torch.Tensor:
@@ -1969,6 +1948,20 @@ def main():
 
         shift = build_shift(pm)
 
+
+    # Guard: SU2 coins only meaningful when max degree <= 2 (line/cycle-like graphs).
+    if coin_family == "su2":
+        deg = (pm.node_ptr[1:] - pm.node_ptr[:-1]).to(torch.int64)
+        max_deg = int(deg.max().item()) if deg.numel() else 0
+        if max_deg > 2:
+            raise ValueError(
+                f"coin.family='su2' only supports graphs with max degree <= 2 (got max_deg={max_deg}). "
+                "For grids/regular/ER/WS use coin.family='exp' or 'cayley' (any-degree coins)."
+            )
+
+
+
+
     # Sim horizon / task
     sim_cfg = cfg.get("sim", {}) or {}
     if not isinstance(sim_cfg, dict):
@@ -2222,10 +2215,18 @@ def main():
 
             compiled = torch.compile(model_eager, **compile_kwargs)
 
-            # Warmup forces any compilation NOW (so we can fall back cleanly)
-            with torch.no_grad():
-                _ = compiled(dummy_X, g.edge_index, T=T)
-
+            # Warmup MUST be grad-enabled. If you warm up under no_grad(),
+            # torch.compile can capture an inference graph and later outputs
+            # may have requires_grad=False during training.
+            compiled.train()
+            with torch.enable_grad():
+                out = compiled(dummy_X, g.edge_index, T=T)
+                # (Optional but robust): trigger backward graph compilation too.
+                if isinstance(out, torch.Tensor):
+                    s = out.real if out.is_complex() else out
+                    s.sum().backward()
+            # clear any warmup grads
+            model_eager.zero_grad(set_to_none=True)
 
             model = compiled  
 

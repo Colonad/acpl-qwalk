@@ -315,12 +315,33 @@ def train_epoch(
                     with_targets=with_targets, cvar_alpha=loop_cfg.cvar_alpha
                 )
 
-            if "loss" in aux and aux["loss"] is not None:
-                loss = aux["loss"]
+            loss_from_aux = aux.get("loss", None)
+
+            # Only trust aux["loss"] for backprop if it is truly differentiable.
+            if isinstance(loss_from_aux, torch.Tensor) and loss_from_aux.requires_grad:
+                loss = loss_from_aux
             else:
                 if loss_builder is None:
-                    raise ValueError("No loss provided by rollout_fn and no loss_builder supplied.")
+                    raise ValueError("No differentiable loss provided by rollout_fn and no loss_builder supplied.")
                 loss = loss_builder(P, aux, batch)
+
+            # Enforce a real scalar Tensor loss (avoid accidental .item() / python floats).
+            if not isinstance(loss, torch.Tensor):
+                raise RuntimeError(f"loss must be a torch.Tensor (got {type(loss)}). Did you call .item() in the loss path?")
+
+            if loss.is_complex():
+                loss = loss.real
+            if loss.ndim != 0:
+                loss = loss.mean()
+
+            # If this triggers, your rollout/simulator detached something (common: no_grad in sim/trace).
+            if not loss.requires_grad:
+                raise RuntimeError(
+                    "Loss does not require grad. This means the rollout output is detached or gradients are disabled.\n"
+                    f"Debug: torch.is_grad_enabled()={torch.is_grad_enabled()} "
+                    f"P.requires_grad={getattr(P, 'requires_grad', None)}\n"
+                    "Check your simulator/trace for @torch.no_grad / torch.inference_mode / .detach() / .item()."
+                )
 
             if not _is_finite(loss):
                 logger.log_text(
