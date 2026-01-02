@@ -1079,28 +1079,59 @@ class ThetaToHermitianAdaptor(nn.Module):
 
 
 
-def unitary_exp_iH(H: torch.Tensor, cdtype=torch.complex64) -> torch.Tensor:
-    n = H.size(-1)
-    Hs = 0.5 * (H + H.transpose(-1, -2))
+def unitary_exp_iH(
+    H: torch.Tensor,
+    cdtype: torch.dtype = torch.complex64,
+    *,
+    method: str = "auto",
+    compute_dtype: torch.dtype | None = None,
+) -> torch.Tensor:
+    """Compute U = exp(i H) for (approximately) Hermitian H.
 
-    # RTX cards: keep FP32 on CUDA (FP64 is extremely slow)
-    if Hs.is_cuda:
-        Hwork = Hs.to(torch.float32)
-    else:
-        Hwork = Hs.to(torch.float64)
+    Notes
+    -----
+    This project uses *many* tiny matrices (node-local coins). On some CPU + BLAS
+    stacks (common on WSL), the autograd path for batched `torch.linalg.eigh`
+    can occasionally crash the process (hard segfault) in very early steps.
+
+    To keep training robust and thesis results defendable, we default to:
+      - CUDA: eigendecomposition (fast for small matrices)
+      - CPU : `torch.matrix_exp` (more conservative; avoids `eigh` backward)
 
     eps = 1e-8
     Hwork = Hwork + torch.eye(n, dtype=Hwork.dtype, device=Hwork.device) * eps
+    You can override via `method=` ('eigh' or 'matrix_exp').
+    """
+    Hs = 0.5 * (H + H.transpose(-1, -2))
+ 
+    m = str(method).lower().strip()
+    if m in ("", "auto"):
+        m = "eigh" if Hs.is_cuda else "matrix_exp"
 
+    if compute_dtype is None:
+        # Default compute dtype: FP32 everywhere (stable + consistent). For CPU,
+        # FP64 is rarely worth it at these sizes and can stress LAPACK/BLAS.
+        compute_dtype = torch.float32
+
+    # Conservative path (recommended on CPU): matrix exponential of iH.
+    if m in ("matrix_exp", "mat_exp", "matrix", "exp"):
+        return torch.matrix_exp((1j * Hs.to(dtype=compute_dtype)).to(dtype=cdtype))
+
+    # Fast path: Hermitian eigendecomposition (supports batched (...,n,n)).
+    # Keep an explicit fallback to matrix_exp for numerical issues.
+    n = Hs.size(-1)
+    Hwork = Hs.to(dtype=compute_dtype)
+    Hwork = Hwork + torch.eye(n, dtype=Hwork.dtype, device=Hwork.device) * 1e-8
     try:
         evals, evecs = torch.linalg.eigh(Hwork)  # supports batched (...,n,n)
         evals = torch.clamp(evals, min=-1e6, max=1e6)
-        D = torch.diag_embed(torch.complex(torch.cos(evals), torch.sin(evals)).to(cdtype))
+        phase = evals.to(torch.float32)
+        D = torch.diag_embed(torch.complex(torch.cos(phase), torch.sin(phase)).to(cdtype))
         Q = evecs.to(cdtype)
         return Q @ D @ Q.transpose(-1, -2).conj()
-    except RuntimeError:
-        return torch.matrix_exp(1j * Hs.to(cdtype))
-
+    except Exception:
+        return torch.matrix_exp((1j * Hs.to(dtype=compute_dtype)).to(dtype=cdtype))
+ 
 
 
 def unitary_cayley(H: torch.Tensor, cdtype=torch.complex64) -> torch.Tensor:
@@ -1119,23 +1150,66 @@ def apply_blockdiag_coins_anydeg(
     pm: PortMap,
     coins_v: list[torch.Tensor | None],
 ) -> torch.Tensor:
-    out = psi.clone()
+    """Apply per-node coins for arbitrary-degree graphs without in-place ops.
+
+    This is the "slow but safe" fallback used when degrees vary across nodes.
+    IMPORTANT: Do NOT write into a view of a tensor that participates in autograd.
+    We therefore build segments functionally and `torch.cat` them.
+    """
+    # Fast-path: nothing to do
+    if pm.num_nodes <= 0:
+        return psi
+
+    # Ensure coins_v length
+    if len(coins_v) != pm.num_nodes:
+        raise ValueError(f"coins_v length mismatch: {len(coins_v)} vs pm.num_nodes={pm.num_nodes}")
+
     start = pm.node_ptr[:-1]
     end = pm.node_ptr[1:]
 
-
-
-    N = pm.num_nodes
-    for v in range(N):
-        s, e = int(start[v]), int(end[v])
+    segs: list[torch.Tensor] = []
+    for v in range(pm.num_nodes):
+        s = int(start[v].item())
+        e = int(end[v].item())
         d = e - s
+
         if d <= 0:
+            # empty segment (isolated node)
+            segs.append(psi.new_empty((0,)))
             continue
+
+        x = psi.narrow(0, s, d)  # view of psi; we NEVER modify it in-place
         U = coins_v[v]
+
+        # If no coin provided for this node, keep segment unchanged
         if U is None:
+            segs.append(x)
             continue
-        out[s:e] = U @ psi[s:e]
-    return out
+
+        # Sanity check coin shape
+        if U.ndim != 2 or U.shape[0] != d or U.shape[1] != d:
+            raise ValueError(f"coin shape mismatch at v={v}: expected ({d},{d}), got {tuple(U.shape)}")
+
+        # Move/cast coin to match psi
+        Ux = U.to(device=psi.device, dtype=psi.dtype)
+
+        # NOTE: On some CPU builds (common on WSL/conda), complex BLAS kernels
+        # can sporadically segfault for very small GEMV/GEMM calls. We therefore
+        # use a real-valued matmul formulation on CPU to improve robustness.
+        if (not psi.is_cuda) and x.is_complex() and torch.is_complex(Ux):
+            Ur = Ux.real.to(dtype=x.real.dtype)
+            Ui = Ux.imag.to(dtype=x.real.dtype)
+            xr = x.real
+            xi = x.imag
+            yr = Ur @ xr - Ui @ xi
+            yi = Ur @ xi + Ui @ xr
+            y = torch.complex(yr, yi).to(dtype=psi.dtype)
+        else:
+            y = Ux @ x
+
+        segs.append(y)
+
+    return torch.cat(segs, dim=0)
 
 
 # -------------------------------
@@ -1261,6 +1335,20 @@ def make_rollout_anydeg_exp_or_cayley(
                 # psi is length A = Nn*d0, arranged in contiguous node blocks -> view as (Nn,d0)
                 psi_v = psi.reshape(Nn, d0) # (Nn, d0)
                 psi_v = torch.bmm(U, psi_v.unsqueeze(-1)).squeeze(-1)  # (Nn, d0)
+                
+                psi_v = psi.reshape(Nn, d0)  # (Nn, d0)
+
+                # On some CPU builds/BLAS stacks (notably WSL/OpenBLAS combos),
+                # complex GEMM can segfault. Use a real-valued equivalent when on CPU.
+                if (not psi.is_cuda) and psi_v.is_complex() and U.is_complex():
+                    Ur, Ui = U.real, U.imag
+                    xr, xi = psi_v.real, psi_v.imag
+                    yr = torch.bmm(Ur, xr.unsqueeze(-1)).squeeze(-1) - torch.bmm(Ui, xi.unsqueeze(-1)).squeeze(-1)
+                    yi = torch.bmm(Ur, xi.unsqueeze(-1)).squeeze(-1) + torch.bmm(Ui, xr.unsqueeze(-1)).squeeze(-1)
+                    psi_v = torch.complex(yr, yi).to(dtype=psi_v.dtype)
+                else:
+                    psi_v = torch.bmm(U, psi_v.unsqueeze(-1)).squeeze(-1)  # (Nn, d0)                
+                
                 psi = psi_v.reshape(-1)  # (A,)
 
                 psi = psi.index_select(0, perm)
@@ -2479,11 +2567,13 @@ def main():
             if ckpt_payload:
                 sd = ckpt_payload.get("state_dict") or ckpt_payload.get("model")
                 if sd is not None:
+                    
                     try:
                         model.load_state_dict(sd, strict=False)
                     except Exception:
                         new_sd = {k.replace("module.", "", 1): v for k, v in sd.items()}
                         model.load_state_dict(new_sd, strict=False)
+
 
                 ad_sd = ckpt_payload.get("adaptor", None)
                 if adaptor is not None and isinstance(ad_sd, dict):
