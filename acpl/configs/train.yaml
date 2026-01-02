@@ -168,6 +168,6 @@ log:
     run_name: A6_line64_T64_gcn_gru_su2
 
 compile:
-  enabled: false
+  enabled: true
   backend: aot_eager
   force_inductor: false

@@ -1312,6 +1312,29 @@ def make_transfer_loss(
         if targets is None:
             raise ValueError("Transfer loss requires 'targets' in aux.")
 
+
+
+
+
+
+        trial_P = aux.get("trial_P", None)
+        if trial_P is not None and isinstance(trial_P, torch.Tensor) and trial_P.ndim == 3:
+            # trial_P: (B,K,N)
+            mass_k = trial_P.index_select(-1, targets).sum(dim=-1)  # (B,K)
+            loss_k = -torch.log(mass_k + eps)  # (B,K)
+
+            alpha = float(aux.get("cvar_alpha", cvar_alpha if cvar_alpha is not None else 1.0))
+            alpha = max(0.0, min(1.0, alpha))
+
+            K = loss_k.shape[1]
+            tail = max(1, int(math.ceil(alpha * K)))
+            worst, _ = torch.topk(loss_k, k=tail, dim=1, largest=True, sorted=False)
+            loss = worst.mean(dim=1)  # (B,)
+            return loss.mean()
+
+
+
+
         # normalize targets to a 1D LongTensor on same device
         if isinstance(targets, int):
             targets = torch.tensor([targets], device=P.device, dtype=torch.long)
@@ -1330,6 +1353,35 @@ def make_transfer_loss(
         if lk == "nll":
             # IMPORTANT: do not clamp_min before log; it kills gradients when mass < eps.
             loss = -torch.log(mass + eps)
+        
+        
+        elif lk in ("robust_combo", "robust-combo", "robustcombo"):
+            # Differentiable combo objective for robust transport.
+            # Robustness should primarily come from disorder/noise during rollout;
+            # this loss just mixes stable terminal-mass objectives.
+
+            # Mix coefficient in [0,1]. Can be overridden per-run via aux.
+            alpha = float(aux.get("robust_combo_alpha", 0.5))
+            alpha = 0.0 if alpha < 0.0 else (1.0 if alpha > 1.0 else alpha)
+
+            loss_nll = -torch.log(mass + eps)  # (B,)
+            loss_prob = -mass                  # (B,)
+            loss = alpha * loss_nll + (1.0 - alpha) * loss_prob
+
+            # Optional: encourage higher-entropy position distribution (more spread),
+            # which can help under disorder. Default off.
+            beta_ent = float(aux.get("robust_entropy_beta", 0.0))
+            if beta_ent != 0.0:
+                ent = -(P * torch.log(P + eps)).sum(dim=-1)  # (B,)
+                loss = loss - beta_ent * ent  # subtract => reward entropy
+
+            # Optional: penalize peaky distributions (also helps robustness). Default off.
+            beta_l2 = float(aux.get("robust_l2_beta", 0.0))
+            if beta_l2 != 0.0:
+                loss = loss + beta_l2 * (P * P).sum(dim=-1)  # (B,)
+        
+        
+        
         elif lk in ("neg_prob", "negprob", "prob", "neg_success", "neg_success_t", "neg_success_terminal"):
             loss = -mass
         elif lk == "hinge":
@@ -1351,6 +1403,41 @@ def make_transfer_loss(
 
     return loss_builder
 
+def make_multi_disorder_trial_rollout(*, rollout_factory, pm, disorder_cfg, trials_per_episode: int):
+    dcfg = disorder_cfg or {}
+    K = max(1, int(trials_per_episode))
+
+    def _rollout(model, batch):
+        base_seed = int(batch.get("rng_seed", 0))
+        Ps = []
+        aux0 = None
+
+        for k in range(K):
+            seed = base_seed + k
+
+            # best-effort: build shift with disorder if supported
+            try:
+                shift_k = build_shift(pm, disorder=dcfg, disorder_seed=seed, seed=seed)
+            except TypeError:
+                shift_k = build_shift(pm)
+
+            rollout_k = rollout_factory(shift_k)
+            Pk, auxk = rollout_k(model, batch)
+
+            if aux0 is None:
+                aux0 = dict(auxk)
+            Ps.append(Pk)
+
+        if K == 1:
+            aux0["disorder_trials"] = 1
+            return Ps[0], aux0
+
+        trial_P = torch.stack(Ps, dim=1)  # (B,K,N)
+        aux0["trial_P"] = trial_P
+        aux0["disorder_trials"] = K
+        return trial_P.mean(dim=1), aux0
+
+    return _rollout
 
 
 def _mix_uniform(N: int, device, dtype=torch.float32) -> torch.Tensor:
