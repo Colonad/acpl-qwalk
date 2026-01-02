@@ -49,7 +49,7 @@ repro:
 # Dataset split protocol (grid sizes) + frozen evaluation manifests
 # -----------------------------------------------------------------------------
 data:
-  family: "grid-2d"
+  family: "grid"
 
   grid:
     boundary: "open"

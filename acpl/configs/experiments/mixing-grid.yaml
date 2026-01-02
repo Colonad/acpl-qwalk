@@ -53,7 +53,7 @@ repro:
 # 2) Data & split protocol (IID + OOD) for GRID-2D
 # -----------------------------------------------------------------------------
 data:
-  family: "grid-2d"
+  family: "grid"
 
   grid:
     boundary: "open"

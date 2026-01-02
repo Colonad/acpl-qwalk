@@ -879,6 +879,26 @@ def _resolve_builder(names: list[str]) -> Callable:
 
 def graph_from_config(data_cfg: dict, *, device, dtype) -> GraphData:
     family = data_cfg.get("family", data_cfg.get("graph", "line")).lower().strip()
+
+
+
+
+   # --- alias normalization (fixes config family names like 'grid-2d') ---
+    if family in ("grid-2d", "grid2d", "grid_2d"):
+        family = "grid"
+    # (optional but useful future-proofing)
+    elif family in ("hypercube",):
+        family = "cube"
+    elif family in ("d-regular", "d_regular"):
+        family = "regular"
+    elif family in ("erdos-renyi", "erdos_renyi"):
+        family = "er"
+    # ---------------------------------------------------------------------
+
+
+
+
+
     seed = int(data_cfg.get("seed", 1234))
 
     if family == "line":
