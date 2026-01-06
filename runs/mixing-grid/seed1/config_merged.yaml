@@ -1,0 +1,423 @@
+seed: 1
+device: cpu
+dtype: float32
+state_dtype: complex64
+data:
+  family: grid
+  N: 64
+  seed: 1234
+  directed: false
+  grid:
+    Lx: 8
+    Ly: 8
+    boundary: open
+    coords_normalize: true
+  regular:
+    d: 3
+  er:
+    p: 0.05
+  ws:
+    Lx: 8
+    Ly: 8
+    kx: 1
+    ky: 1
+    beta: 0.2
+    torus: false
+  train_sizes:
+    mode: fixed_list
+    fixed_list:
+    - 32
+    - 48
+    - 64
+    - 80
+    band:
+      L_min: 32
+      L_max: 80
+  val_sizes:
+    mode: fixed_list
+    fixed_list:
+    - 40
+    - 72
+  test_iid_sizes:
+    mode: fixed_list
+    fixed_list:
+    - 48
+    - 64
+  test_ood_sizes:
+    mode: fixed_list
+    fixed_list:
+    - 96
+    extra_optional:
+    - 112
+  batching:
+    episodes_per_graph: 1
+    graphs_per_batch_train: 2
+    graphs_per_batch_eval: 1
+    shuffle_train: true
+  manifests:
+    enabled: true
+    root_dir: acpl/data/manifests
+    val_manifest: mixing-grid-val.json
+    test_iid_manifest: mixing-grid-test-iid.json
+    test_ood_manifest: mixing-grid-test-ood.json
+    episodes:
+      val: 120
+      test_iid: 120
+      test_ood: 150
+    build:
+      seed: 1338
+      episode_seed_base: 910000
+      horizon_policy: per_horizon_manifest
+      per_horizon:
+        enabled: true
+        horizons:
+        - 64
+        - 96
+        - 128
+features:
+  use_degree: true
+  degree_onehot_K: 16
+  degree_log1p: false
+  degree_norm: inv_sqrt
+  use_coords: true
+  coords_normalize: true
+  use_indicator: false
+  use_lap_pe: true
+  lap_pe_k: 16
+  lap_pe_norm: sym
+  lap_pe_random_sign: true
+  use_rwse: true
+  rwse_K: 16
+  rwse_aggregation: diag
+  use_role_encodings: true
+  role_degree_bins_K: 8
+  role_include_leaf: true
+  role_include_hub: true
+  role_hub_percentile: 0.9
+  role_include_grid_boundary: true
+  use_bitstrings: false
+  build_arcs: false
+  eps: 1.0e-12
+  seed: 42
+  include_degree: true
+  coords:
+    enabled: true
+    normalize: true
+  laplacian_pe:
+    enabled: true
+    k: 16
+    sign_fix: max-abs-positive
+sim:
+  steps: 64
+  horizon_selection:
+    enabled: true
+    candidates:
+    - 64
+    - 96
+    - 128
+    choose_on_val: true
+    criterion_metric: mix/tv
+    tie_break: smaller_T
+  curriculum:
+    enabled: false
+    schedule:
+    - horizon_T: 64
+      epochs: 40
+    - horizon_T: 96
+      epochs: 40
+    - horizon_T: 128
+      epochs: 40
+  rollout:
+    check_unitarity: false
+    check_simplex_every: 0
+task:
+  name: mixing
+  target_index: 63
+  target_radius: 0
+  init_state: node0
+  use_indicator: false
+  objective: minimize TV(P_T, Uniform)
+  normalized_time_feature: true
+  grid:
+    boundary: periodic
+  loss:
+    kind: tv_to_uniform
+    uniform_target: per-graph
+    reduction: mean
+loss:
+  kind: nll
+  reduction: mean
+  normalize_prob: true
+  eps: 1.0e-08
+  margin: 0.0
+  cvar_alpha: 0.1
+  mix_kind: tv
+  mix_eps: 1.0e-12
+model:
+  gnn:
+    kind: gcn
+    hidden: 64
+    out: 64
+    dropout: 0.1
+    layers: 3
+    hidden_dim: 128
+    norm: graphnorm
+    residual: true
+  controller:
+    kind: gru
+    hidden: 64
+    layers: 1
+    dropout: 0.1
+    bidirectional: false
+    hidden_dim: 128
+    time_pe_dim: 32
+    normalized_time_feature: true
+  head:
+    hidden: 0
+    dropout: 0.0
+    layernorm: true
+    kind: mlp
+    hidden_dim: 0
+    activation: gelu
+  time_pe_dim: 32
+  time_pe_learned_scale: true
+  coin:
+    family: cayley
+    generators: full
+    theta_scale: 1.0
+    theta_noise_std: 0.0
+    clamp:
+      enabled: false
+coin:
+  family: exp
+  theta_scale: 1.0
+  theta_noise_std: 0.0
+  auto_fix_notes:
+    reason: su2 invalid for max-degree>2 graphs; auto-switched
+    from: su2
+    to: exp
+    graph_family: grid
+optim:
+  name: adamw
+  lr: 0.00025
+  weight_decay: 1.0e-05
+  betas:
+  - 0.9
+  - 0.999
+  grad_clip:
+    enabled: true
+    mode: norm
+    max_norm: 1.0
+  precision:
+    amp: true
+  scheduler:
+    kind: cosine_warmup
+    cosine_warmup:
+      warmup_steps: 1000
+      t_max: 8000
+      eta_min: 1.0e-05
+  eps: 1.0e-08
+  regularizers:
+    temporal_smoothness: 0.005
+    magnitude: 1.0e-05
+    spectral:
+      enabled: true
+      dct_weight: 0.0001
+      hf_bins: 0.5
+train:
+  epochs: 120
+  batch_size: 1
+  episodes_per_epoch: 200
+  verify_checkpoints: true
+  ci_n_seeds: 5
+  ci_episodes: 100
+  run_dir: runs/mixing-grid/seed1
+log:
+  backend: console
+  interval: 50
+  ci_bootstrap_samples: 1000
+  ci_alpha: 0.05
+  wandb:
+    enabled: false
+    project: acpl-qwalk
+    run_name: A6_line64_T64_gcn_gru_su2
+compile:
+  enabled: false
+  backend: aot_eager
+  force_inductor: false
+experiment:
+  name: mixing-grid
+  goal: fast mixing to uniform on 2D periodic grids
+  description: 'Pre-registered evaluation of Adaptive Coin Policy Learning (ACPL)
+    for fast mixing on 2D periodic lattice graphs. Primary metric is TV(P_T, Uniform).
+    Includes CI-style evaluation, baselines/ablations, OOD size generalization, and
+    interpretability artifacts (node embeddings + variance + spectra).
+
+    '
+  tags:
+  - mixing
+  - grid-2d
+  - periodic
+  - ood
+  - ablations
+  - baselines
+  - ci
+  - embeddings
+  notes: 'This is the grid-only mixing study. Irregular graphs are handled in a separate
+    manifest once the generator supports multi-family.
+
+    '
+defaults:
+  task_config: acpl/configs/task/mixing.yaml
+  optim_config: acpl/configs/optim.yaml
+repro:
+  master_seed: 1234
+  train_seeds:
+  - 0
+  - 1
+  - 2
+  eval_seeds:
+  - 301
+  - 302
+  - 303
+  - 401
+  - 402
+  deterministic_torch: true
+  cublas_workspace_config: :4096:8
+  pythonhashseed: 0
+  save_git_info: true
+  save_resolved_config: true
+training:
+  method: backprop
+  epochs: 120
+  steps_per_epoch: 400
+  accum_steps: 1
+  amp: true
+  device: cuda
+  log_every: 50
+  log_grad_norm_every: 200
+  ckpt:
+    dir: checkpoints/mixing-grid
+    keep_last: 5
+    save_every_steps: 2000
+    save_best_metric: eval/mix/tv
+comparisons:
+  baselines:
+  - name: fixed_grover_d4
+    enabled: true
+    description: Fixed Grover diffusion coin for degree-4 grid.
+  - name: fixed_random_unitary_d4
+    enabled: true
+    description: Seeded random fixed U(4) coin, sanity baseline.
+  - name: global_time_coin
+    enabled: true
+    description: "\u03B8(t) learned but shared across nodes."
+  - name: node_only_coin
+    enabled: true
+    description: "\u03B8(v) learned but constant over time."
+  - name: fixed_identity_coin
+    enabled: false
+    description: Identity coin baseline (often weak, optional).
+  ablations:
+  - name: no_coords
+    enabled: true
+    description: Disable coordinate features.
+  - name: no_lappe
+    enabled: true
+    description: Disable Laplacian PE.
+  - name: globalcoin
+    enabled: true
+    description: "Force \u03B8(v,t)=\u03B8(t)."
+  - name: timefrozen
+    enabled: true
+    description: "Force \u03B8(v,t)=\u03B8(v)."
+  - name: nodepermute
+    enabled: true
+    description: Permutation equivariance sanity check.
+eval:
+  enabled: true
+  ci:
+    alpha: 0.1
+    n_eval_seeds: 5
+    episodes_per_seed:
+      val: 80
+      test_iid: 80
+      test_ood: 100
+    method: bootstrap
+    bootstrap:
+      n_resamples: 2000
+      block_by: episode
+  metrics:
+  - mix/tv
+  - mix/js
+  - mix/hell
+  - mix/l2
+  - mix/H
+  - mix/kl_pu
+  robustness:
+    enabled: true
+    edge_phase:
+      sigma_grid:
+      - 0.0
+      - 0.02
+      - 0.05
+      - 0.1
+      trials: 6
+  artifacts:
+    write_dir: eval
+    write_ci: true
+    write_per_seed: true
+    write_tables: true
+    write_json: true
+    stats:
+      enabled: true
+      quantiles:
+      - 0.05
+      - 0.25
+      - 0.5
+      - 0.75
+      - 0.95
+      include_probability_checks: true
+      include_time_series: true
+    embeddings:
+      enabled: true
+      source: gnn
+      aggregate_time: last
+      max_nodes_for_plot: 1024
+      pca:
+        enabled: true
+        n_components: 2
+      color_by:
+      - coord_x
+      - coord_y
+      - degree
+      save:
+        raw_pt: true
+        raw_csv: true
+        pca_csv: true
+        pca_png: true
+        stats_json: true
+    plots:
+      enabled: true
+      tv_curve: true
+      final_distribution: true
+      theta_spectra: true
+success_criteria:
+  tv_threshold:
+    metric: mix/tv
+    split: test_ood
+    threshold: 0.05
+    horizon_max: 128
+  ci_improvement:
+    metric: mix/tv
+    split: test_ood
+    min_abs_improvement: 0.01
+compute:
+  device: auto
+  dtype:
+    encoder: float32
+    state: complex128
+  amp: true
+  wallclock_hours: 10
+  max_memory_gb: 20
+  track_throughput: true

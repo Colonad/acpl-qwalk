@@ -37,7 +37,7 @@ if [[ -z "${BASE_CFG:-}" ]]; then
 fi
 
 # Training seeds (space-separated)
-TRAIN_SEEDS_STR="${TRAIN_SEEDS:-0 1 2 3 4}"
+TRAIN_SEEDS_STR="${TRAIN_SEEDS:-0 1 2}"
 # allow commas in TRAIN_SEEDS, e.g. "0 1 2,3,4"
 TRAIN_SEEDS_STR="${TRAIN_SEEDS_STR//,/ }"
 
