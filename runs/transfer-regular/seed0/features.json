@@ -1,0 +1,63 @@
+{
+  "manifest_hex": "f7752e936c0b9d77e46ec67e0d492a33",
+  "use_indicator": false,
+  "base_dim": 64,
+  "in_dim": 64,
+  "feature_index": {
+    "deg_norm": [
+      0,
+      1
+    ],
+    "deg_onehot": [
+      1,
+      18
+    ],
+    "coords": [
+      18,
+      19
+    ],
+    "lap_pe": [
+      19,
+      35
+    ],
+    "rwse": [
+      35,
+      51
+    ],
+    "roles": [
+      51,
+      64
+    ]
+  },
+  "feature_spec": {
+    "use_degree": true,
+    "degree_norm": "inv_sqrt",
+    "degree_onehot_K": 16,
+    "use_coords": true,
+    "use_sinusoidal_coords": false,
+    "sinusoidal_dims": 0,
+    "sinusoidal_base": 10000.0,
+    "use_lap_pe": true,
+    "lap_pe_k": 16,
+    "lap_pe_norm": "sym",
+    "lap_pe_random_sign": true,
+    "use_rwse": true,
+    "rwse_K": 16,
+    "rwse_aggregation": "diag",
+    "use_role_encodings": true,
+    "role_degree_bins_K": 8,
+    "role_include_leaf": true,
+    "role_include_hub": true,
+    "role_hub_percentile": 0.9,
+    "role_include_grid_boundary": true,
+    "use_bitstrings": false,
+    "bitstrings_center": "none",
+    "bitstrings_append_hamming": true,
+    "build_arcs": false,
+    "arc_use_direction": true,
+    "arc_use_distance": true,
+    "arc_use_angle2d": true,
+    "eps": 1e-12,
+    "seed": 42
+  }
+}
