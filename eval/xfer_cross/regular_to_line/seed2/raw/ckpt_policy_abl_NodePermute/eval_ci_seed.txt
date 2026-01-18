@@ -1,0 +1,16 @@
+Seed-level CI (replicates = seeds; values = per-seed episode means)
+method=student_t alpha=0.05 n_seeds=10
+mix.tv: mean=0.22272 lo=0.22272 hi=0.22272 stderr=0 n=10
+mix.js: mean=0.0392186 lo=0.0392186 hi=0.0392186 stderr=0 n=10
+mix.hell: mean=0.20224 lo=0.20224 hi=0.20224 stderr=0 n=10
+mix.l2: mean=0.0686338 lo=0.0686338 hi=0.0686338 stderr=0 n=10
+mix.H: mean=4.00801 lo=4.00801 hi=4.00801 stderr=0 n=10
+mix.kl_pu: mean=0.150868 lo=0.150868 hi=0.150868 stderr=0 n=10
+target.success: mean=0.0106263 lo=0.0106263 hi=0.0106263 stderr=0 n=10
+target.maxp: mean=0.0403572 lo=0.0403572 hi=0.0403572 stderr=0 n=10
+target.gini: mean=0.301597 lo=0.301597 hi=0.301597 stderr=0 n=10
+target.tv_vsU: mean=0.22272 lo=0.22272 hi=0.22272 stderr=0 n=10
+target.js_vsU: mean=0.0392186 lo=0.0392186 hi=0.0392186 stderr=0 n=10
+target.H: mean=4.00801 lo=4.00801 hi=4.00801 stderr=0 n=10
+target.KLpU: mean=0.150868 lo=0.150868 hi=0.150868 stderr=0 n=10
+target.cvar_neglogOmega: mean=4.54443 lo=4.54443 hi=4.54443 stderr=0 n=10

@@ -132,7 +132,9 @@ def _write_json(path: Path, obj: Any) -> None:
 def _sanitize(s: str) -> str:
     s = (s or "").strip()
     s = re.sub(r"[^a-zA-Z0-9._-]+", "_", s)
-    s = re.sub(r"__+", "_", s).strip("_")
+    # IMPORTANT: do NOT collapse repeated underscores.
+    # eval/evaldir condition tokens may intentionally use "__" separators.
+    s = s.strip("_")
     return s or "x"
 
 
@@ -1125,7 +1127,7 @@ def bundle_figures_for_evaldir(
             cond_safe_guess = parsed.cond_safe
             cond = "_ALL_"
             if cond_safe_guess != "_ALL_":
-                cond = safe_map.get(cond_safe_guess, cond_safe_guess)
+                cond = safe_map.get(cond_safe_guess) or safe_map.get(_sanitize(cond_safe_guess)) or cond_safe_guess
 
             kind = parsed.kind
             tags = list(parsed.tags)

@@ -3660,6 +3660,234 @@ def _write_csv(rows: list[Mapping[str, Any]], out_csv: Path) -> None:
     out_csv.write_text(buf.getvalue())
 
 
+# ------------------------------ Feature wiring --------------------------------
+
+
+def _infer_in_dim_from_state_dict(sd: Mapping[str, Any] | None) -> tuple[int | None, str | None]:
+    """Best-effort infer the policy input feature dimension from a checkpoint state_dict.
+
+    We primarily look for the first GNN layer weight (GCNConv stores as *.lin.weight).
+    Returns (in_dim, key_used).
+    """
+    if not isinstance(sd, Mapping) or not sd:
+        return None, None
+
+    # Common exact keys (most reliable)
+    exact = (
+        "encoder.gcn1.lin.weight",
+        "encoder.gcn1.weight",
+        "gcn1.lin.weight",
+        "gcn1.weight",
+        "gnn.gcn1.lin.weight",
+        "gnn.gcn1.weight",
+    )
+    for k in exact:
+        v = sd.get(k, None)
+        if isinstance(v, torch.Tensor) and v.ndim == 2:
+            return int(v.shape[1]), k
+
+    # Fallback heuristic search
+    for k, v in sd.items():
+        if not (isinstance(v, torch.Tensor) and v.ndim == 2):
+            continue
+        lk = str(k).lower()
+        if ("gcn1" in lk or "conv1" in lk or "layer0" in lk) and lk.endswith("weight"):
+            return int(v.shape[1]), str(k)
+        if "gcn1" in lk and "lin.weight" in lk:
+            return int(v.shape[1]), str(k)
+
+    return None, None
+
+
+def _parse_feature_spec_from_cfg(cfg: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Extract a FeatureSpec-like dict from cfg.
+
+    Accepts either:
+      - cfg['features'] as a flat dict of FeatureSpec fields
+      - cfg['features']['node'] as a nested dict
+      - cfg['data']['features'] or cfg['data']['feature_spec']
+    """
+    if not isinstance(cfg, dict):
+        return None
+
+    cands = []
+    for path in (
+        ("features",),
+        ("feature_spec",),
+        ("data", "features"),
+        ("data", "feature_spec"),
+    ):
+        cur: Any = cfg
+        ok = True
+        for p in path:
+            if not isinstance(cur, dict) or p not in cur:
+                ok = False
+                break
+            cur = cur[p]
+        if ok and isinstance(cur, dict):
+            cands.append(cur)
+
+    # Prefer the first non-empty candidate
+    fs = None
+    for c in cands:
+        if isinstance(c, dict) and len(c) > 0:
+            fs = c
+            break
+    if fs is None:
+        return None
+
+    # Allow nesting under "node"
+    if isinstance(fs.get("node", None), dict):
+        fs = fs["node"]
+
+    if not isinstance(fs, dict) or not fs:
+        return None
+    return dict(fs)
+
+
+def _get_graph_coords_for_features(
+    *,
+    data_cfg: dict[str, Any],
+    g: Any,
+    N: int,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    """Return coords tensor (N,C) for feature construction.
+
+    - Uses g.coords/g.pos if present.
+    - Falls back to a 1D normalized coordinate for line/cycle.
+    - Otherwise returns an empty (N,0) tensor.
+    """
+    coords = None
+    for attr in ("coords", "pos", "positions"):
+        v = getattr(g, attr, None)
+        if isinstance(v, torch.Tensor) and v.ndim == 2 and int(v.shape[0]) == int(N):
+            coords = v
+            break
+
+    if coords is None or coords.numel() == 0:
+        fam = str(data_cfg.get("family", data_cfg.get("graph", ""))).lower().strip()
+        if fam in ("line", "cycle"):
+            coords = torch.arange(N, device=device, dtype=dtype).unsqueeze(1) / max(N - 1, 1)
+        else:
+            coords = torch.zeros(N, 0, device=device, dtype=dtype)
+    else:
+        coords = coords.to(device=device, dtype=dtype)
+
+    return coords
+
+
+def _build_node_features_for_eval(
+    *,
+    cfg: dict[str, Any],
+    data_cfg: dict[str, Any],
+    g: Any,
+    pm: Any,
+    device: torch.device,
+    dtype: torch.dtype,
+    base_target_dim: int | None,
+) -> tuple[torch.Tensor, dict[str, Any]]:
+    """Build base node features X to match training as closely as possible.
+
+    If cfg contains a FeatureSpec-like block, we use it via acpl.data.features.build_node_features.
+    Otherwise we fall back to a sensible default and (optionally) auto-enable LapPE to match
+    base_target_dim inferred from the checkpoint.
+
+    Returns (X, meta) where meta contains debug info (spec_used, index_map, etc.).
+    """
+    N = int(getattr(g, "N", getattr(g, "num_nodes", 0) or 0) or 0)
+    if N <= 0:
+        N = int(getattr(g, "edge_index", torch.empty(2, 0)).max().item() + 1) if hasattr(g, "edge_index") else 0
+    N = int(N)
+
+    # degrees as integer counts
+    deg_int = (pm.node_ptr[1:] - pm.node_ptr[:-1]).to(device=device, dtype=torch.long)
+
+    coords = _get_graph_coords_for_features(data_cfg=data_cfg, g=g, N=N, device=device, dtype=dtype)
+    edge_index = getattr(g, "edge_index", None)
+    if not isinstance(edge_index, torch.Tensor):
+        raise RuntimeError("Graph object is missing a tensor edge_index.")
+    edge_index = edge_index.to(device=device)
+
+    meta: dict[str, Any] = {"base_target_dim": base_target_dim}
+
+    # Try to use the repo feature builder (preferred)
+    try:
+        from acpl.data.features import FeatureSpec, build_node_features
+
+        fs_cfg = _parse_feature_spec_from_cfg(cfg)
+        spec = FeatureSpec()
+        if isinstance(fs_cfg, dict) and fs_cfg:
+            # Filter unknown keys
+            allowed = set(getattr(FeatureSpec, "__dataclass_fields__", {}).keys())
+            filt = {k: v for k, v in fs_cfg.items() if k in allowed}
+            try:
+                spec = FeatureSpec(**filt)
+            except Exception:
+                # keep defaults
+                spec = FeatureSpec()
+
+        # Ensure deterministic seed wiring unless user explicitly disables
+        if getattr(spec, "seed", None) is None:
+            try:
+                spec.seed = int(cfg.get("seed", 0))
+            except Exception:
+                pass
+
+        # Auto LapPE to match checkpoint dim if cfg doesn't specify features
+        if base_target_dim is not None and not fs_cfg:
+            # Default layout: deg_norm (1) + coords (C) + LapPE (k)
+            base_now = 0
+            if spec.use_degree:
+                base_now += 1
+                if getattr(spec, "degree_onehot_K", 0) > 0:
+                    base_now += int(spec.degree_onehot_K) + 1
+            if spec.use_coords and coords.numel() > 0:
+                base_now += int(coords.shape[1])
+
+            need = int(base_target_dim - base_now)
+            if need > 0:
+                # Prefer LapPE since it is what most runs used; clamp to N
+                spec.use_lap_pe = True
+                spec.lap_pe_k = int(min(need, N))
+
+        X, idx_map = build_node_features(
+            edge_index=edge_index,
+            degrees=deg_int,
+            coords=coords,
+            spec=spec,
+            device=device,
+        )
+        meta.update(
+            {
+                "spec_used": getattr(spec, "__dict__", {}),
+                "index_map": idx_map,
+                "coords_dim": int(coords.shape[1]) if coords is not None else 0,
+            }
+        )
+    except Exception as e:
+        # Minimal, dependency-free fallback (degree + 1D coord)
+        meta["feature_builder_fallback"] = f"{type(e).__name__}: {e}"
+        deg_feat = deg_int.to(dtype=dtype).unsqueeze(1)
+        coord1 = torch.arange(N, device=device, dtype=dtype).unsqueeze(1) / max(N - 1, 1)
+        X = torch.cat([deg_feat, coord1], dim=1)
+
+    # Enforce target dim if provided
+    if base_target_dim is not None and int(X.shape[1]) != int(base_target_dim):
+        cur = int(X.shape[1])
+        tgt = int(base_target_dim)
+        if cur < tgt:
+            pad = torch.zeros(N, tgt - cur, device=X.device, dtype=X.dtype)
+            X = torch.cat([X, pad], dim=1)
+            meta["dim_adjust"] = {"kind": "pad", "from": cur, "to": tgt}
+        else:
+            X = X[:, :tgt]
+            meta["dim_adjust"] = {"kind": "slice", "from": cur, "to": tgt}
+
+    return X.to(device=device, dtype=dtype), meta
+
+
 
 
 
@@ -3939,12 +4167,60 @@ def run_eval(
         else:
             T = int(task_cfg.get("horizon_T", steps_val))
 
-        # --- node features X (match train.py: degree + coord1) ---
-        N = int(g.N)
-        deg_out = (pm.node_ptr[1:] - pm.node_ptr[:-1]).to(device=torch_device, dtype=dtype)
-        deg_feat = deg_out.unsqueeze(1)
-        coord1 = torch.arange(N, device=torch_device, dtype=dtype).unsqueeze(1) / max(N - 1, 1)
-        X = torch.cat([deg_feat, coord1], dim=1)  # (N,2)
+        # Whether episodes append an indicator channel.
+        #
+        # IMPORTANT:
+        #   - Search episodes use MarkedGraphEpisodeDataset which *always* appends a single
+        #     mark/indicator channel to X. We must always account for that channel here,
+        #     otherwise older checkpoints (trained with a smaller base feature dim) will crash.
+        #   - Robust episodes may append a target-indicator depending on config.
+        if is_search:
+            use_indicator = True
+        elif is_robust:
+            use_indicator = bool(task_cfg.get("use_indicator", True))
+        else:
+            use_indicator = bool(task_cfg.get("use_indicator", False))
+        # --------------------------- build policy (ckpt vs baseline) ---------------------------
+        policy = (policy or "ckpt").lower().strip()
+        baseline_coins_kwargs = dict(baseline_coins_kwargs or {})
+        baseline_policy_kwargs = dict(baseline_policy_kwargs or {})
+
+        # Pull checkpoint state_dict early so we can match input feature dims.
+        sd = None
+        ckpt_in_dim = None
+        ckpt_in_key = None
+        if policy != "baseline":
+            sd = ckpt.get("state_dict", None)
+            if sd is None and isinstance(ckpt.get("model", None), Mapping):
+                # some saves store the raw state_dict under "model"
+                sd = ckpt["model"]
+            if isinstance(sd, Mapping):
+                ckpt_in_dim, ckpt_in_key = _infer_in_dim_from_state_dict(sd)
+
+        # --- node features X (match training config; auto-infer if missing) ---
+        N = int(getattr(g, "N", getattr(g, "num_nodes", 0) or 0) or 0)
+        indicator_extra = 1 if use_indicator else 0
+        base_target_dim = None
+        if ckpt_in_dim is not None:
+            base_target_dim = max(int(ckpt_in_dim) - int(indicator_extra), 0)
+
+        X, X_meta = _build_node_features_for_eval(
+            cfg=cfg,
+            data_cfg=data_cfg,
+            g=g,
+            pm=pm,
+            device=torch_device,
+            dtype=dtype,
+            base_target_dim=base_target_dim,
+        )
+        if ckpt_in_dim is not None:
+            got = int(X.shape[1]) + int(indicator_extra)
+            if got != int(ckpt_in_dim):
+                print(
+                    f"[warn] feature dim mismatch after build: X={int(X.shape[1])} + indicator={indicator_extra} -> {got}, "
+                    f"but ckpt expects {int(ckpt_in_dim)} (from {ckpt_in_key}); will still set model.in_dim={int(ckpt_in_dim)}.",
+                    file=sys.stderr,
+                )
 
         # --- build model exactly like train.py ---
         model_cfg = cfg.get("model", {}) or {}
@@ -3964,8 +4240,9 @@ def run_eval(
         if coin_family in ("exp", "cayley"):
             head_layernorm = False
 
-        use_indicator = bool(task_cfg.get("use_indicator", is_search or is_robust))
-        in_dim = 3 if use_indicator else 2
+        # IMPORTANT: model input dim must match the checkpoint.
+        # X is the *base* feature matrix; indicator (if used) is appended per-episode by the dataset.
+        in_dim = int(ckpt_in_dim) if ckpt_in_dim is not None else (int(X.shape[1]) + (1 if use_indicator else 0))
 
         acpl_cfg = th.ACPLPolicyConfig(
             in_dim=in_dim,
@@ -3990,11 +4267,6 @@ def run_eval(
             head_dropout=float(head_cfg.get("dropout", 0.0)),
         )
 
-        # --------------------------- build policy (ckpt vs baseline) ---------------------------
-        policy = (policy or "ckpt").lower().strip()
-        baseline_coins_kwargs = dict(baseline_coins_kwargs or {})
-        baseline_policy_kwargs = dict(baseline_policy_kwargs or {})
-
         if policy == "baseline":
             try:
                 from acpl.baselines.policies import build_baseline_policy as _build_baseline_policy
@@ -4016,11 +4288,6 @@ def run_eval(
             model = th.ACPLPolicy(acpl_cfg).to(device=torch_device).eval()
 
             # ---- load weights (CRITICAL) ----
-            sd = ckpt.get("state_dict", None)
-            if sd is None and isinstance(ckpt.get("model", None), Mapping):
-                # some saves store the raw state_dict under "model"
-                sd = ckpt["model"]
-
             if isinstance(sd, Mapping):
                 try:
                     model.load_state_dict(_normalize_state_dict_keys(sd), strict=False)
@@ -4109,7 +4376,7 @@ def run_eval(
         elif is_robust:
             targets_per_episode = int(task_cfg.get("targets_per_episode", 1))
             random_start = bool(task_cfg.get("random_start", True))
-            append_indicator = bool(task_cfg.get("use_indicator", True))
+            append_indicator = bool(use_indicator)
             payload = {
                 "X": X,  # base (N,2); dataset may append target indicator -> (N,3)
                 "edge_index": g.edge_index,
@@ -4528,8 +4795,10 @@ def run_eval(
 
             # --- NEW: seed-level CI (replicates = seeds), saved separately ---
             seed_ci_payload: dict[str, Any] = {}
+            seed_ci_lines: list[str] = []
+            
             seed_ci_text = ""
-            if compute_ci is not None and bool(eval_cfg.keep_per_seed_means) and len(seed_list) >= 2:
+            if bool(eval_cfg.keep_per_seed_means) and len(seed_list) >= 2:
                 for metric, vv in results.items():
                     if not (isinstance(vv, dict) and "all" in vv):
                         continue
@@ -4563,16 +4832,26 @@ def run_eval(
                             sd = math.sqrt(max(var, 0.0))
                             se = sd / math.sqrt(n)
                             tc = _tcrit_95_or_normal(n - 1, alpha)
-                            return {"mean": mu, "lo": mu - tc * se, "hi": mu + tc * se, "stderr": se, "n": float(n)}
+                            return {"mean": mu, "lo": mu - tc * se, "hi": mu + tc * se, "stderr": se, "n": int(n)}
 
-                        seed_ci_payload[str(metric)] = _ci_to_dict(ci_seed)
-
+                        ci_seed = _seed_level_t_ci(seed_means, alpha=eval_cfg.ci_alpha)
+                        if ci_seed is not None:
+                            seed_ci_payload[str(metric)] = ci_seed
+                            seed_ci_lines.append(
+                                f"{metric}: mean={ci_seed['mean']:.6g} lo={ci_seed['lo']:.6g} hi={ci_seed['hi']:.6g} stderr={ci_seed['stderr']:.6g} n={int(ci_seed['n'])}"
+                            )
                 if seed_ci_payload:
                     (tag_dir / "eval_ci_seed.json").write_text(_json_dump(seed_ci_payload), encoding="utf-8")
                     seed_ci_text = (
                         "Seed-level CI (replicates = seeds; values = per-seed episode means)\n"
                         f"method=student_t alpha={eval_cfg.ci_alpha} n_seeds={len(seed_list)}\n"
                     )
+
+
+                    if seed_ci_lines:
+                        seed_ci_text += "\n".join(seed_ci_lines) + "\n"
+
+
                     (tag_dir / "eval_ci_seed.txt").write_text(seed_ci_text, encoding="utf-8")
 
             if logger is not None:
@@ -5920,6 +6199,7 @@ def main(argv: list[str] | None = None) -> int:
 
     run_kwargs = dict(
         ckpt_path=ckpt_path,
+        config_path=config_path,
         outdir=outdir,
         suite=args.suite,
         device=args.device,

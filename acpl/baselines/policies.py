@@ -453,6 +453,56 @@ class BaselinePolicy(nn.Module):
 
         return theta
 
+
+
+
+    @torch.no_grad()
+    def coins_su2(
+        self,
+        X: Tensor,
+        edge_index: Tensor,
+        *,
+        T: int,
+        edge_weight: Tensor | None = None,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Return explicit SU(2) coin matrices for baseline compatibility.
+
+        Learned policies expose model.coins_su2(...). The shared rollout_fn
+        (imported from scripts/train.py) calls that method directly, so the
+        baseline wrapper must implement it as well.
+
+        Returns:
+            coins: (T, N, 2, 2) complex tensor
+        """
+        theta_or_U = self.forward(
+            X,
+            edge_index,
+            T=T,
+            edge_weight=edge_weight,
+            **kwargs,
+        )
+
+        # If the schedule already returned matrices, accept them.
+        if (
+            isinstance(theta_or_U, torch.Tensor)
+            and theta_or_U.ndim == 4
+            and tuple(theta_or_U.shape[-2:]) == (2, 2)
+        ):
+            return theta_or_U if theta_or_U.is_complex() else theta_or_U.to(dtype=torch.complex64)
+
+        # Otherwise, interpret as ZYZ angles (...,3).
+        if not isinstance(theta_or_U, torch.Tensor) or theta_or_U.shape[-1] != 3:
+            raise ValueError(
+                f"BaselinePolicy.coins_su2 expected theta (...,3) or U (...,2,2); got {getattr(theta_or_U, 'shape', None)}"
+            )
+
+        from acpl.baselines.coins import su2_from_zyz
+        return su2_from_zyz(theta_or_U)
+
+
+
+
     def extra_repr(self) -> str:
         return (
             f"name={self.cfg.name}, strict_theta_shape={self.cfg.strict_theta_shape}, "

@@ -1,0 +1,91 @@
+EVAL STATS (first-class artifacts)
+
+UTC: 2026-01-11T14:52:13Z
+Python: 3.11.9 (main, Apr 19 2024, 16:48:06) [GCC 11.2.0]
+Torch: 2.4.1+cu121 CUDA_avail=False
+
+[ckpt_policy]
+  Metrics:
+    - mix.tv: 0.9225649833679199
+    - mix.js: 0.565868079662323
+    - mix.hell: 0.8595505356788635
+    - mix.l2: 0.565543532371521
+    - mix.H: 1.2437330484390259
+    - mix.kl_pu: 2.915172576904297
+    - target.success: 0.0
+    - target.maxp: 0.39511582255363464
+    - target.gini: 0.9560631513595581
+    - target.tv_vsU: 0.9225649833679199
+    - target.js_vsU: 0.565868079662323
+    - target.H: 1.2437330484390259
+    - target.KLpU: 2.915172576904297
+    - target.cvar_neglogOmega: 18.42068099975586
+
+[ckpt_policy__abl_NoPE]
+  Metrics:
+    - mix.tv: 0.8509705662727356
+    - mix.js: 0.49796509742736816
+    - mix.hell: 0.806810200214386
+    - mix.l2: 0.46017616987228394
+    - mix.H: 1.7902123928070068
+    - mix.kl_pu: 2.36869215965271
+    - target.success: 0.0
+    - target.maxp: 0.37315985560417175
+    - target.gini: 0.927737832069397
+    - target.tv_vsU: 0.8509705662727356
+    - target.js_vsU: 0.49796509742736816
+    - target.H: 1.7902123928070068
+    - target.KLpU: 2.36869215965271
+    - target.cvar_neglogOmega: 18.42068099975586
+
+[ckpt_policy__abl_GlobalCoin]
+  Metrics:
+    - mix.tv: 0.9225649833679199
+    - mix.js: 0.565868079662323
+    - mix.hell: 0.8595505356788635
+    - mix.l2: 0.565543532371521
+    - mix.H: 1.2437330484390259
+    - mix.kl_pu: 2.915172576904297
+    - target.success: 0.0
+    - target.maxp: 0.39511582255363464
+    - target.gini: 0.9560631513595581
+    - target.tv_vsU: 0.9225649833679199
+    - target.js_vsU: 0.565868079662323
+    - target.H: 1.2437330484390259
+    - target.KLpU: 2.915172576904297
+    - target.cvar_neglogOmega: 18.42068099975586
+
+[ckpt_policy__abl_TimeFrozen]
+  Metrics:
+    - mix.tv: 0.9225649833679199
+    - mix.js: 0.565868079662323
+    - mix.hell: 0.8595505356788635
+    - mix.l2: 0.565543532371521
+    - mix.H: 1.2437330484390259
+    - mix.kl_pu: 2.915172576904297
+    - target.success: 0.0
+    - target.maxp: 0.39511582255363464
+    - target.gini: 0.9560631513595581
+    - target.tv_vsU: 0.9225649833679199
+    - target.js_vsU: 0.565868079662323
+    - target.H: 1.2437330484390259
+    - target.KLpU: 2.915172576904297
+    - target.cvar_neglogOmega: 18.42068099975586
+
+[ckpt_policy__abl_NodePermute]
+  Metrics:
+    - mix.tv: 0.913374125957489
+    - mix.js: 0.5584781169891357
+    - mix.hell: 0.8537029027938843
+    - mix.l2: 0.5448610782623291
+    - mix.H: 1.3366286754608154
+    - mix.kl_pu: 2.8222765922546387
+    - target.success: 1.0127432046487117e-25
+    - target.maxp: 0.45028769969940186
+    - target.gini: 0.9539503455162048
+    - target.tv_vsU: 0.913374125957489
+    - target.js_vsU: 0.5584781169891357
+    - target.H: 1.3366286754608154
+    - target.KLpU: 2.8222765922546387
+    - target.cvar_neglogOmega: 18.42068099975586
+

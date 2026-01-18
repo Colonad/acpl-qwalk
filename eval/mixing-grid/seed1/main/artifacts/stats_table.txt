@@ -1,0 +1,51 @@
+EVAL STATS (first-class artifacts)
+
+UTC: 2026-01-10T09:05:15Z
+Python: 3.11.9 (main, Apr 19 2024, 16:48:06) [GCC 11.2.0]
+Torch: 2.4.1+cu121 CUDA_avail=False
+
+[ckpt_policy]
+  Metrics:
+    - mix.tv: 0.5986020565032959
+    - mix.js: 0.28541651368141174
+    - mix.hell: 0.6065647602081299
+    - mix.l2: 0.20697031915187836
+    - mix.H: 3.0728919506073
+    - mix.kl_pu: 1.0860044956207275
+
+[ckpt_policy__abl_NoPE]
+  Metrics:
+    - mix.tv: 0.5391840934753418
+    - mix.js: 0.24110431969165802
+    - mix.hell: 0.565218985080719
+    - mix.l2: 0.15383616089820862
+    - mix.H: 3.3275370597839355
+    - mix.kl_pu: 0.831359326839447
+
+[ckpt_policy__abl_GlobalCoin]
+  Metrics:
+    - mix.tv: 0.5417512059211731
+    - mix.js: 0.25295835733413696
+    - mix.hell: 0.5768029093742371
+    - mix.l2: 0.1757909059524536
+    - mix.H: 3.244577407836914
+    - mix.kl_pu: 0.9143189787864685
+
+[ckpt_policy__abl_TimeFrozen]
+  Metrics:
+    - mix.tv: 0.6780295968055725
+    - mix.js: 0.3347263038158417
+    - mix.hell: 0.6511560082435608
+    - mix.l2: 0.2667631506919861
+    - mix.H: 2.7758405208587646
+    - mix.kl_pu: 1.3830559253692627
+
+[ckpt_policy__abl_NodePermute]
+  Metrics:
+    - mix.tv: 0.5465779900550842
+    - mix.js: 0.26284900307655334
+    - mix.hell: 0.5869118571281433
+    - mix.l2: 0.20189005136489868
+    - mix.H: 3.1654114723205566
+    - mix.kl_pu: 0.9934850931167603
+

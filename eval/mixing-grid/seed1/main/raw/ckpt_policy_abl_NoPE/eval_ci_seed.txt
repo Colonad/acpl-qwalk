@@ -1,0 +1,8 @@
+Seed-level CI (replicates = seeds; values = per-seed episode means)
+method=student_t alpha=0.05 n_seeds=10
+mix.tv: mean=0.539184 lo=0.539184 hi=0.539184 stderr=0 n=10
+mix.js: mean=0.241104 lo=0.241104 hi=0.241104 stderr=0 n=10
+mix.hell: mean=0.565219 lo=0.565219 hi=0.565219 stderr=0 n=10
+mix.l2: mean=0.153836 lo=0.153836 hi=0.153836 stderr=0 n=10
+mix.H: mean=3.32754 lo=3.32754 hi=3.32754 stderr=0 n=10
+mix.kl_pu: mean=0.831359 lo=0.831359 hi=0.831359 stderr=0 n=10

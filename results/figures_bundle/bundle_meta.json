@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "scripts/make_figures.py",
+    "--root",
+    "eval",
+    "--outdir",
+    "results/figures_bundle",
+    "--layout",
+    "by_kind",
+    "--write-tex",
+    "--include-embeddings"
+  ],
+  "counts": {
+    "entries": 323,
+    "errors": 0,
+    "evaldirs": 59
+  },
+  "cwd": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk",
+  "errors": [],
+  "figures_root": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/results/figures_bundle/figures",
+  "generated_at": "2026-01-15T22:32:19Z",
+  "git": {
+    "branch": "main",
+    "describe": "428e1fc-dirty",
+    "dirty": true,
+    "head": "428e1fc4e060587e57b13e7a9cb4b4c0d322683a"
+  },
+  "include_embeddings": true,
+  "layout": "by_kind",
+  "mode": "copy",
+  "outdir": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/results/figures_bundle",
+  "schema": "acpl.make_figures.v1"
+}

@@ -5,7 +5,7 @@ set -euo pipefail
 RUNS_ROOT="${RUNS_ROOT:-runs}"
 EVAL_ROOT="${EVAL_ROOT:-eval}"
 
-DEVICE="${DEVICE:-cuda}"        # or cpu; eval.py also has auto if you pass nothing
+DEVICE="${DEVICE:-cpu}"        # or cpu; eval.py also has auto if you pass nothing
 EVAL_SEEDS="${EVAL_SEEDS:-10}"  # CI seeds in eval.py (0..EVAL_SEEDS-1)
 EPISODES="${EPISODES:-256}"
 

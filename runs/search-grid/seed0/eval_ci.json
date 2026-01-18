@@ -1,0 +1,138 @@
+{
+  "mix.tv": {
+<<<<<<< HEAD:runs/mixing-grid/seed0/eval_ci.json
+    "mean": 0.5326706171035767,
+    "lo": 0.5326706171035767,
+    "hi": 0.5326706171035767,
+=======
+    "mean": 0.5326703190803528,
+    "lo": 0.5326703190803528,
+    "hi": 0.5326703190803528,
+>>>>>>> 21d3ccf (Uploading training results.):runs/search-grid/seed0/eval_ci.json
+    "stderr": 0.0,
+    "n": 500
+  },
+  "mix.js": {
+<<<<<<< HEAD:runs/mixing-grid/seed0/eval_ci.json
+    "mean": 0.24169306457042694,
+    "lo": 0.24169306457042694,
+    "hi": 0.24169306457042694,
+=======
+    "mean": 0.24169301986694336,
+    "lo": 0.24169301986694336,
+    "hi": 0.24169301986694336,
+>>>>>>> 21d3ccf (Uploading training results.):runs/search-grid/seed0/eval_ci.json
+    "stderr": 0.0,
+    "n": 500
+  },
+  "mix.hell": {
+<<<<<<< HEAD:runs/mixing-grid/seed0/eval_ci.json
+    "mean": 0.5660168528556824,
+    "lo": 0.5660168528556824,
+    "hi": 0.5660168528556824,
+=======
+    "mean": 0.566016674041748,
+    "lo": 0.566016674041748,
+    "hi": 0.566016674041748,
+>>>>>>> 21d3ccf (Uploading training results.):runs/search-grid/seed0/eval_ci.json
+    "stderr": 0.0,
+    "n": 500
+  },
+  "mix.l2": {
+<<<<<<< HEAD:runs/mixing-grid/seed0/eval_ci.json
+    "mean": 0.15867677330970764,
+    "lo": 0.15867677330970764,
+    "hi": 0.15867677330970764,
+=======
+    "mean": 0.1586766541004181,
+    "lo": 0.1586766541004181,
+    "hi": 0.1586766541004181,
+>>>>>>> 21d3ccf (Uploading training results.):runs/search-grid/seed0/eval_ci.json
+    "stderr": 0.0,
+    "n": 500
+  },
+  "mix.H": {
+<<<<<<< HEAD:runs/mixing-grid/seed0/eval_ci.json
+    "mean": 3.316514253616333,
+    "lo": 3.316514253616333,
+    "hi": 3.316514253616333,
+=======
+    "mean": 3.3165152072906494,
+    "lo": 3.3165152072906494,
+    "hi": 3.3165152072906494,
+>>>>>>> 21d3ccf (Uploading training results.):runs/search-grid/seed0/eval_ci.json
+    "stderr": 0.0,
+    "n": 500
+  },
+  "mix.kl_pu": {
+<<<<<<< HEAD:runs/mixing-grid/seed0/eval_ci.json
+    "mean": 0.8423819541931152,
+    "lo": 0.8423819541931152,
+    "hi": 0.8423819541931152,
+    "stderr": 0.0,
+    "n": 500
+=======
+    "mean": 0.8423812985420227,
+    "lo": 0.8423812985420227,
+    "hi": 0.8423812985420227,
+    "stderr": 0.0,
+    "n": 500
+  },
+  "target.success": {
+    "mean": 0.01611330319009721,
+    "lo": 0.01453708360157907,
+    "hi": 0.01785360260326415,
+    "stderr": 0.0008670866755058926,
+    "n": 500
+  },
+  "target.maxp": {
+    "mean": 0.08478491008281708,
+    "lo": 0.08478491008281708,
+    "hi": 0.08478491008281708,
+    "stderr": 0.0,
+    "n": 500
+  },
+  "target.gini": {
+    "mean": 0.6517106890678406,
+    "lo": 0.6517106890678406,
+    "hi": 0.6517106890678406,
+    "stderr": 0.0,
+    "n": 500
+  },
+  "target.tv_vsU": {
+    "mean": 0.5326703190803528,
+    "lo": 0.5326703190803528,
+    "hi": 0.5326703190803528,
+    "stderr": 0.0,
+    "n": 500
+  },
+  "target.js_vsU": {
+    "mean": 0.24169301986694336,
+    "lo": 0.24169301986694336,
+    "hi": 0.24169301986694336,
+    "stderr": 0.0,
+    "n": 500
+  },
+  "target.H": {
+    "mean": 3.3165152072906494,
+    "lo": 3.3165152072906494,
+    "hi": 3.3165152072906494,
+    "stderr": 0.0,
+    "n": 500
+  },
+  "target.KLpU": {
+    "mean": 0.8423812985420227,
+    "lo": 0.8423812985420227,
+    "hi": 0.8423812985420227,
+    "stderr": 0.0,
+    "n": 500
+  },
+  "target.cvar_neglogOmega": {
+    "mean": 10.951270232200622,
+    "lo": 10.274491296064854,
+    "hi": 11.575179962658883,
+    "stderr": 0.3292904346040416,
+    "n": 500
+>>>>>>> 21d3ccf (Uploading training results.):runs/search-grid/seed0/eval_ci.json
+  }
+}

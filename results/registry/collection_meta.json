@@ -1,0 +1,42 @@
+{
+  "argv": [
+    "scripts/collect_results.py",
+    "--root",
+    "eval",
+    "--outdir",
+    "results/registry",
+    "--with-ci-cols",
+    "--strict"
+  ],
+  "counts": {
+    "candidates": 59,
+    "errors": 0,
+    "loaded_runs": 59,
+    "metrics": 8
+  },
+  "cwd": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk",
+  "generated_at": "2026-01-15T22:32:09Z",
+  "git": {
+    "branch": "main",
+    "describe": "428e1fc-dirty",
+    "dirty": true,
+    "head": "428e1fc4e060587e57b13e7a9cb4b4c0d322683a"
+  },
+  "metric_columns": {
+    "mix.H": "mix_H",
+    "mix.hell": "mix_hell",
+    "mix.js": "mix_js",
+    "mix.kl_pu": "mix_kl_pu",
+    "mix.l2": "mix_l2",
+    "mix.tv": "mix_tv",
+    "target.success": "target_success",
+    "target.tv_vsU": "target_tv_vsU"
+  },
+  "paths": {
+    "results_csv": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/results/registry/results.csv",
+    "results_json": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/results/registry/results.json",
+    "results_long_csv": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/results/registry/results_long.csv",
+    "runs_csv": "/mnt/c/Users/Angel/Desktop/CS598/acpl-qwalk/results/registry/runs.csv"
+  },
+  "schema": "acpl.collect_results.v1"
+}

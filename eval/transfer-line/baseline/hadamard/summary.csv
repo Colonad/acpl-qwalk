@@ -1,0 +1,2 @@
+cond,metric.mix.tv,metric.mix.js,metric.mix.hell,metric.mix.l2,metric.mix.H,metric.mix.kl_pu,metric.target.success,metric.target.maxp,metric.target.gini,metric.target.tv_vsU,metric.target.js_vsU,metric.target.H,metric.target.KLpU,metric.target.cvar_neglogOmega
+baseline_hadamard,0.7982268333435059,0.4465341866016388,0.7542856335639954,0.49026957154273987,1.895134687423706,2.263762950897217,3.181720837318325e-13,0.4470682442188263,0.9159197211265564,0.7982268333435059,0.4465341866016388,1.895134687423706,2.263762950897217,18.42068099975586

@@ -1,0 +1,15 @@
+EVAL STATS (first-class artifacts)
+
+UTC: 2026-01-10T18:19:11Z
+Python: 3.11.9 (main, Apr 19 2024, 16:48:06) [GCC 11.2.0]
+Torch: 2.4.1+cu121 CUDA_avail=False
+
+[baseline_hadamard]
+  Metrics:
+    - mix.tv: 0.984375
+    - mix.js: 0.6527416706085205
+    - mix.hell: 0.9354143738746643
+    - mix.l2: 0.9921567440032959
+    - mix.H: 0.00010154399933526292
+    - mix.kl_pu: 4.158807754516602
+

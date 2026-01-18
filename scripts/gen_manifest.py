@@ -34,7 +34,7 @@ Supported input schemas:
           per_horizon: { enabled: true, horizons: [64, 96, 128] }
           episode_seed_base: 900000
 
-(B) Legacy "pre-registration" YAMLs (compat mode), like the one you pasted:
+(B) Legacy "pre-registration" YAMLs (compat mode):
     goal: transfer
     train: {...}
     data:
