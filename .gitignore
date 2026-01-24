@@ -42,3 +42,11 @@ Thumbs.db
 
 # misc
 .env
+
+
+!*.sh
+!*.yml
+!*.yaml
+!mypy.ini
+!pytest.ini
+!pyproject.toml

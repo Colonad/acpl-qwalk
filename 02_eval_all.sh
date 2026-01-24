@@ -190,7 +190,7 @@ done
 echo "==== BASELINE exp=${EXP}"
 run_eval_baseline "${CFG}" "${EVAL_ROOT}/${EXP}/baseline/${BASELINE_KIND}" "${EXP}" "robust_baseline_${BASELINE_KIND}"
 
-# Robustness sweep (thesis-critical)
+# Robustness sweep 
 for SEED in ${TRAIN_SEEDS_STR}; do
   echo "==== ROBUST-SWEEP exp=${EXP} train_seed=${SEED}"
   python scripts/eval.py \

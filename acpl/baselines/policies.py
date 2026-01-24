@@ -104,7 +104,7 @@ class NodeEmbeddingConfig:
     Controls what BaselinePolicy.encode_nodes returns.
 
     Why this exists:
-      - Your eval harness extracts embeddings for plots/stats.
+      - eval harness extracts embeddings for plots/stats.
       - Baselines often don’t have an internal GNN module to hook.
       - So we provide a deterministic, explicit encode_nodes implementation.
 

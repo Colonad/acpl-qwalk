@@ -650,7 +650,7 @@ def _maybe_squeeze_leading(x):
 
 
 # -------------------------------
-# Minimal dataset wrapper (single episode)
+# Dataset wrapper (single episode)
 # -------------------------------
 
 
@@ -965,7 +965,7 @@ def graph_from_config(data_cfg: dict, *, device, dtype) -> GraphData:
 
 
 # -------------------------------
-# Port-Fourier → Hermitian adaptor (Phase B)
+# Port-Fourier → Hermitian adaptor =
 # -------------------------------
 
 
