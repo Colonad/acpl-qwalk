@@ -1,0 +1,15 @@
+cond,metric,mean,lo,hi,stderr,n
+baseline_hadamard,mix.tv,0.622492,0.620659,0.624468,0.001003,2560
+baseline_hadamard,target.tv_vsU,0.622492,0.620642,0.624411,0.000991,2560
+baseline_hadamard,target.success,0.016127,0.014985,0.017182,0.000563,2560
+baseline_hadamard,mix.H,2.940140,2.929273,2.950305,0.005502,2560
+baseline_hadamard,mix.hell,0.625436,0.624073,0.626801,0.000696,2560
+baseline_hadamard,mix.js,0.305173,0.303625,0.306642,0.000774,2560
+baseline_hadamard,mix.kl_pu,1.218757,1.208414,1.229196,0.005255,2560
+baseline_hadamard,mix.l2,0.240310,0.237856,0.242909,0.001320,2560
+baseline_hadamard,target.H,2.940140,2.930226,2.950662,0.005384,2560
+baseline_hadamard,target.KLpU,1.218757,1.208948,1.229305,0.005479,2560
+baseline_hadamard,target.cvar_neglogOmega,11.172311,10.883863,11.438640,0.143944,2560
+baseline_hadamard,target.gini,0.762769,0.760863,0.764577,0.000925,2560
+baseline_hadamard,target.js_vsU,0.305173,0.303599,0.306717,0.000768,2560
+baseline_hadamard,target.maxp,0.168712,0.165757,0.171797,0.001567,2560
