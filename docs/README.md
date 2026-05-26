@@ -1,2 +1,2 @@
 # acpl-qwalk
-Graduate Project 2025
+Thesis Project 2025
